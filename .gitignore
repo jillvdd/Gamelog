@@ -7,6 +7,9 @@ xcuserdata/
 *.xcuserstate
 build/
 
-# 私人交接文档（仅本地 vibe 使用，不上传 GitHub）
+# 交接文档
 HANDOVER.md
 HANDOVER_PROMPT.md
+
+# 发布产物
+dist/
