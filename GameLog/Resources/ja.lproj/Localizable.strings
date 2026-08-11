@@ -6,6 +6,7 @@
 "library.sortByName" = "名前順";
 "library.sortByRelease" = "発売日順";
 "library.sortByCompletion" = "クリア日順";
+"library.sort" = "並び替え";
 "library.gridView" = "グリッド表示";
 "library.listView" = "リスト表示";
 "library.addGame" = "ゲームを追加";
@@ -51,6 +52,7 @@
 "common.edit" = "編集";
 "common.delete" = "削除";
 "common.custom" = "カスタム…";
+"common.done" = "完了";
 "common.confirmDelete" = "削除";
 "common.back" = "戻る";
 "delete.confirmGame" = "「%@」を削除しますか？このゲームの全クリア記録も削除されます。";

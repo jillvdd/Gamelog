@@ -6,6 +6,7 @@
 "library.sortByName" = "Name";
 "library.sortByRelease" = "Release date";
 "library.sortByCompletion" = "Completion date";
+"library.sort" = "Sort";
 "library.gridView" = "Grid view";
 "library.listView" = "List view";
 "library.addGame" = "Add Game";
@@ -51,6 +52,7 @@
 "common.edit" = "Edit";
 "common.delete" = "Delete";
 "common.custom" = "Custom…";
+"common.done" = "Done";
 "common.confirmDelete" = "Delete";
 "common.back" = "Back";
 "delete.confirmGame" = "Delete “%@”? All of its completions will be deleted too.";

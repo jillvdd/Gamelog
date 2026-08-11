@@ -6,6 +6,7 @@
 "library.sortByName" = "按名字";
 "library.sortByRelease" = "按发售日期";
 "library.sortByCompletion" = "按通关日期";
+"library.sort" = "排序";
 "library.gridView" = "网格视图";
 "library.listView" = "列表视图";
 "library.addGame" = "新建游戏";
@@ -51,6 +52,7 @@
 "common.edit" = "编辑";
 "common.delete" = "删除";
 "common.custom" = "自定义…";
+"common.done" = "完成";
 "common.confirmDelete" = "删除";
 "common.back" = "返回";
 "delete.confirmGame" = "确定删除「%@」？该游戏的所有通关记录也会被删除。";
