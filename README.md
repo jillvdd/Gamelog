@@ -6,13 +6,14 @@
 
 ## 功能
 
-- **游戏库**：网格 / 列表视图切换；按名称 + 别名搜索；按平台筛选；自定义分组（可重命名 / 删除，同一游戏可进多个分组）；按名字 / 发售日期 / 通关日期排序。库显示分 = 该游戏所有已评分通关记录平均分的均值，四舍五入到 0.5；未评分显示"未评分"。
-- **游戏详情**：评价（一句话标题 + 正文）、所有通关记录、可编辑 / 追加 / 删除。
+- **游戏库**：网格 / 列表视图切换；按名称 + 别名搜索；按平台筛选；左侧分组侧边栏，分组可新建 / 重命名 / 删除，同一游戏可进多个分组；按名字 / 发售日期 / 通关日期排序。库显示分 = 该游戏所有已评分通关记录平均分的均值，四舍五入到 0.5；未评分显示"未评分"。
+- **游戏详情**：评价（一句话标题 + 正文）、所有通关记录、可编辑 / 追加 / 删除；窗口拉宽时评价与通关记录自动并排双栏。
 - **四维评分**：剧情 / 画面 / 音乐 / 玩法，1–10、0.1 步进滑块。首条通关记录评分必填，之后的记录可勾选"本次跳过评分"。
 - **通关记录**：平台、通关日期、通关程度（主线通关 / 全支线 / 全结局 / 全收集白金 / 多周目 / 速通 / 自定义）、时长、通关内容备注。
-- **封面**：本机选图，或通过 [SteamGridDB](https://www.steamgriddb.com) API 按名字搜索并下载（需在设置里填 API Key）。
+- **日期选择**：发售日期与通关日期用三列滚轮（年 / 月 / 日）选择，自动处理闰年 2 月 29 日与月末钳位。
+- **封面**：本机选图，或通过 [SteamGridDB](https://www.steamgriddb.com) API 搜索并下载（需在设置里填 API Key）。搜索为即输即搜的补全式（服务端最多返回 10 条），面板可随时关闭，不必选择封面。
 - **分享图**：单选一张游戏 → 单卡（竖版 1080×1920 或横版 1920×1080）；多选 → 一张总览图（标题可自定义，随游戏数量自动换行）。配色跟随系统深浅色，可保存 PNG 或调起系统分享。
-- **统计**：通关总数、库平均分、按平台分布。
+- **统计**：通关总数、库平均分、按平台分布（窗口拉宽时自动排两列）。
 - **备份**：整个库导出为单个 JSON（封面以 base64 内嵌），可整体导入替换，带确认弹窗。
 
 ## 环境要求
@@ -47,7 +48,7 @@ GameLog/
 ├── Models/                  # SwiftData 模型（Game / Completion / GameGroup / Presets）
 ├── Support/                 # 评分逻辑、备份、语言环境、L10n、SteamGridDB 客户端
 ├── Share/                   # 分享卡视图 + ImageRenderer 出图管线
-├── Views/                   # 库 / 详情 / 编辑 / 统计 / 设置 / 分享面板 / 封面搜索
+├── Views/                   # 侧边栏 / 库 / 详情 / 编辑 / 统计 / 设置 / 分享面板 / 封面搜索 / 日期滚轮
 └── Resources/               # 三语 Localizable.strings（zh-Hans / ja / en）
 Scripts/                     # 独立回归测试（不编进 app，见下）
 ```
@@ -60,7 +61,19 @@ Scripts/                     # 独立回归测试（不编进 app，见下）
 - `Scripts/DataSmokeTest/` — 数据层冒烟：多对多关系、级联删除、评分集成、备份往返、导入幂等与替换、日期保真、预设本地化
 - `Scripts/ShareRenderTest/` — 分享卡渲染管线：真实调用 ImageRenderer 出 PNG 校验像素尺寸
 
-新增 UI 文案时，key 必须同时进三个 `Localizable.strings`，并统一用 `L10n.tr` / `LText`（勿用 `String(localized:)`）。
+新增 UI 文案时，key 必须同时进三个 `Localizable.strings`，并统一用 `L10n.tr` / `LText`（勿用 `String(localized:)`）。改完跑一次 key 覆盖检查，三语必须 0 缺失：
+
+```bash
+perl -0777 -ne 'while(/(?:L10n\.tr|LText)\(\s*(?:key:\s*)?"([A-Za-z0-9._]+)"/g){print "$1\n"}' GameLog/**/*.swift | sort -u > /tmp/code_keys.txt
+python3 -c "
+import re
+code = set(open('/tmp/code_keys.txt').read().split())
+for lang in ['zh-Hans','ja','en']:
+    keys = set(re.findall(r'\"([A-Za-z0-9._]+)\"\s*=', open(f'GameLog/Resources/{lang}.lproj/Localizable.strings').read()))
+    missing = code - keys
+    print(lang, '缺', len(missing), sorted(missing) if missing else '无')
+"
+```
 
 ## 术语约定
 
