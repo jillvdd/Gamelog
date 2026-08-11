@@ -8,98 +8,113 @@ struct PresetOrCustomPicker: View {
     let title: String
     let presets: [String]
     let category: PresetCategory
-    /// 平台类长列表默认收起：只显示前几个快捷项 + 一个「展开全部」入口。通关程度等短列表传 false。
+    /// 平台类长列表：菜单顶部只放前几个快捷项，其余项收进「所有平台…」子菜单。通关程度等短列表传 false。
     var collapsible = false
     @Binding var value: String
     @Environment(\.appLanguageCode) private var language
 
-    private static let customTag = "§custom"
     /// 收起时直接展示的快捷项条数。
     private static let quickCount = 5
 
-    @State private var selection = PresetOrCustomPicker.customTag
+    @State private var isCustom = false
     @State private var customText = ""
-    @State private var showAll = false
 
     private var quickPresets: [String] { Array(presets.prefix(Self.quickCount)) }
 
-    /// 收起时若当前选中项不在快捷区，补一项保证选中可见（编辑旧记录时下拉仍能高亮当前平台）。
+    /// 收起时若当前选中项不在快捷区，补一项保证选中可见（编辑旧记录时菜单里仍能高亮当前平台）。
     private var extraSelection: String? {
-        guard collapsible, !showAll,
-              selection != Self.customTag,
-              !quickPresets.contains(selection) else { return nil }
-        return selection
+        guard collapsible, !isCustom,
+              !quickPresets.contains(value) else { return nil }
+        return value
     }
 
-    private var isCustom: Bool { !presets.contains(value) }
+    /// 放入「所有平台…」子菜单的其余项（排除快捷项与补出的当前项，避免重复）。
+    private var remainingPresets: [String] {
+        presets.filter { !quickPresets.contains($0) && $0 != extraSelection }
+    }
 
     var body: some View {
         Group {
-            if selection == Self.customTag {
-                VStack(alignment: .leading, spacing: 4) {
-                    TextField(title, text: $customText)
-                        .textFieldStyle(.roundedBorder)
-                        .onChange(of: customText) { _, newValue in
-                            value = newValue
-                        }
-                    Button {
-                        value = presets.first ?? ""
-                        selection = presets.first ?? ""
-                    } label: {
-                        Text(verbatim: L10n.tr("common.back", lang: language))
+            if isCustom {
+            VStack(alignment: .leading, spacing: 4) {
+                TextField(title, text: $customText)
+                    .textFieldStyle(.roundedBorder)
+                    .onChange(of: customText) { _, newValue in
+                        value = newValue
                     }
-                    .buttonStyle(.link)
+                Button {
+                    value = presets.first ?? ""
+                    isCustom = false
+                } label: {
+                    Text(verbatim: L10n.tr("common.back", lang: language))
                 }
-            } else {
-                VStack(alignment: .leading, spacing: 4) {
-                    Picker(title, selection: $selection) {
-                        if collapsible && !showAll {
-                            ForEach(quickPresets, id: \.self) { p in
-                                Text(verbatim: Presets.display(p, category: category, language: language)).tag(p)
-                            }
-                            if let extra = extraSelection {
-                                Text(verbatim: Presets.display(extra, category: category, language: language)).tag(extra)
-                            }
-                        } else {
-                            ForEach(presets, id: \.self) { p in
-                                Text(verbatim: Presets.display(p, category: category, language: language)).tag(p)
-                            }
-                        }
-                        Text(verbatim: L10n.tr("common.custom", lang: language)).tag(Self.customTag)
-                    }
-                    .onChange(of: selection) { _, newValue in
-                        if newValue != Self.customTag {
-                            value = newValue
-                        } else {
-                            value = ""
-                            customText = ""
-                        }
-                    }
-                    if collapsible {
-                        Button {
-                            showAll.toggle()
-                        } label: {
-                            Text(verbatim: L10n.tr(showAll ? "preset.collapse" : "preset.showAll", lang: language))
-                        }
-                        .buttonStyle(.link)
-                        .controlSize(.small)
-                    }
-                }
+                .buttonStyle(.link)
             }
+        } else {
+            LabeledContent(title) {
+                Menu {
+                    if collapsible {
+                        ForEach(quickPresets, id: \.self) { p in
+                            option(p)
+                        }
+                        if let extra = extraSelection {
+                            option(extra)
+                        }
+                        Menu {
+                            ForEach(remainingPresets, id: \.self) { p in
+                                option(p)
+                            }
+                        } label: {
+                            Text(verbatim: L10n.tr("preset.allPlatforms", lang: language))
+                        }
+                    } else {
+                        ForEach(presets, id: \.self) { p in
+                            option(p)
+                        }
+                    }
+                    Divider()
+                    Button {
+                        isCustom = true
+                        customText = ""
+                        value = ""
+                    } label: {
+                        Text(verbatim: L10n.tr("common.custom", lang: language))
+                    }
+                } label: {
+                    Text(verbatim: Presets.display(value, category: category, language: language))
+                }
+                .menuStyle(.borderlessButton)
+            }
+        }
         }
         .onAppear { sync(to: value) }
         .onChange(of: value) { _, newValue in sync(to: newValue) }
     }
 
-    /// 把外部绑定值同步到内部 selection / customText。
+    /// 单个平台选项，当前选中的带对勾。
+    private func option(_ p: String) -> some View {
+        Button {
+            value = p
+        } label: {
+            Group {
+                if value == p {
+                    Label(Presets.display(p, category: category, language: language), systemImage: "checkmark")
+                } else {
+                    Text(verbatim: Presets.display(p, category: category, language: language))
+                }
+            }
+        }
+    }
+
+    /// 把外部绑定值同步到内部自定义态。
     /// 子视图的 onAppear 先于父视图 load() 执行，因此仅靠 onAppear 同步不够，
     /// 编辑时父视图稍后写入 value，必须再监听 value 变化补一次同步。
     private func sync(to newValue: String) {
         if presets.contains(newValue) {
-            selection = newValue
+            isCustom = false
         } else {
-            selection = Self.customTag
-            if newValue != Self.customTag {
+            isCustom = true
+            if !newValue.isEmpty {
                 customText = newValue
             }
         }

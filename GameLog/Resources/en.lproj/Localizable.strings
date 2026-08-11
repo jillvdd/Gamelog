@@ -100,8 +100,7 @@
 "group.rename" = "Rename Group";
 "group.deleteTitle" = "Delete Group";
 "group.deleteConfirm" = "Delete group “%@”? Games in it will not be deleted.";
-"preset.showAll" = "Show All Platforms…";
-"preset.collapse" = "Collapse Platform List";
+"preset.allPlatforms" = "All Platforms…";
 "completion.playtimeFormat" = "%.1f h";
 "cover.searchFailed" = "Couldn't fetch covers. Check your network or API key.";
 "cover.noGrids" = "No covers found for this game";

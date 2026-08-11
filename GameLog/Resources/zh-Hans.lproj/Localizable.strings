@@ -99,8 +99,7 @@
 "group.rename" = "重命名分组";
 "group.deleteTitle" = "删除分组";
 "group.deleteConfirm" = "确定删除分组「%@」？分组中的游戏不会被删除。";
-"preset.showAll" = "展开全部平台…";
-"preset.collapse" = "收起平台列表";
+"preset.allPlatforms" = "所有平台…";
 "completion.playtimeFormat" = "%.1f 小时";
 "cover.searchFailed" = "封面获取失败，请检查网络或 API Key";
 "cover.noGrids" = "未找到该游戏的封面";
