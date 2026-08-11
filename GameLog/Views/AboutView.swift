@@ -31,7 +31,7 @@ struct AboutView: View {
             .padding(.vertical, 4)
 
             LabeledContent(L10n.tr("about.developer", lang: language)) {
-                Text(verbatim: "jillvdd")
+                Text(verbatim: "jill")
             }
             LabeledContent("GitHub") {
                 Text(verbatim: "jillvdd")
