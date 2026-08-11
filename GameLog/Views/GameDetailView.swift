@@ -14,10 +14,10 @@ struct CompletionCardView: View {
                 Text(verbatim: completion.date.formatted(date: .abbreviated, time: .omitted))
                     .font(.system(size: 12, weight: .semibold))
                 if !completion.platform.isEmpty {
-                    chip(Presets.display(completion.platform, category: .platform, language: language), icon: "desktopcomputer")
+                    chip(Presets.display(completion.platform, category: .platform, language: language))
                 }
                 if !completion.degree.isEmpty {
-                    chip(Presets.display(completion.degree, category: .degree, language: language), icon: "flag.checkered")
+                    chip(Presets.display(completion.degree, category: .degree, language: language))
                 }
                 if let playtime = completion.playtime {
                     Text(verbatim: L10n.tr("completion.playtimeFormat", [playtime], lang: language))
@@ -72,12 +72,15 @@ struct CompletionCardView: View {
             RoundedRectangle(cornerRadius: 10)
                 .fill(Color(nsColor: .controlBackgroundColor))
         )
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color(nsColor: .separatorColor))
+        )
     }
 
-    private func chip(_ text: String, icon: String) -> some View {
-        Label(text, systemImage: icon)
+    private func chip(_ text: String) -> some View {
+        Text(text)
             .font(.caption)
-            .labelStyle(.titleAndIcon)
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
             .background(Capsule().fill(Color.accentColor.opacity(0.12)))
@@ -102,16 +105,31 @@ struct GameDetailView: View {
         game.platformList
     }
 
+    /// 是否有评价内容（标题或正文）。
+    private var hasReview: Bool {
+        !game.reviewTitle.isEmpty || !game.reviewBody.isEmpty
+    }
+
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 28) {
-                header
-                reviewSection
-                completionsSection
+        GeometryReader { geo in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 28) {
+                    header
+                    if geo.size.width >= 1000 {
+                        if hasReview {
+                            wideContent(contentWidth: min(1500, geo.size.width) - 56)
+                        } else {
+                            completionsSection
+                        }
+                    } else {
+                        reviewSection
+                        completionsSection
+                    }
+                }
+                .padding(28)
+                .frame(maxWidth: 1500)
+                .frame(maxWidth: .infinity, alignment: .top)
             }
-            .padding(28)
-            .frame(maxWidth: 780, alignment: .leading)
-            .frame(maxWidth: .infinity, alignment: .top)
         }
         .navigationTitle(game.name)
         .toolbar {
@@ -248,6 +266,22 @@ struct GameDetailView: View {
 
     // MARK: - 评价
 
+    /// 评价正文卡片（不含标题，标题由调用方按布局需要放置）。
+    @ViewBuilder
+    private var reviewBodySection: some View {
+        if !game.reviewBody.isEmpty {
+            Text(verbatim: game.reviewBody)
+                .font(.body)
+                .foregroundStyle(.secondary)
+                .textSelection(.enabled)
+                .lineSpacing(4)
+                .padding(16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(RoundedRectangle(cornerRadius: 10).fill(Color(nsColor: .controlBackgroundColor)))
+        }
+    }
+
+    /// 评价区（单栏模式）：标题 + 正文卡片。
     @ViewBuilder
     private var reviewSection: some View {
         if !game.reviewTitle.isEmpty || !game.reviewBody.isEmpty {
@@ -256,21 +290,27 @@ struct GameDetailView: View {
                     Text(verbatim: game.reviewTitle)
                         .font(.title3.bold())
                 }
-                if !game.reviewBody.isEmpty {
-                    Text(verbatim: game.reviewBody)
-                        .font(.body)
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-                        .lineSpacing(4)
-                }
+                reviewBodySection
             }
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 10).fill(Color(nsColor: .controlBackgroundColor)))
         }
     }
 
     // MARK: - 通关记录
+
+    /// 宽窗口双列：评价标题与正文占约 58% 宽度，通关记录占剩余。
+    /// 评价标题与「通关记录」标题同为 title3 粗体，两列顶部天然对齐。
+    private func wideContent(contentWidth: CGFloat) -> some View {
+        HStack(alignment: .top, spacing: 24) {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(verbatim: game.reviewTitle)
+                    .font(.title3.bold())
+                reviewBodySection
+            }
+            .frame(width: max(340, contentWidth * 0.58), alignment: .leading)
+            completionsSection
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
 
     private var completionsSection: some View {
         VStack(alignment: .leading, spacing: 12) {

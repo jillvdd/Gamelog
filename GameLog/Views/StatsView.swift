@@ -30,69 +30,84 @@ struct StatsView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                if games.isEmpty {
-                    ContentUnavailableView {
-                        Image(systemName: "chart.bar")
-                            .font(.system(size: 48))
-                    } description: {
-                        LText("stats.noData")
-                    }
-                } else {
-                    HStack(spacing: 16) {
-                        statTile(
-                            value: "\(totalGames)",
-                            label: L10n.tr("stats.totalGames", lang: language),
-                            icon: "gamecontroller"
-                        )
-                        statTile(
-                            value: avgScore.map { String(format: "%.1f", $0) } ?? "—",
-                            label: L10n.tr("stats.avgScore", lang: language),
-                            icon: "star"
-                        )
-                    }
+        GeometryReader { geo in
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    if games.isEmpty {
+                        ContentUnavailableView {
+                            Image(systemName: "chart.bar")
+                                .font(.system(size: 48))
+                        } description: {
+                            LText("stats.noData")
+                        }
+                    } else {
+                        HStack(spacing: 16) {
+                            statTile(
+                                value: "\(totalGames)",
+                                label: L10n.tr("stats.totalGames", lang: language),
+                                icon: "gamecontroller"
+                            )
+                            statTile(
+                                value: avgScore.map { String(format: "%.1f", $0) } ?? "—",
+                                label: L10n.tr("stats.avgScore", lang: language),
+                                icon: "star"
+                            )
+                        }
 
-                    if !platformCounts.isEmpty {
-                        VStack(alignment: .leading, spacing: 12) {
-                            LText("stats.byPlatform")
-                                .font(.title3.bold())
-                            VStack(spacing: 8) {
-                                ForEach(platformCounts, id: \.platform) { item in
-                                    HStack(spacing: 12) {
-                                        Text(verbatim: Presets.display(item.platform, category: .platform, language: language))
-                                            .frame(width: 160, alignment: .leading)
-                                            .lineLimit(1)
-                                        GeometryReader { proxy in
-                                            ZStack(alignment: .leading) {
-                                                Capsule()
-                                                    .fill(Color.accentColor.opacity(0.15))
-                                                Capsule()
-                                                    .fill(Color.accentColor)
-                                                    .frame(width: proxy.size.width * CGFloat(item.count) / CGFloat(maxPlatformCount))
-                                            }
-                                        }
-                                        .frame(height: 10)
-                                        Text(verbatim: "\(item.count)")
-                                            .monospacedDigit()
-                                            .frame(width: 32, alignment: .trailing)
+                        if !platformCounts.isEmpty {
+                            VStack(alignment: .leading, spacing: 12) {
+                                LText("stats.byPlatform")
+                                    .font(.title3.bold())
+                                LazyVGrid(columns: platformColumns(for: geo.size.width), spacing: 8) {
+                                    ForEach(platformCounts, id: \.platform) { item in
+                                        platformBar(item)
                                     }
                                 }
+                                .padding(14)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .fill(Color(nsColor: .controlBackgroundColor))
+                                )
                             }
-                            .padding(14)
-                            .background(
-                                RoundedRectangle(cornerRadius: 10)
-                                    .fill(Color(nsColor: .controlBackgroundColor))
-                            )
                         }
                     }
                 }
+                .padding(28)
+                .frame(maxWidth: 1500)
+                .frame(maxWidth: .infinity, alignment: .top)
             }
-            .padding(28)
-            .frame(maxWidth: 720, alignment: .leading)
-            .frame(maxWidth: .infinity, alignment: .top)
         }
         .navigationTitle(L10n.tr("library.stats", lang: language))
+    }
+
+    /// 平台分布列数：宽窗口两列，窄窗口单列。
+    private func platformColumns(for width: CGFloat) -> [GridItem] {
+        if width >= 900 {
+            return [GridItem(.flexible(), spacing: 24), GridItem(.flexible(), spacing: 24)]
+        }
+        return [GridItem(.flexible(), spacing: 8)]
+    }
+
+    /// 单行平台条形。
+    private func platformBar(_ item: (platform: String, count: Int)) -> some View {
+        HStack(spacing: 12) {
+            Text(verbatim: Presets.display(item.platform, category: .platform, language: language))
+                .frame(width: 160, alignment: .leading)
+                .lineLimit(1)
+            GeometryReader { proxy in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(Color.accentColor.opacity(0.15))
+                    Capsule()
+                        .fill(Color.accentColor)
+                        .frame(width: proxy.size.width * CGFloat(item.count) / CGFloat(maxPlatformCount))
+                }
+            }
+            .frame(height: 10)
+            Text(verbatim: "\(item.count)")
+                .monospacedDigit()
+                .frame(width: 32, alignment: .trailing)
+        }
     }
 
     private func statTile(value: String, label: String, icon: String) -> some View {
