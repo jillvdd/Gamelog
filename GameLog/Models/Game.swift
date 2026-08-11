@@ -61,6 +61,22 @@ extension Game {
         completions.map(\.date).max()
     }
 
+    /// 该游戏出现过的所有平台，去重；按平台预设的世代倒序排列，预设外的自定义值按字典序排在最后。
+    var platformList: [String] {
+        let order = Dictionary(
+            uniqueKeysWithValues: Presets.platforms.enumerated().map { ($0.element, $0.offset) }
+        )
+        let unique = Set(completions.map(\.platform).filter { !$0.isEmpty })
+        return unique.sorted { a, b in
+            switch (order[a], order[b]) {
+            case (nil, nil): return a < b
+            case (nil, _): return false
+            case (_, nil): return true
+            case (let ia?, let ib?): return ia < ib
+            }
+        }
+    }
+
     /// 库显示分：已评分记录平均分的均值，取整到 0.5。无已评分记录则 nil。
     var libraryScore: Double? {
         let averages = completions

@@ -100,6 +100,8 @@
 "group.rename" = "グループ名を変更";
 "group.deleteTitle" = "グループを削除";
 "group.deleteConfirm" = "「%@」を削除しますか？グループ内のゲームは削除されません。";
+"preset.showAll" = "すべてのプラットフォーム…";
+"preset.collapse" = "プラットフォーム一覧を折りたたむ";
 "completion.playtimeFormat" = "%.1f 時間";
 "cover.searchFailed" = "カバーを取得できませんでした。ネットワークか API Key を確認してください";
 "cover.noGrids" = "このゲームのカバーは見つかりませんでした";

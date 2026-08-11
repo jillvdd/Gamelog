@@ -37,6 +37,7 @@ struct CompletionEditView: View {
                     title: L10n.tr("completion.platform", lang: language),
                     presets: Presets.platforms,
                     category: .platform,
+                    collapsible: true,
                     value: $platform
                 )
                 DatePicker(L10n.tr("completion.date", lang: language), selection: $date, displayedComponents: [.date])

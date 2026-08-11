@@ -34,11 +34,21 @@ struct GameCardView: View {
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
-    private var subtitle: String {
+    private var platformText: String {
+        let list = game.platformList
+        guard !list.isEmpty else { return "" }
+        let shown = list.prefix(2).map { Presets.display($0, category: .platform, language: language) }
+            .joined(separator: " · ")
+        if list.count > 2 {
+            return "\(shown) · +\(list.count - 2)"
+        }
+        return shown
+    }
+
+    /// 最近一次通关日期，单独一行。
+    private var dateText: String {
         guard let latest = game.sortedCompletions.last else { return "" }
-        let platform = Presets.display(latest.platform, category: .platform, language: language)
-        let date = latest.date.formatted(date: .abbreviated, time: .omitted)
-        return platform.isEmpty ? date : "\(platform) · \(date)"
+        return latest.date.formatted(date: .abbreviated, time: .omitted)
     }
 
     var body: some View {
@@ -59,11 +69,16 @@ struct GameCardView: View {
                 .font(.system(size: 12, weight: .medium))
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)
-            if !subtitle.isEmpty {
-                Text(verbatim: subtitle)
+            if !platformText.isEmpty {
+                Text(verbatim: platformText)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+            }
+            if !dateText.isEmpty {
+                Text(verbatim: dateText)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -80,11 +95,9 @@ struct GameRowView: View {
     let game: Game
 
     private var subtitle: String {
-        let platforms = game.completions.map(\.platform).filter { !$0.isEmpty }
-        let unique = Array(Set(platforms)).sorted()
+        game.platformList
             .map { Presets.display($0, category: .platform, language: language) }
             .joined(separator: " · ")
-        return unique
     }
 
     var body: some View {

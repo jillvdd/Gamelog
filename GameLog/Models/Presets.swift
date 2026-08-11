@@ -10,9 +10,22 @@ enum PresetCategory {
 /// 存储始终使用 canonical 值（预设即中文词条，兼容历史数据）；展示层按当前语言翻译预设值，
 /// 自定义值原样返回。这样筛选/统计按 canonical 分组，切换语言不会产生混杂数据。
 enum Presets {
+    /// 主机预设，按游戏机世代倒序（Gen9 → FC/NES → 其他）。
+    /// 存储即 canonical，展示层按语言翻译；语言中性的条目（PC、Switch、FC/NES 等）三语原样显示。
     static let platforms = [
-        "PC", "Steam Deck", "Switch", "PS5", "PS4", "PS3",
-        "Xbox Series X|S", "Xbox One", "手机", "掌机", "其他"
+        "Xbox Series X|S", "Switch 2", "PS5",
+        "PC", "iOS",
+        "Xbox One", "Wii U", "Switch", "PS4",
+        "3DS", "PS Vita",
+        "Xbox 360", "Wii", "PS3",
+        "NDS", "PSP",
+        "Xbox", "GameCube", "PS2",
+        "GBA",
+        "N64", "PS1",
+        "Game Boy Color",
+        "SFC/SNES", "Game Boy",
+        "FC/NES",
+        "其他"
     ]
 
     static let degrees = [
@@ -25,7 +38,8 @@ enum Presets {
         let en: String
     }
 
-    /// 仅收录需要翻译的词条；语言中性的预设（PC、Switch 等）不在表里，直接原样显示。
+    /// 仅收录需要翻译的词条；语言中性的预设（PC、Switch、FC/NES 等）不在表里，直接原样显示。
+    /// 「手机」「掌机」已从预设选项移除，但保留词条用于翻译历史数据，且自动化测试断言依赖它们。
     private static let localized: [PresetCategory: [String: LocalizedPreset]] = [
         .platform: [
             "手机": .init(zh: "手机", ja: "スマホ", en: "Mobile"),

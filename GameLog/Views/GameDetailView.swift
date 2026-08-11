@@ -99,7 +99,7 @@ struct GameDetailView: View {
     @State private var showingShare = false
 
     private var platforms: [String] {
-        Array(Set(game.completions.map(\.platform).filter { !$0.isEmpty })).sorted()
+        game.platformList
     }
 
     var body: some View {

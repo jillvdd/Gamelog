@@ -8,12 +8,28 @@ struct PresetOrCustomPicker: View {
     let title: String
     let presets: [String]
     let category: PresetCategory
+    /// 平台类长列表默认收起：只显示前几个快捷项 + 一个「展开全部」入口。通关程度等短列表传 false。
+    var collapsible = false
     @Binding var value: String
     @Environment(\.appLanguageCode) private var language
 
     private static let customTag = "§custom"
+    /// 收起时直接展示的快捷项条数。
+    private static let quickCount = 5
+
     @State private var selection = PresetOrCustomPicker.customTag
     @State private var customText = ""
+    @State private var showAll = false
+
+    private var quickPresets: [String] { Array(presets.prefix(Self.quickCount)) }
+
+    /// 收起时若当前选中项不在快捷区，补一项保证选中可见（编辑旧记录时下拉仍能高亮当前平台）。
+    private var extraSelection: String? {
+        guard collapsible, !showAll,
+              selection != Self.customTag,
+              !quickPresets.contains(selection) else { return nil }
+        return selection
+    }
 
     private var isCustom: Bool { !presets.contains(value) }
 
@@ -35,18 +51,38 @@ struct PresetOrCustomPicker: View {
                     .buttonStyle(.link)
                 }
             } else {
-                Picker(title, selection: $selection) {
-                    ForEach(presets, id: \.self) { p in
-                        Text(verbatim: Presets.display(p, category: category, language: language)).tag(p)
+                VStack(alignment: .leading, spacing: 4) {
+                    Picker(title, selection: $selection) {
+                        if collapsible && !showAll {
+                            ForEach(quickPresets, id: \.self) { p in
+                                Text(verbatim: Presets.display(p, category: category, language: language)).tag(p)
+                            }
+                            if let extra = extraSelection {
+                                Text(verbatim: Presets.display(extra, category: category, language: language)).tag(extra)
+                            }
+                        } else {
+                            ForEach(presets, id: \.self) { p in
+                                Text(verbatim: Presets.display(p, category: category, language: language)).tag(p)
+                            }
+                        }
+                        Text(verbatim: L10n.tr("common.custom", lang: language)).tag(Self.customTag)
                     }
-                    Text(verbatim: L10n.tr("common.custom", lang: language)).tag(Self.customTag)
-                }
-                .onChange(of: selection) { _, newValue in
-                    if newValue != Self.customTag {
-                        value = newValue
-                    } else {
-                        value = ""
-                        customText = ""
+                    .onChange(of: selection) { _, newValue in
+                        if newValue != Self.customTag {
+                            value = newValue
+                        } else {
+                            value = ""
+                            customText = ""
+                        }
+                    }
+                    if collapsible {
+                        Button {
+                            showAll.toggle()
+                        } label: {
+                            Text(verbatim: L10n.tr(showAll ? "preset.collapse" : "preset.showAll", lang: language))
+                        }
+                        .buttonStyle(.link)
+                        .controlSize(.small)
                     }
                 }
             }
@@ -240,6 +276,7 @@ struct GameEditView: View {
                         title: L10n.tr("completion.platform", lang: language),
                         presets: Presets.platforms,
                         category: .platform,
+                        collapsible: true,
                         value: $platform
                     )
                     DatePicker(L10n.tr("completion.date", lang: language), selection: $completionDate, displayedComponents: [.date])
