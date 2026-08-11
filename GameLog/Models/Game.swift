@@ -85,6 +85,15 @@ extension Game {
         return ScoreMath.libraryScore(recordAverages: averages)
     }
 
+    /// 某维度在已评分记录上的均值（1–10），与 libraryScore 同一套已评分口径。无则 nil。
+    func dimensionAverage(for dimension: Dimension) -> Double? {
+        let values = completions
+            .filter(\.hasScores)
+            .compactMap { $0.score(for: dimension) }
+        guard !values.isEmpty else { return nil }
+        return values.reduce(0, +) / Double(values.count)
+    }
+
     /// 搜索文本：名称 + 全部别名，小写化。
     var searchableText: String {
         ([name] + aliases).map { $0.lowercased() }.joined(separator: " ")

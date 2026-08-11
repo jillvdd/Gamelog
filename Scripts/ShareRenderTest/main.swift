@@ -7,6 +7,7 @@
 //     GameLog/Models/Game.swift GameLog/Models/Completion.swift GameLog/Models/GameGroup.swift \
 //     GameLog/Models/Presets.swift \
 //     GameLog/Support/ScoreMath.swift GameLog/Support/AppLanguage.swift GameLog/Support/L10n.swift \
+//     GameLog/Support/UserCustomization.swift \
 //     GameLog/Share/ShareCardView.swift GameLog/Share/ShareCardRenderer.swift \
 //     -plugin-path /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib/swift/host/plugins
 //   /tmp/gamelog_sharetest

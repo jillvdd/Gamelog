@@ -90,6 +90,54 @@ struct ShareTheme {
     }
 }
 
+// MARK: - 品牌水印（用户名·游戏簿 + 圆形头像）
+
+/// 分享图左下角品牌水印：设了用户名显示「{用户名}的游戏簿」，未设回退 app.menu；
+/// 设了头像则右侧跟一个圆形头像（带主题色描边）。
+private struct BrandWatermark: View {
+    let theme: ShareTheme
+    let fontSize: CGFloat
+    @Environment(\.appLanguageCode) private var language
+    @AppStorage(UserCustomization.usernameKey) private var username = ""
+    @AppStorage(UserCustomization.avatarFileKey) private var avatarFile = ""
+
+    private var text: String {
+        let name = username.trimmingCharacters(in: .whitespaces)
+        if name.isEmpty { return L10n.tr("app.menu", lang: language) }
+        return L10n.tr("share.brandUser", [name], lang: language)
+    }
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(verbatim: text)
+                .font(.system(size: fontSize))
+                .foregroundStyle(theme.secondary)
+            if !avatarFile.isEmpty, let avatar = UserCustomization.avatarImage() {
+                Image(nsImage: avatar)
+                    .resizable()
+                    .frame(width: 48, height: 48)
+                    .clipShape(Circle())
+                    .overlay(Circle().stroke(theme.secondary, lineWidth: 2))
+            }
+        }
+    }
+}
+
+// MARK: - 分享图日期格式（跟随 app 语言，与系统区域无关）
+
+private enum ShareDateFormat {
+    static func string(from date: Date, language: String) -> String {
+        let fmt = DateFormatter()
+        fmt.locale = Locale(identifier: language)
+        if language == "zh-Hans" || language == "ja" {
+            fmt.dateFormat = "yyyy年 M月 d日"
+        } else {
+            fmt.dateFormat = "MMM d, yyyy"
+        }
+        return fmt.string(from: date)
+    }
+}
+
 // MARK: - 封面辅助视图
 
 private struct CoverFill: View {
@@ -190,6 +238,13 @@ private struct SingleCardVertical: View {
                         .padding(.top, 20)
                 }
 
+                if let latest = game.sortedCompletions.last {
+                    Text(verbatim: ShareDateFormat.string(from: latest.date, language: language))
+                        .font(.system(size: 30))
+                        .foregroundStyle(theme.secondary)
+                        .padding(.top, 12)
+                }
+
                 if !game.reviewTitle.isEmpty {
                     Text(verbatim: game.reviewTitle)
                         .font(.system(size: 38)).italic()
@@ -233,9 +288,7 @@ private struct SingleCardVertical: View {
                 }
                 .padding(.vertical, 44)
 
-                LText(key: "app.menu")
-                    .font(.system(size: 28))
-                    .foregroundStyle(theme.secondary)
+                BrandWatermark(theme: theme, fontSize: 28)
             }
             .padding(.horizontal, 72)
             .padding(.bottom, 56)
@@ -300,6 +353,13 @@ private struct SingleCardHorizontal: View {
                         .padding(.top, 18)
                 }
 
+                if let latest = game.sortedCompletions.last {
+                    Text(verbatim: ShareDateFormat.string(from: latest.date, language: language))
+                        .font(.system(size: 27))
+                        .foregroundStyle(theme.secondary)
+                        .padding(.top, 10)
+                }
+
                 if !game.reviewTitle.isEmpty {
                     Text(verbatim: game.reviewTitle)
                         .font(.system(size: 34)).italic()
@@ -343,9 +403,7 @@ private struct SingleCardHorizontal: View {
                 }
                 .padding(.vertical, 36)
 
-                LText(key: "app.menu")
-                    .font(.system(size: 26))
-                    .foregroundStyle(theme.secondary)
+                BrandWatermark(theme: theme, fontSize: 26)
             }
             .padding(.horizontal, 68)
             .padding(.bottom, 44)
@@ -377,6 +435,7 @@ private struct OverviewCard: View {
     let size: ShareSize
     let theme: ShareTheme
     @Environment(\.appLanguageCode) private var language
+    @AppStorage(UserCustomization.avatarFileKey) private var avatarFile = ""
 
     private var columns: Int { size == .phone ? 2 : 4 }
     private var cellSize: CGSize { ShareCardLayout.cellSize(count: games.count, size: size) }
@@ -406,6 +465,16 @@ private struct OverviewCard: View {
         }
         .frame(width: size.pixels.width, height: ShareCardLayout.overviewSize(gameCount: games.count, size: size).height)
         .background(theme.background)
+        .overlay(alignment: .topLeading) {
+            if !avatarFile.isEmpty, let avatar = UserCustomization.avatarImage() {
+                Image(nsImage: avatar)
+                    .resizable()
+                    .frame(width: 72, height: 72)
+                    .clipShape(Circle())
+                    .overlay(Circle().stroke(theme.secondary, lineWidth: 2))
+                    .padding(28)
+            }
+        }
     }
 
     private var header: some View {
@@ -413,6 +482,8 @@ private struct OverviewCard: View {
             Text(verbatim: title)
                 .font(.system(size: size == .phone ? 64 : 54, weight: .bold))
                 .foregroundStyle(theme.text)
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
             Text(verbatim: L10n.tr("share.count", [games.count as CVarArg], lang: language))
                 .font(.system(size: 32))
                 .foregroundStyle(theme.secondary)
@@ -463,6 +534,13 @@ private struct OverviewCell: View {
                         .monospacedDigit()
                         .foregroundStyle(theme.accent)
                 }
+            }
+
+            if let latest = game.sortedCompletions.last {
+                Text(verbatim: ShareDateFormat.string(from: latest.date, language: language))
+                    .font(.system(size: 17))
+                    .foregroundStyle(theme.secondary)
+                    .lineLimit(1)
             }
         }
         .frame(width: cellSize.width, height: cellSize.height, alignment: .top)

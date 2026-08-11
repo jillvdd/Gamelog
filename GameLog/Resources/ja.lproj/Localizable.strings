@@ -61,7 +61,7 @@
 "share.phone" = "スマホ (9:16)";
 "share.desktop" = "PC (16:9)";
 "share.overviewTitle" = "タイトル";
-"share.overviewTitleDefault" = "マイクリア記録";
+"share.overviewTitleDefault" = "My Gamelog";
 "share.count" = "合計 %d タイトル";
 "share.preview" = "プレビュー";
 "share.saveImage" = "画像を保存…";
@@ -76,6 +76,17 @@
 "settings.steamGridDBKey" = "API Key";
 "settings.steamGridDBHint" = "steamgriddb.com で無料登録後、プロフィールから取得";
 "settings.backup" = "データバックアップ";
+"settings.customization" = "カスタマイズ";
+"settings.username" = "ユーザー名";
+"settings.avatar" = "アバター";
+"settings.icon" = "App アイコン";
+"settings.chooseImage" = "画像を選択…";
+"settings.removeAvatar" = "アバターを削除";
+"settings.restoreIcon" = "デフォルトアイコンに戻す";
+"crop.titleAvatar" = "アバターを切り抜く";
+"crop.titleIcon" = "アイコンを切り抜く";
+"crop.zoom" = "ズーム";
+"share.brandUser" = "%@'s Gamelog";
 "about.menu" = "My Gamelog について";
 "about.version" = "バージョン";
 "about.developer" = "開発者";

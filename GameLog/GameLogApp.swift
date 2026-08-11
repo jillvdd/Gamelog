@@ -21,6 +21,7 @@ struct GameLogApp: App {
             RootView()
                 .environment(\.appLanguageCode, languageCode)
                 .environment(\.locale, Locale(identifier: languageCode))
+                .onAppear { UserCustomization.applyDockIcon() }
         }
         .modelContainer(container)
         .commands {

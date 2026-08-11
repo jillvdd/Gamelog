@@ -61,7 +61,7 @@
 "share.phone" = "手机 (9:16)";
 "share.desktop" = "电脑 (16:9)";
 "share.overviewTitle" = "总览标题";
-"share.overviewTitleDefault" = "我的通关记录";
+"share.overviewTitleDefault" = "我的游戏簿";
 "share.count" = "共 %d 款";"share.preview" = "预览";
 "share.saveImage" = "保存图片…";
 "share.openShareSheet" = "分享…";
@@ -75,6 +75,17 @@
 "settings.steamGridDBKey" = "API Key";
 "settings.steamGridDBHint" = "在 steamgriddb.com 免费注册后，从个人页面获取";
 "settings.backup" = "数据备份";
+"settings.customization" = "个性化";
+"settings.username" = "用户名";
+"settings.avatar" = "头像";
+"settings.icon" = "App 图标";
+"settings.chooseImage" = "选择图片…";
+"settings.removeAvatar" = "移除头像";
+"settings.restoreIcon" = "恢复默认图标";
+"crop.titleAvatar" = "裁切头像";
+"crop.titleIcon" = "裁切图标";
+"crop.zoom" = "缩放";
+"share.brandUser" = "%@的游戏簿";
 "about.menu" = "关于我的游戏簿";
 "about.version" = "版本";
 "about.developer" = "开发者";

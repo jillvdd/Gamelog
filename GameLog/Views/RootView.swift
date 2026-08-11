@@ -12,6 +12,7 @@ struct RootView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.appLanguageCode) private var language
     @Query(sort: \GameGroup.name) private var groups: [GameGroup]
+    @AppStorage(UserCustomization.avatarFileKey) private var avatarFile = ""
     @State private var selection: SidebarItem? = .all
     @State private var showingNewGroup = false
     @State private var renameGroup: GameGroup?
@@ -52,13 +53,21 @@ struct RootView: View {
             .listStyle(.sidebar)
             .navigationSplitViewColumnWidth(min: 180, ideal: 210)
             .safeAreaInset(edge: .bottom) {
-                Button {
-                    showingNewGroup = true
-                } label: {
-                    Label(L10n.tr("group.newGroup", lang: language), systemImage: "plus")
+                HStack(spacing: 8) {
+                    if !avatarFile.isEmpty, let avatar = UserCustomization.avatarImage() {
+                        Image(nsImage: avatar)
+                            .resizable()
+                            .frame(width: 32, height: 32)
+                            .clipShape(Circle())
+                    }
+                    Button {
+                        showingNewGroup = true
+                    } label: {
+                        Label(L10n.tr("group.newGroup", lang: language), systemImage: "plus")
+                    }
+                    .buttonStyle(.plain)
+                    .padding()
                 }
-                .buttonStyle(.plain)
-                .padding()
             }
         } detail: {
             switch selection {

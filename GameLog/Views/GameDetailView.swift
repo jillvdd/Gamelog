@@ -87,6 +87,50 @@ struct CompletionCardView: View {
     }
 }
 
+/// 详情页头部的四维评分条形图：每维度一条，颜色区分，长度按 10 分制比例。
+private struct DimensionScoreBars: View {
+    let game: Game
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            ForEach(Dimension.allCases) { dimension in
+                let value = game.dimensionAverage(for: dimension)
+                HStack(spacing: 8) {
+                    LText(dimension.labelKey)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 34, alignment: .leading)
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Color(nsColor: .quaternarySystemFill))
+                        if let value {
+                            Capsule()
+                                .fill(dimension.barColor)
+                                .frame(width: 150 * (value / 10))
+                        }
+                    }
+                    .frame(width: 150, height: 6)
+                    Text(verbatim: value.map { String(format: "%.1f", $0) } ?? "—")
+                        .font(.caption2.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .frame(width: 26, alignment: .trailing)
+                }
+            }
+        }
+    }
+}
+
+private extension Dimension {
+    /// 四维条形图的颜色（详情页用）。
+    var barColor: Color {
+        switch self {
+        case .story: .blue
+        case .graphics: .purple
+        case .music: .pink
+        case .gameplay: .orange
+        }
+    }
+}
+
 /// 游戏详情页：信息 + 评价 + 通关记录列表。
 struct GameDetailView: View {
     @Environment(\.modelContext) private var context
@@ -244,18 +288,23 @@ struct GameDetailView: View {
                     }
                 }
 
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    if let score = game.libraryScore {
-                        Text(verbatim: String(format: "%.1f", score))
-                            .font(.system(size: 44, weight: .bold))
-                            .monospacedDigit()
-                        LText("score.average")
-                            .font(.headline)
-                            .foregroundStyle(.secondary)
-                    } else {
-                        LText("score.unrated")
-                            .font(.title2)
-                            .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        if let score = game.libraryScore {
+                            Text(verbatim: String(format: "%.1f", score))
+                                .font(.system(size: 44, weight: .bold))
+                                .monospacedDigit()
+                            LText("score.average")
+                                .font(.headline)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            LText("score.unrated")
+                                .font(.title2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    if game.libraryScore != nil {
+                        DimensionScoreBars(game: game)
                     }
                 }
                 .padding(.top, 6)

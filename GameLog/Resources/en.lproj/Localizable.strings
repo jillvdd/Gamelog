@@ -61,7 +61,7 @@
 "share.phone" = "Phone (9:16)";
 "share.desktop" = "Desktop (16:9)";
 "share.overviewTitle" = "Overview title";
-"share.overviewTitleDefault" = "My Game Log";
+"share.overviewTitleDefault" = "My Gamelog";
 "share.count" = "%d games";
 "share.preview" = "Preview";
 "share.saveImage" = "Save Image…";
@@ -76,6 +76,17 @@
 "settings.steamGridDBKey" = "API Key";
 "settings.steamGridDBHint" = "Register free at steamgriddb.com, then get the key from your profile";
 "settings.backup" = "Backup";
+"settings.customization" = "Personalization";
+"settings.username" = "Username";
+"settings.avatar" = "Avatar";
+"settings.icon" = "App Icon";
+"settings.chooseImage" = "Choose Image…";
+"settings.removeAvatar" = "Remove Avatar";
+"settings.restoreIcon" = "Restore Default Icon";
+"crop.titleAvatar" = "Crop Avatar";
+"crop.titleIcon" = "Crop Icon";
+"crop.zoom" = "Zoom";
+"share.brandUser" = "%@'s Gamelog";
 "about.menu" = "About My Gamelog";
 "about.version" = "Version";
 "about.developer" = "Developer";

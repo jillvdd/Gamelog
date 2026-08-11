@@ -7,6 +7,7 @@
 //     Scripts/DataSmokeTest/main.swift \
 //     GameLog/Models/Game.swift GameLog/Models/Completion.swift GameLog/Models/GameGroup.swift \
 //     GameLog/Models/Presets.swift GameLog/Support/ScoreMath.swift GameLog/Support/ExportImport.swift \
+//     GameLog/Support/UserCustomization.swift \
 //     -plugin-path /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib/swift/host/plugins
 //   /tmp/gamelog_datasmoke
 import Foundation

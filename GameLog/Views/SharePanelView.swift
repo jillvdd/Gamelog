@@ -16,6 +16,7 @@ struct SharePanelView: View {
     @State private var renderedPNG: Data?
     @State private var shareURL: URL?
     @State private var renderTask: Task<Void, Never>?
+    @AppStorage(UserCustomization.usernameKey) private var username = ""
 
     private var selectedGames: [Game] {
         games.filter { selectedIDs.contains($0.persistentModelID) }
@@ -159,6 +160,12 @@ struct SharePanelView: View {
                 TextField(L10n.tr("share.overviewTitle", lang: language), text: $overviewTitle)
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 220)
+                    .onChange(of: overviewTitle) { _, newValue in
+                        let max = UserCustomization.usernameMaxLength
+                        if Array(newValue).count > max {
+                            overviewTitle = String(Array(newValue).prefix(max))
+                        }
+                    }
             }
 
             Spacer()
@@ -186,8 +193,15 @@ struct SharePanelView: View {
         if !preselected.isEmpty {
             selectedIDs = Set(preselected.map(\.persistentModelID))
         }
-        overviewTitle = L10n.tr("share.overviewTitleDefault", lang: language)
+        overviewTitle = defaultOverviewTitle()
         // 不在此直接 rerender：上面的 state 写入会触发 onChange → scheduleRerender
+    }
+
+    /// 总览图默认标题：设了用户名 →「{用户名}的游戏簿」，未设 → app 品牌名。
+    private func defaultOverviewTitle() -> String {
+        let name = username.trimmingCharacters(in: .whitespaces)
+        if name.isEmpty { return L10n.tr("app.menu", lang: language) }
+        return L10n.tr("share.brandUser", [name], lang: language)
     }
 
     /// 防抖重渲染：大尺寸 ImageRenderer 较慢，避免标题逐键触发全尺寸出图。
@@ -212,7 +226,7 @@ struct SharePanelView: View {
             content = .single(games[0], size: size)
         } else {
             let title = overviewTitle.trimmingCharacters(in: .whitespaces).isEmpty
-                ? L10n.tr("share.overviewTitleDefault", lang: language)
+                ? defaultOverviewTitle()
                 : overviewTitle
             content = .overview(games, title: title, size: size)
         }

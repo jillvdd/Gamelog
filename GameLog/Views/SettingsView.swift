@@ -1,19 +1,25 @@
 import SwiftUI
 import SwiftData
 import AppKit
+import UniformTypeIdentifiers
 
-/// 设置：语言（中日英）、SteamGridDB key、数据备份。
+/// 设置：语言（中日英）、个性化（用户名/头像/图标）、SteamGridDB key、数据备份。
 struct SettingsView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.appLanguageCode) private var language
     @AppStorage("appLanguage") private var languageCode = AppLanguage.chinese.localeCode
     @AppStorage("steamGridDBKey") private var steamGridDBKey = ""
 
+    @AppStorage(UserCustomization.usernameKey) private var username = ""
+    @AppStorage(UserCustomization.avatarFileKey) private var avatarFile = ""
+    @AppStorage(UserCustomization.iconFileKey) private var iconFile = ""
+
     @Query(sort: \Game.createdAt) private var games: [Game]
     @Query(sort: \GameGroup.name) private var groups: [GameGroup]
 
     @State private var statusMessage: String?
     @State private var showingImportConfirm = false
+    @State private var cropSession: CropSession?
 
     var body: some View {
         Form {
@@ -24,6 +30,35 @@ struct SettingsView: View {
                     }
                 }
                 .pickerStyle(.segmented)
+            }
+
+            Section(L10n.tr("settings.customization", lang: language)) {
+                TextField(L10n.tr("settings.username", lang: language), text: $username)
+                    .textFieldStyle(.roundedBorder)
+                    .onChange(of: username) { _, newValue in
+                        let max = UserCustomization.usernameMaxLength
+                        if Array(newValue).count > max {
+                            username = String(Array(newValue).prefix(max))
+                        }
+                    }
+
+                LabeledContent(L10n.tr("settings.avatar", lang: language)) {
+                    HStack {
+                        avatarPreview
+                        Button(L10n.tr("settings.chooseImage", lang: language)) { pickImage(for: .avatar) }
+                        Button(L10n.tr("settings.removeAvatar", lang: language)) { UserCustomization.removeAvatar() }
+                            .disabled(avatarFile.isEmpty)
+                    }
+                }
+
+                LabeledContent(L10n.tr("settings.icon", lang: language)) {
+                    HStack {
+                        iconPreview
+                        Button(L10n.tr("settings.chooseImage", lang: language)) { pickImage(for: .icon) }
+                        Button(L10n.tr("settings.restoreIcon", lang: language)) { UserCustomization.removeIcon() }
+                            .disabled(iconFile.isEmpty)
+                    }
+                }
             }
 
             Section(L10n.tr("settings.steamgriddb", lang: language)) {
@@ -45,7 +80,7 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 500, height: 620)
+        .frame(width: 520, height: 720)
         .confirmationDialog(
             L10n.tr("common.confirm", lang: language),
             isPresented: $showingImportConfirm,
@@ -55,6 +90,75 @@ struct SettingsView: View {
             Button(L10n.tr("common.cancel", lang: language), role: .cancel) {}
         } message: {
             LText("backup.importConfirm")
+        }
+        .sheet(item: $cropSession) { session in
+            ImageCropSheet(
+                kind: session.kind,
+                sourceImage: session.image,
+                onCancel: { cropSession = nil },
+                onConfirm: { result in
+                    saveCrop(kind: session.kind, image: result)
+                    cropSession = nil
+                }
+            )
+        }
+    }
+
+    // MARK: - 个性化预览
+
+    private var avatarPreview: some View {
+        Group {
+            if let img = UserCustomization.avatarImage() {
+                Image(nsImage: img)
+                    .resizable()
+                    .frame(width: 32, height: 32)
+                    .clipShape(Circle())
+            } else {
+                Image(systemName: "person.crop.circle")
+                    .font(.system(size: 26))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 32, height: 32)
+            }
+        }
+    }
+
+    private var iconPreview: some View {
+        Group {
+            if let img = UserCustomization.iconImage() {
+                Image(nsImage: img)
+                    .resizable()
+                    .frame(width: 32, height: 32)
+                    .clipShape(RoundedRectangle(cornerRadius: 7))
+            } else {
+                Image(systemName: "app.dashed")
+                    .font(.system(size: 24))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 32, height: 32)
+            }
+        }
+    }
+
+    // MARK: - 选图 + 裁切
+
+    private func pickImage(for kind: CropKind) {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.png, .jpeg, .tiff, .heic]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        guard let image = NSImage(contentsOf: url) else { return }
+        cropSession = CropSession(kind: kind, image: image)
+    }
+
+    private func saveCrop(kind: CropKind, image: NSImage) {
+        guard let data = UserCustomization.pngData(from: image) else { return }
+        do {
+            switch kind {
+            case .avatar: try UserCustomization.saveAvatarPNG(data)
+            case .icon: try UserCustomization.saveIconPNG(data)
+            }
+        } catch {
+            // 保存失败（磁盘满等罕见情况）静默；下次打开设置仍显示原值
         }
     }
 
@@ -90,4 +194,11 @@ struct SettingsView: View {
             statusMessage = L10n.tr("backup.importFailed", lang: language)
         }
     }
+}
+
+/// 一次「选图 → 裁切」会话，供 .sheet(item:) 驱动。
+private struct CropSession: Identifiable {
+    let id = UUID()
+    let kind: CropKind
+    let image: NSImage
 }

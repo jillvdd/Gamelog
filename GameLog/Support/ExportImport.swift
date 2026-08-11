@@ -8,6 +8,10 @@ struct BackupDTO: Codable {
     var exportedAt: Date
     var groups: [GroupDTO]
     var games: [GameDTO]
+    /// 三项自定义（旧版备份无此字段 → nil，导入时保持现状）。
+    var username: String?
+    var avatarBase64: String?
+    var iconBase64: String?
 }
 
 struct GroupDTO: Codable {
@@ -71,7 +75,10 @@ enum BackupManager {
                         )
                     }
                 )
-            }
+            },
+            username: UserDefaults.standard.string(forKey: UserCustomization.usernameKey),
+            avatarBase64: UserCustomization.avatarImageData()?.base64EncodedString(),
+            iconBase64: UserCustomization.iconImageData()?.base64EncodedString()
         )
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
@@ -127,6 +134,24 @@ enum BackupManager {
                 completion.game = game
                 context.insert(completion)
             }
+        }
+
+        // 自定义三项：旧版备份缺字段 → 保持现状不覆盖
+        if let name = dto.username {
+            if name.isEmpty {
+                UserDefaults.standard.removeObject(forKey: UserCustomization.usernameKey)
+            } else {
+                UserDefaults.standard.set(
+                    String(Array(name).prefix(UserCustomization.usernameMaxLength)),
+                    forKey: UserCustomization.usernameKey
+                )
+            }
+        }
+        if let avatar = dto.avatarBase64.flatMap({ Data(base64Encoded: $0) }) {
+            try UserCustomization.saveAvatarPNG(avatar)
+        }
+        if let icon = dto.iconBase64.flatMap({ Data(base64Encoded: $0) }) {
+            try UserCustomization.saveIconPNG(icon)
         }
     }
 }
