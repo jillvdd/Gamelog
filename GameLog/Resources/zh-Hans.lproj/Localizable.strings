@@ -73,6 +73,9 @@
 "settings.steamGridDBKey" = "API Key";
 "settings.steamGridDBHint" = "在 steamgriddb.com 免费注册后，从个人页面获取";
 "settings.backup" = "数据备份";
+"settings.about" = "关于";
+"about.version" = "版本";
+"about.developer" = "开发者";
 "backup.export" = "导出备份…";
 "backup.import" = "导入备份…";
 "backup.exportDone" = "备份已导出";

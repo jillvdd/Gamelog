@@ -74,6 +74,9 @@
 "settings.steamGridDBKey" = "API Key";
 "settings.steamGridDBHint" = "steamgriddb.com で無料登録後、プロフィールから取得";
 "settings.backup" = "データバックアップ";
+"settings.about" = "このアプリについて";
+"about.version" = "バージョン";
+"about.developer" = "開発者";
 "backup.export" = "バックアップを書き出し…";
 "backup.import" = "バックアップを読み込み…";
 "backup.exportDone" = "バックアップを書き出しました";

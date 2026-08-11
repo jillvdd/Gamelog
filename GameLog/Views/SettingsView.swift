@@ -43,9 +43,11 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+
+            AboutView()
         }
         .formStyle(.grouped)
-        .frame(width: 500, height: 400)
+        .frame(width: 500, height: 620)
         .confirmationDialog(
             L10n.tr("common.confirm", lang: language),
             isPresented: $showingImportConfirm,
