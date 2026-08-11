@@ -49,9 +49,7 @@ struct CompletionEditView: View {
                 )
                 TextField(L10n.tr("completion.playtime", lang: language), text: $playtimeText)
                     .textFieldStyle(.roundedBorder)
-                TextEditor(text: $notes)
-                    .frame(height: 80)
-                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color(nsColor: .separatorColor)))
+                BorderedTextEditor(text: $notes, minHeight: 80)
             }
 
             Section(L10n.tr("completion.scores", lang: language)) {

@@ -15,18 +15,28 @@ struct CoverSearchSheet: View {
     @State private var isLoading = false
     @State private var downloadingGrid: Int?
     @State private var errorMessage: String?
+    @State private var hasSearched = false
+    @State private var searchGeneration = 0
+    @State private var searchTask: Task<Void, Never>?
 
     private var client: SteamGridDBClient { SteamGridDBClient(apiKey: apiKey) }
 
     var body: some View {
         VStack(spacing: 14) {
             HStack {
-                TextField(L10n.tr("library.search", lang: language), text: $searchText)
-                    .textFieldStyle(.roundedBorder)
-                    .onSubmit { performSearch() }
-                Button(L10n.tr("library.search", lang: language)) { performSearch() }
-                    .disabled(searchText.trimmingCharacters(in: .whitespaces).isEmpty)
+                LText("cover.title")
+                    .font(.headline)
+                Spacer()
+                Button(L10n.tr("cover.close", lang: language)) { dismiss() }
+                    .keyboardShortcut(.cancelAction)
             }
+
+            TextField(L10n.tr("library.search", lang: language), text: $searchText)
+                .textFieldStyle(.roundedBorder)
+                .onSubmit { searchNow() }
+                .onChange(of: searchText) { _, newValue in
+                    scheduleSearch(newValue)
+                }
 
             if let errorMessage {
                 Text(verbatim: errorMessage)
@@ -40,12 +50,18 @@ struct CoverSearchSheet: View {
                 Spacer()
             } else if let selectedGame {
                 gridsSection(selectedGame)
-            } else {
-                resultsList
+            } else if hasSearched {
+                if results.isEmpty {
+                    LText("library.noResult")
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    resultsList
+                }
             }
         }
         .padding(16)
-        .frame(width: 620, height: 500)
+        .frame(width: 620, height: 500, alignment: .top)
     }
 
     // MARK: - 搜索结果
@@ -135,22 +151,54 @@ struct CoverSearchSheet: View {
 
     // MARK: - 逻辑
 
-    private func performSearch() {
+    /// 即时搜索（点按钮 / 回车）。
+    private func searchNow() {
+        searchTask?.cancel()
+        searchGeneration += 1
+        isLoading = false
         let term = searchText.trimmingCharacters(in: .whitespaces)
         guard !term.isEmpty else { return }
+        let gen = searchGeneration
+        searchTask = Task { await performSearch(term: term, generation: gen) }
+    }
+
+    /// 输入防抖：停止输入约 300ms 后才真正搜索；连发请求只保留最后一个生效。
+    private func scheduleSearch(_ newValue: String) {
+        searchTask?.cancel()
+        searchGeneration += 1
+        isLoading = false
+        // 改动搜索词说明要重新搜索，退回结果视图
+        selectedGame = nil
+        grids = []
+        let term = newValue.trimmingCharacters(in: .whitespaces)
+        guard !term.isEmpty else {
+            hasSearched = false
+            results = []
+            errorMessage = nil
+            return
+        }
+        let gen = searchGeneration
+        let task = Task {
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            guard !Task.isCancelled, gen == searchGeneration else { return }
+            await performSearch(term: term, generation: gen)
+        }
+        searchTask = task
+    }
+
+    private func performSearch(term: String, generation: Int) async {
         errorMessage = nil
         isLoading = true
-        Task {
-            do {
-                results = try await client.search(term: term)
-                isLoading = false
-                if results.isEmpty {
-                    errorMessage = L10n.tr("library.noResult", lang: language)
-                }
-            } catch {
-                isLoading = false
-                errorMessage = L10n.tr("cover.searchFailed", lang: language)
-            }
+        do {
+            let hits = try await client.search(term: term)
+            guard generation == searchGeneration else { return }
+            isLoading = false
+            hasSearched = true
+            results = hits
+        } catch {
+            guard generation == searchGeneration else { return }
+            isLoading = false
+            errorMessage = L10n.tr("cover.searchFailed", lang: language)
         }
     }
 

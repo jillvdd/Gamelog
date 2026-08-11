@@ -121,16 +121,149 @@ struct PresetOrCustomPicker: View {
     }
 }
 
+/// 带圆角边框的文本编辑框（NSTextView 实现）：
+/// - 高度随内容增长、封顶约 20 行，超出后内部滚动；
+/// - 滚动条仅在可滚动时出现（overlay scroller + autohidesScrollers，无溢出不显示）；
+/// - textContainerInset 真正垫开文本，首行不会被边框压住。
+/// 圆角背景与描边放在 SwiftUI 层（NSView 的 layer 属性在托管时不可靠），NSTextView 保持透明。
+struct BorderedTextEditor: View {
+    @Binding var text: String
+    var minHeight: CGFloat
+    var maxHeight: CGFloat
+
+    init(text: Binding<String>, minHeight: CGFloat, maxHeight: CGFloat? = nil) {
+        self._text = text
+        self.minHeight = minHeight
+        self.maxHeight = maxHeight ?? Self.defaultMaxHeight
+    }
+
+    /// 约 20 行的最大高度：系统正文字号行高 × 20 + 上下内边距。
+    static var defaultMaxHeight: CGFloat {
+        let lineHeight = NSLayoutManager().defaultLineHeight(for: NSFont.systemFont(ofSize: NSFont.systemFontSize))
+        return lineHeight * 20 + 12
+    }
+
+    var body: some View {
+        TextEditorNSView(text: $text, minHeight: minHeight, maxHeight: maxHeight)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(Color(nsColor: .textBackgroundColor))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color(nsColor: .separatorColor))
+            )
+    }
+}
+
+/// 透明的 NSTextView 滚动容器，背景由外层 BorderedTextEditor 提供。
+private struct TextEditorNSView: NSViewRepresentable {
+    @Binding var text: String
+    var minHeight: CGFloat
+    var maxHeight: CGFloat
+
+    final class Coordinator: NSObject, NSTextViewDelegate {
+        var parent: TextEditorNSView
+        weak var textView: NSTextView?
+        var frameObservation: NSKeyValueObservation?
+
+        init(_ parent: TextEditorNSView) { self.parent = parent }
+
+        func textDidChange(_ notification: Notification) {
+            guard let textView else { return }
+            parent.text = textView.string
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let scrollView = AutoGrowScrollView(minHeight: minHeight, maxHeight: maxHeight)
+        let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 0, height: 0))
+        textView.isRichText = false
+        textView.allowsUndo = true
+        textView.isVerticallyResizable = true
+        textView.isHorizontallyResizable = false
+        textView.autoresizingMask = [.width]
+        textView.minSize = NSSize(width: 0, height: minHeight)
+        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        textView.textContainer?.containerSize = NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude)
+        textView.textContainer?.widthTracksTextView = true
+        textView.textContainerInset = NSSize(width: 6, height: 6)
+        textView.font = NSFont.systemFont(ofSize: NSFont.systemFontSize)
+        textView.drawsBackground = false
+        textView.delegate = context.coordinator
+
+        scrollView.documentView = textView
+        scrollView.hasVerticalScroller = true
+        scrollView.scrollerStyle = .overlay
+        scrollView.autohidesScrollers = true
+        scrollView.drawsBackground = false
+        scrollView.contentView.drawsBackground = false
+        scrollView.hasHorizontalScroller = false
+
+        context.coordinator.textView = textView
+        context.coordinator.frameObservation = textView.observe(\.frame, options: [.new]) { [weak scrollView] _, _ in
+            scrollView?.invalidateIntrinsicContentSize()
+        }
+        textView.string = text
+        return scrollView
+    }
+
+    func updateNSView(_ nsView: NSScrollView, context: Context) {
+        context.coordinator.parent = self
+        if let scroll = nsView as? AutoGrowScrollView {
+            scroll.minHeight = minHeight
+            scroll.maxHeight = maxHeight
+        }
+        guard let textView = context.coordinator.textView else { return }
+        if textView.string != text {
+            textView.string = text
+        }
+    }
+}
+
+/// 高度随文档内容自适应、封顶 maxHeight 的 NSScrollView。
+private final class AutoGrowScrollView: NSScrollView {
+    var minHeight: CGFloat
+    var maxHeight: CGFloat
+
+    init(minHeight: CGFloat, maxHeight: CGFloat) {
+        self.minHeight = minHeight
+        self.maxHeight = maxHeight
+        super.init(frame: .zero)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override var intrinsicContentSize: NSSize {
+        let docHeight = documentView?.frame.height ?? 0
+        let h = min(maxHeight, max(minHeight, docHeight))
+        return NSSize(width: NSView.noIntrinsicMetric, height: h)
+    }
+}
+
 /// 四维评分滑块行。
 struct ScoreSliderRow: View {
     let titleKey: String
     @Binding var value: Double
 
+    /// 去掉 step 以避免滑块下方的刻度点点，写入时仍取整到 0.1 保证数据步进。
+    private var snapped: Binding<Double> {
+        Binding(
+            get: { value },
+            set: { value = ($0 * 10).rounded() / 10 }
+        )
+    }
+
     var body: some View {
         HStack(spacing: 12) {
             LText(titleKey)
                 .frame(width: 64, alignment: .leading)
-            Slider(value: $value, in: 1...10, step: 0.1)
+            Slider(value: snapped, in: 1...10)
             Text(verbatim: String(format: "%.1f", value))
                 .font(.system(.body, design: .monospaced))
                 .monospacedDigit()
@@ -275,9 +408,7 @@ struct GameEditView: View {
             Section(L10n.tr("game.reviewTitle", lang: language)) {
                 TextField(L10n.tr("game.reviewTitlePlaceholder", lang: language), text: $reviewTitle)
                     .textFieldStyle(.roundedBorder)
-                TextEditor(text: $reviewBody)
-                    .frame(height: 100)
-                    .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color(nsColor: .separatorColor)))
+                BorderedTextEditor(text: $reviewBody, minHeight: 140)
             }
 
             if isCreating {
@@ -298,9 +429,7 @@ struct GameEditView: View {
                     )
                     TextField(L10n.tr("completion.playtime", lang: language), text: $playtimeText)
                         .textFieldStyle(.roundedBorder)
-                    TextEditor(text: $notes)
-                        .frame(height: 80)
-                        .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color(nsColor: .separatorColor)))
+                    BorderedTextEditor(text: $notes, minHeight: 80)
                 }
 
                 Section(L10n.tr("completion.scores", lang: language)) {
