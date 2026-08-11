@@ -1,0 +1,8 @@
+# macOS
+.DS_Store
+
+# Xcode 构建产物
+DerivedData/
+xcuserdata/
+*.xcuserstate
+build/
