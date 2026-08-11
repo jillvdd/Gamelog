@@ -68,4 +68,4 @@ Scripts/                     # 独立回归测试（不编进 app，见下）
 
 ## License
 
-本项目基于 [GPL-3.0](LICENSE) 发布，详见仓库根目录的 `LICENSE` 文件。
+本项目基于 [MIT](LICENSE) 许可证发布，详见仓库根目录的 `LICENSE` 文件。
