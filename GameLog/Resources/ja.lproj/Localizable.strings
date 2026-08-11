@@ -104,3 +104,7 @@
 "completion.playtimeFormat" = "%.1f 時間";
 "cover.searchFailed" = "カバーを取得できませんでした。ネットワークか API Key を確認してください";
 "cover.noGrids" = "このゲームのカバーは見つかりませんでした";
+
+"date.year" = "年";
+"date.day" = "日";
+"date.earlierYears" = "より前の年…";

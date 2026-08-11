@@ -40,7 +40,7 @@ struct CompletionEditView: View {
                     collapsible: true,
                     value: $platform
                 )
-                DatePicker(L10n.tr("completion.date", lang: language), selection: $date, displayedComponents: [.date])
+                DateMenuPicker(title: L10n.tr("completion.date", lang: language), selection: $date)
                 PresetOrCustomPicker(
                     title: L10n.tr("completion.degree", lang: language),
                     presets: Presets.degrees,

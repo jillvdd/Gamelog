@@ -222,12 +222,7 @@ struct GameEditView: View {
 
                 Toggle(L10n.tr("game.releaseDate", lang: language), isOn: $hasReleaseDate)
                 if hasReleaseDate {
-                    DatePicker(
-                        L10n.tr("game.releaseDate", lang: language),
-                        selection: $releaseDate,
-                        displayedComponents: [.date]
-                    )
-                    .datePickerStyle(.field)
+                    DateMenuPicker(title: L10n.tr("game.releaseDate", lang: language), selection: $releaseDate)
                 }
 
                 // 分组
@@ -294,7 +289,7 @@ struct GameEditView: View {
                         collapsible: true,
                         value: $platform
                     )
-                    DatePicker(L10n.tr("completion.date", lang: language), selection: $completionDate, displayedComponents: [.date])
+                    DateMenuPicker(title: L10n.tr("completion.date", lang: language), selection: $completionDate)
                     PresetOrCustomPicker(
                         title: L10n.tr("completion.degree", lang: language),
                         presets: Presets.degrees,

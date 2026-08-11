@@ -104,3 +104,7 @@
 "completion.playtimeFormat" = "%.1f h";
 "cover.searchFailed" = "Couldn't fetch covers. Check your network or API key.";
 "cover.noGrids" = "No covers found for this game";
+
+"date.year" = "";
+"date.day" = "";
+"date.earlierYears" = "Earlier Years…";

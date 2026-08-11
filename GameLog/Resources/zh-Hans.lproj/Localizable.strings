@@ -103,3 +103,7 @@
 "completion.playtimeFormat" = "%.1f 小时";
 "cover.searchFailed" = "封面获取失败，请检查网络或 API Key";
 "cover.noGrids" = "未找到该游戏的封面";
+
+"date.year" = "年";
+"date.day" = "日";
+"date.earlierYears" = "更早年份…";
