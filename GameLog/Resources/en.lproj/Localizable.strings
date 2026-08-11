@@ -76,7 +76,7 @@
 "settings.steamGridDBKey" = "API Key";
 "settings.steamGridDBHint" = "Register free at steamgriddb.com, then get the key from your profile";
 "settings.backup" = "Backup";
-"settings.about" = "About";
+"about.menu" = "About My Gamelog";
 "about.version" = "Version";
 "about.developer" = "Developer";
 "backup.export" = "Export Backup…";
@@ -95,7 +95,7 @@
 "title.editCompletion" = "Edit Completion";
 "share.singleNote" = "One game selected: renders a card for it";
 "share.multiNote" = "Multiple selected: renders one overview image";
-"app.menu" = "Game Completion Log";
+"app.menu" = "My Gamelog";
 "common.confirm" = "OK";
 "group.rename" = "Rename Group";
 "group.deleteTitle" = "Delete Group";

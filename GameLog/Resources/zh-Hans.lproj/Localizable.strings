@@ -75,7 +75,7 @@
 "settings.steamGridDBKey" = "API Key";
 "settings.steamGridDBHint" = "在 steamgriddb.com 免费注册后，从个人页面获取";
 "settings.backup" = "数据备份";
-"settings.about" = "关于";
+"about.menu" = "关于我的游戏簿";
 "about.version" = "版本";
 "about.developer" = "开发者";
 "backup.export" = "导出备份…";
@@ -94,7 +94,7 @@
 "title.editCompletion" = "编辑通关记录";
 "share.singleNote" = "分享一个游戏：生成该游戏的一张卡片";
 "share.multiNote" = "分享多个游戏：生成一张总览图";
-"app.menu" = "游戏通关记录";
+"app.menu" = "我的游戏簿";
 "common.confirm" = "确定";
 "group.rename" = "重命名分组";
 "group.deleteTitle" = "删除分组";

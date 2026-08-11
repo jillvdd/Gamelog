@@ -76,7 +76,7 @@
 "settings.steamGridDBKey" = "API Key";
 "settings.steamGridDBHint" = "steamgriddb.com で無料登録後、プロフィールから取得";
 "settings.backup" = "データバックアップ";
-"settings.about" = "このアプリについて";
+"about.menu" = "My Gamelog について";
 "about.version" = "バージョン";
 "about.developer" = "開発者";
 "backup.export" = "バックアップを書き出し…";
@@ -95,7 +95,7 @@
 "title.editCompletion" = "クリア記録を編集";
 "share.singleNote" = "ゲームを1つ選択：そのゲームのカード画像を生成";
 "share.multiNote" = "複数選択：1枚の総合画像を生成";
-"app.menu" = "ゲームクリア記録";
+"app.menu" = "My Gamelog";
 "common.confirm" = "OK";
 "group.rename" = "グループ名を変更";
 "group.deleteTitle" = "グループを削除";

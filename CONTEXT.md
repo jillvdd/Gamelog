@@ -1,4 +1,4 @@
-# Game Completion Tracker (游戏通关记录)
+# My Gamelog (我的游戏簿)
 
 A personal macOS app for recording video games the user has finished, including cover art, four-dimension scores, and per-playthrough notes.
 
