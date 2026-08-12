@@ -39,7 +39,8 @@ game1.groups = [groupA, groupB]
 
 let c1 = Completion(platform: "Switch", date: Date(timeIntervalSince1970: 1_600_000_000),
                     degree: "主线通关", playtime: 80, notes: "太棒了",
-                    scoreStory: 9, scoreGraphics: 8, scoreMusic: 9, scoreGameplay: 10)
+                    scoreGameplay: 10, scoreDesign: 9, scoreStory: 9, scoreArt: 8,
+                    scoreMusic: 9, scorePerformance: 9)
 c1.game = game1
 context.insert(c1)
 try? context.save()
@@ -48,7 +49,7 @@ check("game1.groups 双向（2 个）", game1.groups.count == 2)
 check("groupA.games 含 game1", groupA.games.contains { $0.persistentModelID == game1.persistentModelID })
 check("groupB.games 含 game1", groupB.games.contains { $0.persistentModelID == game1.persistentModelID })
 check("c1.game 反向指向 game1", c1.game?.persistentModelID == game1.persistentModelID)
-check("libraryScore 9+8+9+10 → 9.0", game1.libraryScore == 9.0)
+check("libraryScore 10+9+9+8+9+9 → 9.0", game1.libraryScore == 9.0)
 check("recordAverage 9.0", c1.recordAverage == 9.0)
 
 // --- 2. 追加一条跳过评分的记录：不计入库显示分 ---
@@ -106,7 +107,8 @@ context.insert(exportGroup)
 exportGame.groups = [exportGroup]
 let exportC = Completion(platform: "Switch", date: Date(timeIntervalSince1970: 1_660_000_000),
                          degree: "全收集/白金", playtime: 150.5, notes: "全图鉴",
-                         scoreStory: 9.5, scoreGraphics: 8.5, scoreMusic: 9, scoreGameplay: 9.5)
+                         scoreGameplay: 9.5, scoreDesign: 9, scoreStory: 9.5, scoreArt: 8.5,
+                         scoreMusic: 9, scorePerformance: 9)
 exportC.game = exportGame
 context.insert(exportC)
 try? context.save()
@@ -144,9 +146,10 @@ check("记录日期保真", ic.date == originalDate)
 check("记录通关程度往返", ic.degree == "全收集/白金")
 check("记录时长往返（150.5）", ic.playtime == 150.5)
 check("记录内容往返", ic.notes == "全图鉴")
-check("四维评分往返", ic.scoreStory == 9.5 && ic.scoreGraphics == 8.5 && ic.scoreMusic == 9 && ic.scoreGameplay == 9.5)
+check("六维评分往返", ic.scoreGameplay == 9.5 && ic.scoreDesign == 9 && ic.scoreStory == 9.5
+    && ic.scoreArt == 8.5 && ic.scoreMusic == 9 && ic.scorePerformance == 9)
 check("记录↔游戏关联恢复", ic.game?.persistentModelID == ig.persistentModelID)
-check("库显示分往返 9.0（9.5+8.5+9+9.5→9.125→round 9.0）", ig.libraryScore == 9.0)
+check("库显示分往返 9.0（9.5+9+9.5+8.5+9+9→54.5/6→9.083→round 9.0）", ig.libraryScore == 9.0)
 
 // --- 7. 重复导入幂等 ---
 try BackupManager.decodeAndReplace(backupData, into: context)

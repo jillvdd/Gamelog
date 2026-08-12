@@ -8,12 +8,12 @@ enum ScoreMath {
         (value * 2).rounded() / 2
     }
 
-    /// 单条通关记录的平均分：四个维度的算术均值。
-    /// 传入的四维评分不足四个或任一超出 1–10 范围则返回 nil（视为未评分）。
+    /// 单条通关记录的平均分：六个维度的算术均值。
+    /// 传入的六维评分不足六个或任一超出 1–10 范围则返回 nil（视为未评分）。
     static func recordAverage(_ scores: [Double]) -> Double? {
-        guard scores.count == 4,
+        guard scores.count == 6,
               scores.allSatisfy({ $0 >= 1 && $0 <= 10 }) else { return nil }
-        return scores.reduce(0, +) / 4
+        return scores.reduce(0, +) / 6
     }
 
     /// 库显示分：所有已评分记录平均分的均值，再取整到最近的 0.5。
@@ -49,10 +49,11 @@ enum ScoreMath {
             assertEq("round 8.0", roundToHalf(8.0), 8.0),
             assertEq("round 8.25", roundToHalf(8.25), 8.5),
             assertEq("round 8.75", roundToHalf(8.75), 9.0),
-            assertEq("record avg 8,9,7,8", recordAverage([8, 9, 7, 8]), 8.0),
+            assertEq("record avg 8,9,8,7,9,7", recordAverage([8, 9, 8, 7, 9, 7]), 8.0),
             assertEq("record avg empty", recordAverage([]), nil),
             assertEq("record avg 2 items", recordAverage([8, 9]), nil),
-            assertEq("record avg out of range", recordAverage([8, 9, 11, 8]), nil),
+            assertEq("record avg 4 items (旧四维) invalid", recordAverage([8, 9, 7, 8]), nil),
+            assertEq("record avg out of range", recordAverage([8, 9, 11, 8, 9, 8]), nil),
             assertEq("library 8.0 & 9.0", libraryScore(recordAverages: [8.0, 9.0]), 8.5),
             assertEq("library 8.2 only", libraryScore(recordAverages: [8.2]), 8.0),
             assertEq("library empty", libraryScore(recordAverages: []), nil),

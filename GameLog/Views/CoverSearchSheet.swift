@@ -210,12 +210,7 @@ struct CoverSearchSheet: View {
         Task {
             do {
                 let all = try await client.grids(for: game.id)
-                // 优先竖版封面
-                grids = all.sorted { lhs, rhs in
-                    if lhs.height > lhs.width && rhs.height < rhs.width { return true }
-                    if lhs.height < lhs.width && rhs.height > rhs.width { return false }
-                    return (lhs.width * lhs.height) > (rhs.width * rhs.height)
-                }
+                grids = SteamGridDBClient.sorted(all)
                 isLoading = false
             } catch {
                 isLoading = false

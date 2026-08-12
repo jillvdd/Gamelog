@@ -41,10 +41,12 @@
 "completion.delete" = "Delete";
 "completion.skipScores" = "Skip scoring this run";
 "completion.scores" = "Dimension Scores";
-"dimension.story" = "Story";
-"dimension.graphics" = "Graphics";
-"dimension.music" = "Music";
 "dimension.gameplay" = "Gameplay";
+"dimension.design" = "Design";
+"dimension.story" = "Story";
+"dimension.art" = "Art";
+"dimension.music" = "Music";
+"dimension.performance" = "Performance";
 "score.average" = "Average";
 "score.unrated" = "Unrated";
 "common.save" = "Save";
@@ -83,6 +85,8 @@
 "settings.chooseImage" = "Choose Image…";
 "settings.removeAvatar" = "Remove Avatar";
 "settings.restoreIcon" = "Restore Default Icon";
+"settings.autoMatchCover" = "Auto-fill Cover";
+"settings.autoMatchCoverHint" = "When you type a game name, automatically searches SteamGridDB and sets the first cover found (requires an API key below).";
 "crop.titleAvatar" = "Crop Avatar";
 "crop.titleIcon" = "Crop Icon";
 "crop.zoom" = "Zoom";

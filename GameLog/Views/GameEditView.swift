@@ -246,7 +246,7 @@ private final class AutoGrowScrollView: NSScrollView {
     }
 }
 
-/// 四维评分滑块行。
+/// 六维评分滑块行。
 struct ScoreSliderRow: View {
     let titleKey: String
     @Binding var value: Double
@@ -262,7 +262,9 @@ struct ScoreSliderRow: View {
     var body: some View {
         HStack(spacing: 12) {
             LText(titleKey)
-                .frame(width: 64, alignment: .leading)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(width: 96, alignment: .leading)
             Slider(value: snapped, in: 1...10)
             Text(verbatim: String(format: "%.1f", value))
                 .font(.system(.body, design: .monospaced))
@@ -298,14 +300,21 @@ struct GameEditView: View {
     @State private var degree = Presets.degrees[0]
     @State private var playtimeText = ""
     @State private var notes = ""
-    @State private var sStory = 7.0
-    @State private var sGraphics = 7.0
-    @State private var sMusic = 7.0
     @State private var sGameplay = 7.0
+    @State private var sDesign = 7.0
+    @State private var sStory = 7.0
+    @State private var sArt = 7.0
+    @State private var sMusic = 7.0
+    @State private var sPerformance = 7.0
 
     @State private var validationError: String?
     @State private var showingCoverSearch = false
     @AppStorage("steamGridDBKey") private var steamGridDBKey = ""
+    @AppStorage(UserCustomization.autoMatchCoverKey) private var autoMatchCover = false
+
+    @State private var isAutoMatching = false
+    @State private var didFinishLoading = false
+    @State private var autoMatchTask: Task<Void, Never>?
 
     private var isCreating: Bool { game == nil }
 
@@ -314,6 +323,7 @@ struct GameEditView: View {
             Section(L10n.tr("game.name", lang: language)) {
                 TextField(L10n.tr("game.name", lang: language), text: $name)
                     .textFieldStyle(.roundedBorder)
+                    .onChange(of: name) { _, newValue in scheduleAutoMatch(newValue) }
 
                 // 别名
                 VStack(alignment: .leading, spacing: 6) {
@@ -392,6 +402,16 @@ struct GameEditView: View {
                     }
                     .frame(width: 72, height: 96)
                     .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .overlay {
+                        if isAutoMatching {
+                            ZStack {
+                                Color.black.opacity(0.35)
+                                ProgressView()
+                                    .controlSize(.small)
+                            }
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                        }
+                    }
 
                     VStack(alignment: .leading, spacing: 8) {
                         Button(L10n.tr("game.chooseCover", lang: language)) { pickCover() }
@@ -433,10 +453,12 @@ struct GameEditView: View {
                 }
 
                 Section(L10n.tr("completion.scores", lang: language)) {
-                    ScoreSliderRow(titleKey: "dimension.story", value: $sStory)
-                    ScoreSliderRow(titleKey: "dimension.graphics", value: $sGraphics)
-                    ScoreSliderRow(titleKey: "dimension.music", value: $sMusic)
                     ScoreSliderRow(titleKey: "dimension.gameplay", value: $sGameplay)
+                    ScoreSliderRow(titleKey: "dimension.design", value: $sDesign)
+                    ScoreSliderRow(titleKey: "dimension.story", value: $sStory)
+                    ScoreSliderRow(titleKey: "dimension.art", value: $sArt)
+                    ScoreSliderRow(titleKey: "dimension.music", value: $sMusic)
+                    ScoreSliderRow(titleKey: "dimension.performance", value: $sPerformance)
                 }
             }
         }
@@ -472,7 +494,11 @@ struct GameEditView: View {
     }
 
     private func load() {
-        guard let game else { return }
+        guard let game else {
+            // 新建：字段全部保持默认，直接标记已加载完成，之后输入名字即可触发自动匹配。
+            didFinishLoading = true
+            return
+        }
         name = game.name
         aliases = game.aliases
         hasReleaseDate = game.releaseDate != nil
@@ -481,6 +507,8 @@ struct GameEditView: View {
         reviewTitle = game.reviewTitle
         reviewBody = game.reviewBody
         groupIDs = Set(game.groups.map(\.persistentModelID))
+        // 放在所有字段写入之后：避免上面给 name 赋值那一次 onChange 触发自动匹配。
+        didFinishLoading = true
     }
 
     private func pickCover() {
@@ -490,6 +518,37 @@ struct GameEditView: View {
         panel.canChooseDirectories = false
         if panel.runModal() == .OK, let url = panel.url, let data = try? Data(contentsOf: url) {
             coverData = data
+        }
+    }
+
+    // MARK: - 自动匹配封面
+
+    /// 输入游戏名 → 防抖后自动匹配封面（仅当开关开、已配 key、且尚无封面时）。
+    private func scheduleAutoMatch(_ newValue: String) {
+        autoMatchTask?.cancel()
+        guard autoMatchCover, !steamGridDBKey.isEmpty, coverData == nil, didFinishLoading else { return }
+        let term = newValue.trimmingCharacters(in: .whitespaces)
+        // 名字过短（不足 2 字）不搜，避免输字过程中频繁命中。
+        guard term.count >= 2 else { return }
+        let task = Task {
+            try? await Task.sleep(nanoseconds: 600_000_000)
+            guard !Task.isCancelled else { return }
+            await performAutoMatch(term: term)
+        }
+        autoMatchTask = task
+    }
+
+    private func performAutoMatch(term: String) async {
+        isAutoMatching = true
+        defer { isAutoMatching = false }
+        guard coverData == nil else { return }
+        let client = SteamGridDBClient(apiKey: steamGridDBKey)
+        do {
+            if let data = try await client.autoCover(for: term), coverData == nil {
+                coverData = data
+            }
+        } catch {
+            // 匹配失败静默降级：不打断录入，封面保持为空，可随时手动搜索。
         }
     }
 
@@ -536,10 +595,12 @@ struct GameEditView: View {
                 degree: degree,
                 playtime: parsedPlaytime,
                 notes: notes,
+                scoreGameplay: sGameplay,
+                scoreDesign: sDesign,
                 scoreStory: sStory,
-                scoreGraphics: sGraphics,
+                scoreArt: sArt,
                 scoreMusic: sMusic,
-                scoreGameplay: sGameplay
+                scorePerformance: sPerformance
             )
             completion.game = newGame
             context.insert(completion)

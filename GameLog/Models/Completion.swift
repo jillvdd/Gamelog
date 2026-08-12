@@ -2,7 +2,7 @@ import Foundation
 import SwiftData
 
 /// 一次通关记录。挂在 Game 下，可追加多条。
-/// 四维评分整体可选：首条记录必填，之后可跳过；跳过时四个分全部为 nil。
+/// 六维评分整体可选：首条记录必填，之后可跳过；跳过时六个分全部为 nil。
 @Model
 final class Completion {
     var platform: String
@@ -10,25 +10,30 @@ final class Completion {
     var degree: String
     var playtime: Double?
     var notes: String
-    var scoreStory: Double?
-    var scoreGraphics: Double?
-    var scoreMusic: Double?
     var scoreGameplay: Double?
+    var scoreDesign: Double?
+    var scoreStory: Double?
+    var scoreArt: Double?
+    var scoreMusic: Double?
+    var scorePerformance: Double?
     var createdAt: Date
     var game: Game?
 
     init(platform: String, date: Date, degree: String, playtime: Double? = nil,
-         notes: String = "", scoreStory: Double? = nil, scoreGraphics: Double? = nil,
-         scoreMusic: Double? = nil, scoreGameplay: Double? = nil, createdAt: Date = .now) {
+         notes: String = "", scoreGameplay: Double? = nil, scoreDesign: Double? = nil,
+         scoreStory: Double? = nil, scoreArt: Double? = nil, scoreMusic: Double? = nil,
+         scorePerformance: Double? = nil, createdAt: Date = .now) {
         self.platform = platform
         self.date = date
         self.degree = degree
         self.playtime = playtime
         self.notes = notes
-        self.scoreStory = scoreStory
-        self.scoreGraphics = scoreGraphics
-        self.scoreMusic = scoreMusic
         self.scoreGameplay = scoreGameplay
+        self.scoreDesign = scoreDesign
+        self.scoreStory = scoreStory
+        self.scoreArt = scoreArt
+        self.scoreMusic = scoreMusic
+        self.scorePerformance = scorePerformance
         self.createdAt = createdAt
     }
 }
@@ -37,13 +42,13 @@ final class Completion {
 
 extension Completion {
 
-    /// 已有的四维评分（可能不足四个）。
+    /// 已有的六维评分（可能不足六个）。按 Dimension 顺序排列。
     var scoreValues: [Double] {
-        [scoreStory, scoreGraphics, scoreMusic, scoreGameplay].compactMap { $0 }
+        [scoreGameplay, scoreDesign, scoreStory, scoreArt, scoreMusic, scorePerformance].compactMap { $0 }
     }
 
-    /// 是否已评分（四维全部填齐才算）。
-    var hasScores: Bool { scoreValues.count == 4 }
+    /// 是否已评分（六维全部填齐才算）。
+    var hasScores: Bool { scoreValues.count == 6 }
 
     /// 单条平均分（原始均值），未评分则 nil。
     var recordAverage: Double? {
@@ -58,10 +63,12 @@ extension Completion {
     /// 取指定维度的评分。
     func score(for dimension: Dimension) -> Double? {
         switch dimension {
-        case .story: scoreStory
-        case .graphics: scoreGraphics
-        case .music: scoreMusic
         case .gameplay: scoreGameplay
+        case .design: scoreDesign
+        case .story: scoreStory
+        case .art: scoreArt
+        case .music: scoreMusic
+        case .performance: scorePerformance
         }
     }
 }

@@ -15,10 +15,12 @@ struct CompletionEditView: View {
     @State private var playtimeText = ""
     @State private var notes = ""
     @State private var skipScores = false
-    @State private var sStory = 7.0
-    @State private var sGraphics = 7.0
-    @State private var sMusic = 7.0
     @State private var sGameplay = 7.0
+    @State private var sDesign = 7.0
+    @State private var sStory = 7.0
+    @State private var sArt = 7.0
+    @State private var sMusic = 7.0
+    @State private var sPerformance = 7.0
 
     @State private var validationError: String?
 
@@ -56,10 +58,12 @@ struct CompletionEditView: View {
                 Toggle(L10n.tr("completion.skipScores", lang: language), isOn: $skipScores)
                     .disabled(isFirst)
                 if !skipScores {
-                    ScoreSliderRow(titleKey: "dimension.story", value: $sStory)
-                    ScoreSliderRow(titleKey: "dimension.graphics", value: $sGraphics)
-                    ScoreSliderRow(titleKey: "dimension.music", value: $sMusic)
                     ScoreSliderRow(titleKey: "dimension.gameplay", value: $sGameplay)
+                    ScoreSliderRow(titleKey: "dimension.design", value: $sDesign)
+                    ScoreSliderRow(titleKey: "dimension.story", value: $sStory)
+                    ScoreSliderRow(titleKey: "dimension.art", value: $sArt)
+                    ScoreSliderRow(titleKey: "dimension.music", value: $sMusic)
+                    ScoreSliderRow(titleKey: "dimension.performance", value: $sPerformance)
                 }
             }
         }
@@ -95,10 +99,12 @@ struct CompletionEditView: View {
         playtimeText = completion.playtime.map { String($0) } ?? ""
         notes = completion.notes
         skipScores = !completion.hasScores
-        if let v = completion.scoreStory { sStory = v }
-        if let v = completion.scoreGraphics { sGraphics = v }
-        if let v = completion.scoreMusic { sMusic = v }
         if let v = completion.scoreGameplay { sGameplay = v }
+        if let v = completion.scoreDesign { sDesign = v }
+        if let v = completion.scoreStory { sStory = v }
+        if let v = completion.scoreArt { sArt = v }
+        if let v = completion.scoreMusic { sMusic = v }
+        if let v = completion.scorePerformance { sPerformance = v }
     }
 
     private var parsedPlaytime: Double? {
@@ -124,15 +130,19 @@ struct CompletionEditView: View {
             completion.playtime = parsedPlaytime
             completion.notes = notes
             if effectiveSkip {
-                completion.scoreStory = nil
-                completion.scoreGraphics = nil
-                completion.scoreMusic = nil
                 completion.scoreGameplay = nil
+                completion.scoreDesign = nil
+                completion.scoreStory = nil
+                completion.scoreArt = nil
+                completion.scoreMusic = nil
+                completion.scorePerformance = nil
             } else {
-                completion.scoreStory = sStory
-                completion.scoreGraphics = sGraphics
-                completion.scoreMusic = sMusic
                 completion.scoreGameplay = sGameplay
+                completion.scoreDesign = sDesign
+                completion.scoreStory = sStory
+                completion.scoreArt = sArt
+                completion.scoreMusic = sMusic
+                completion.scorePerformance = sPerformance
             }
         } else {
             let newCompletion = Completion(
@@ -141,10 +151,12 @@ struct CompletionEditView: View {
                 degree: degree,
                 playtime: parsedPlaytime,
                 notes: notes,
+                scoreGameplay: effectiveSkip ? nil : sGameplay,
+                scoreDesign: effectiveSkip ? nil : sDesign,
                 scoreStory: effectiveSkip ? nil : sStory,
-                scoreGraphics: effectiveSkip ? nil : sGraphics,
+                scoreArt: effectiveSkip ? nil : sArt,
                 scoreMusic: effectiveSkip ? nil : sMusic,
-                scoreGameplay: effectiveSkip ? nil : sGameplay
+                scorePerformance: effectiveSkip ? nil : sPerformance
             )
             newCompletion.game = game
             context.insert(newCompletion)

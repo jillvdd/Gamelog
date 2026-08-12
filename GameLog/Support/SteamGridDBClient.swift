@@ -52,6 +52,25 @@ struct SteamGridDBClient {
         return data
     }
 
+    /// 自动匹配封面：搜索第一个命中 → 竖版优先的第一张封面 → 下载。
+    /// 无命中或无封面返回 nil（调用方静默降级）；网络/服务异常会 throw。
+    func autoCover(for term: String) async throws -> Data? {
+        let hits = try await search(term: term)
+        guard let first = hits.first else { return nil }
+        let all = try await grids(for: first.id)
+        guard let grid = Self.sorted(all).first else { return nil }
+        return try await fetchImage(urlString: grid.url)
+    }
+
+    /// 竖版优先、大尺寸优先的封面排序（CoverSearchSheet 与自动匹配共用）。
+    static func sorted(_ grids: [SteamGridDBGrid]) -> [SteamGridDBGrid] {
+        grids.sorted { lhs, rhs in
+            if lhs.height > lhs.width && rhs.height < rhs.width { return true }
+            if lhs.height < lhs.width && rhs.height > rhs.width { return false }
+            return (lhs.width * lhs.height) > (rhs.width * rhs.height)
+        }
+    }
+
     private func requestData(_ url: URL) async throws -> Data {
         var request = URLRequest(url: url)
         request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")

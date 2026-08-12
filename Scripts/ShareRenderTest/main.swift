@@ -60,7 +60,8 @@ func run() -> Int {
                     coverData: coverData, reviewTitle: "RPG 天花板", reviewBody: "")
     context.insert(game)
     let c = Completion(platform: "Switch", date: .now, degree: "全收集/白金", playtime: 150,
-                       notes: "", scoreStory: 9.5, scoreGraphics: 8.5, scoreMusic: 9, scoreGameplay: 9.5)
+                       notes: "", scoreGameplay: 9.5, scoreDesign: 9, scoreStory: 9.5,
+                       scoreArt: 8.5, scoreMusic: 9, scorePerformance: 9)
     c.game = game
     context.insert(c)
 

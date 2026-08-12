@@ -35,10 +35,12 @@ struct CompletionDTO: Codable {
     var degree: String
     var playtime: Double?
     var notes: String
-    var scoreStory: Double?
-    var scoreGraphics: Double?
-    var scoreMusic: Double?
     var scoreGameplay: Double?
+    var scoreDesign: Double?
+    var scoreStory: Double?
+    var scoreArt: Double?
+    var scoreMusic: Double?
+    var scorePerformance: Double?
 }
 
 // MARK: - 导出 / 导入
@@ -68,10 +70,12 @@ enum BackupManager {
                             degree: completion.degree,
                             playtime: completion.playtime,
                             notes: completion.notes,
+                            scoreGameplay: completion.scoreGameplay,
+                            scoreDesign: completion.scoreDesign,
                             scoreStory: completion.scoreStory,
-                            scoreGraphics: completion.scoreGraphics,
+                            scoreArt: completion.scoreArt,
                             scoreMusic: completion.scoreMusic,
-                            scoreGameplay: completion.scoreGameplay
+                            scorePerformance: completion.scorePerformance
                         )
                     }
                 )
@@ -126,10 +130,12 @@ enum BackupManager {
                     degree: completionDTO.degree,
                     playtime: completionDTO.playtime,
                     notes: completionDTO.notes,
+                    scoreGameplay: completionDTO.scoreGameplay,
+                    scoreDesign: completionDTO.scoreDesign,
                     scoreStory: completionDTO.scoreStory,
-                    scoreGraphics: completionDTO.scoreGraphics,
+                    scoreArt: completionDTO.scoreArt,
                     scoreMusic: completionDTO.scoreMusic,
-                    scoreGameplay: completionDTO.scoreGameplay
+                    scorePerformance: completionDTO.scorePerformance
                 )
                 completion.game = game
                 context.insert(completion)

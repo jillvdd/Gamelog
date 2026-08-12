@@ -52,9 +52,12 @@ struct CompletionCardView: View {
                             LText(dimension.labelKey)
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.7)
                             Text(verbatim: completion.score(for: dimension).map { String(format: "%.1f", $0) } ?? "—")
                                 .font(.system(.body, design: .monospaced))
                         }
+                        .frame(maxWidth: .infinity)
                     }
                 }
             }
@@ -87,7 +90,7 @@ struct CompletionCardView: View {
     }
 }
 
-/// 详情页头部的四维评分条形图：每维度一条，颜色区分，长度按 10 分制比例。
+/// 详情页头部的六维评分条形图：每维度一条，颜色区分，长度按 10 分制比例。
 private struct DimensionScoreBars: View {
     let game: Game
 
@@ -99,7 +102,9 @@ private struct DimensionScoreBars: View {
                     LText(dimension.labelKey)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
-                        .frame(width: 34, alignment: .leading)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                        .frame(width: 96, alignment: .leading)
                     ZStack(alignment: .leading) {
                         Capsule().fill(Color(nsColor: .quaternarySystemFill))
                         if let value {
@@ -120,13 +125,15 @@ private struct DimensionScoreBars: View {
 }
 
 private extension Dimension {
-    /// 四维条形图的颜色（详情页用）。
+    /// 六维条形图的颜色（详情页用）。
     var barColor: Color {
         switch self {
-        case .story: .blue
-        case .graphics: .purple
-        case .music: .pink
         case .gameplay: .orange
+        case .design: .teal
+        case .story: .blue
+        case .art: .purple
+        case .music: .pink
+        case .performance: .green
         }
     }
 }
@@ -244,7 +251,7 @@ struct GameDetailView: View {
                 if let image = game.coverImage {
                     Image(nsImage: image)
                         .resizable()
-                        .scaledToFill()
+                        .scaledToFit()
                 } else {
                     ZStack {
                         Rectangle().fill(Color(nsColor: .quaternarySystemFill))
@@ -255,6 +262,7 @@ struct GameDetailView: View {
                 }
             }
             .frame(width: 160, height: 213)
+            .background(Rectangle().fill(Color(nsColor: .quaternarySystemFill)))
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .shadow(color: .black.opacity(0.15), radius: 6, y: 2)
 

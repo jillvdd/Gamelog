@@ -13,6 +13,7 @@ struct SettingsView: View {
     @AppStorage(UserCustomization.usernameKey) private var username = ""
     @AppStorage(UserCustomization.avatarFileKey) private var avatarFile = ""
     @AppStorage(UserCustomization.iconFileKey) private var iconFile = ""
+    @AppStorage(UserCustomization.autoMatchCoverKey) private var autoMatchCover = false
 
     @Query(sort: \Game.createdAt) private var games: [Game]
     @Query(sort: \GameGroup.name) private var groups: [GameGroup]
@@ -59,6 +60,11 @@ struct SettingsView: View {
                             .disabled(iconFile.isEmpty)
                     }
                 }
+
+                Toggle(L10n.tr("settings.autoMatchCover", lang: language), isOn: $autoMatchCover)
+                LText("settings.autoMatchCoverHint")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section(L10n.tr("settings.steamgriddb", lang: language)) {

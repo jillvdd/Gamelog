@@ -97,9 +97,13 @@ struct ShareTheme {
 private struct BrandWatermark: View {
     let theme: ShareTheme
     let fontSize: CGFloat
+    /// 覆盖文字与头像描边色：竖卡内容叠在深色遮罩上时传浅色，默认随主题。
+    var tint: Color? = nil
     @Environment(\.appLanguageCode) private var language
     @AppStorage(UserCustomization.usernameKey) private var username = ""
     @AppStorage(UserCustomization.avatarFileKey) private var avatarFile = ""
+
+    private var color: Color { tint ?? theme.secondary }
 
     private var text: String {
         let name = username.trimmingCharacters(in: .whitespaces)
@@ -111,13 +115,13 @@ private struct BrandWatermark: View {
         HStack(spacing: 12) {
             Text(verbatim: text)
                 .font(.system(size: fontSize))
-                .foregroundStyle(theme.secondary)
+                .foregroundStyle(color)
             if !avatarFile.isEmpty, let avatar = UserCustomization.avatarImage() {
                 Image(nsImage: avatar)
                     .resizable()
                     .frame(width: 48, height: 48)
                     .clipShape(Circle())
-                    .overlay(Circle().stroke(theme.secondary, lineWidth: 2))
+                    .overlay(Circle().stroke(color, lineWidth: 2))
             }
         }
     }
@@ -140,16 +144,18 @@ private enum ShareDateFormat {
 
 // MARK: - 封面辅助视图
 
-private struct CoverFill: View {
+private struct CoverImage: View {
     let game: Game
     let theme: ShareTheme
+    /// .fit：完整显示封面（居中、四边可能留白）；.fill：铺满容器（可能裁切）。
+    var mode: ContentMode = .fill
 
     var body: some View {
         Group {
             if let image = game.coverImage {
                 Image(nsImage: image)
                     .resizable()
-                    .scaledToFill()
+                    .aspectRatio(contentMode: mode)
             } else {
                 ZStack {
                     Rectangle().fill(theme.card)
@@ -195,107 +201,121 @@ private struct SingleCardVertical: View {
     let game: Game
     let theme: ShareTheme
 
+    /// 深色半透明内容条的文案用色：封面明暗随机，固定浅色保证可读。
+    private let contentText = Color.white
+    private let contentSecondary = Color.white.opacity(0.82)
+    private let contentAccent = Color(red: 1.0, green: 0.82, blue: 0.55)
+
     var body: some View {
-        VStack(spacing: 0) {
-            ZStack(alignment: .topTrailing) {
-                CoverFill(game: game, theme: theme)
-                    .frame(height: 1050)
-                    .clipped()
+        ZStack(alignment: .top) {
+            // 封面：按卡宽完整显示、顶端对齐，作为整卡背景。
+            CoverImage(game: game, theme: theme, mode: .fit)
+                .frame(width: 1080, height: 1920, alignment: .top)
+                .clipped()
+
+            // 内容条：贴卡底，半透明渐变遮罩铺满整条（标题区也有明显遮罩），封面完整透出。
+            ZStack(alignment: .bottom) {
                 LinearGradient(
-                    colors: [.clear, theme.background],
-                    startPoint: .center,
+                    colors: [.black.opacity(0.45), Color.black.opacity(0.85)],
+                    startPoint: .top,
                     endPoint: .bottom
                 )
-                .frame(height: 240)
-                .frame(maxHeight: .infinity, alignment: .bottom)
+                .frame(height: 800)
 
-                if let score = game.libraryScore {
-                    Text(verbatim: String(format: "%.1f", score))
-                        .font(.system(size: 52, weight: .bold))
-                        .monospacedDigit()
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 26)
-                        .padding(.vertical, 12)
-                        .background(.black.opacity(0.55), in: Capsule())
-                        .padding(32)
-                }
-            }
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(verbatim: game.name)
+                        .font(.system(size: 78, weight: .bold))
+                        .foregroundStyle(contentText)
+                        .lineLimit(2)
 
-            VStack(alignment: .leading, spacing: 0) {
-                Spacer(minLength: 40)
-                Text(verbatim: game.name)
-                    .font(.system(size: 78, weight: .bold))
-                    .foregroundStyle(theme.text)
-                    .lineLimit(2)
+                    let platforms = game.completions.map(\.platform).filter { !$0.isEmpty }
+                    if !platforms.isEmpty {
+                        Text(verbatim: Array(Set(platforms)).sorted()
+                            .map { Presets.display($0, category: .platform, language: language) }
+                            .joined(separator: " · "))
+                            .font(.system(size: 40, weight: .medium))
+                            .foregroundStyle(contentSecondary)
+                            .padding(.top, 20)
+                    }
 
-                let platforms = game.completions.map(\.platform).filter { !$0.isEmpty }
-                if !platforms.isEmpty {
-                    Text(verbatim: Array(Set(platforms)).sorted()
-                        .map { Presets.display($0, category: .platform, language: language) }
-                        .joined(separator: " · "))
-                        .font(.system(size: 40, weight: .medium))
-                        .foregroundStyle(theme.secondary)
-                        .padding(.top, 20)
-                }
+                    if let latest = game.sortedCompletions.last {
+                        Text(verbatim: ShareDateFormat.string(from: latest.date, language: language))
+                            .font(.system(size: 30))
+                            .foregroundStyle(contentSecondary)
+                            .padding(.top, 12)
+                    }
 
-                if let latest = game.sortedCompletions.last {
-                    Text(verbatim: ShareDateFormat.string(from: latest.date, language: language))
-                        .font(.system(size: 30))
-                        .foregroundStyle(theme.secondary)
-                        .padding(.top, 12)
-                }
+                    if !game.reviewTitle.isEmpty {
+                        Text(verbatim: game.reviewTitle)
+                            .font(.system(size: 38)).italic()
+                            .foregroundStyle(contentAccent)
+                            .padding(.top, 28)
+                    }
 
-                if !game.reviewTitle.isEmpty {
-                    Text(verbatim: game.reviewTitle)
-                        .font(.system(size: 38)).italic()
-                        .foregroundStyle(theme.accent)
-                        .padding(.top, 28)
-                }
-
-                Spacer()
-
-                if let averages = dimensionValues {
-                    HStack(spacing: 40) {
-                        ForEach(Dimension.allCases) { dimension in
-                            VStack(spacing: 8) {
-                                Text(verbatim: L10n.tr(dimension.labelKey, lang: language))
-                                    .font(.system(size: 30, weight: .medium))
-                                    .foregroundStyle(theme.secondary)
-                                Text(verbatim: String(format: "%.1f", averages[dimension] ?? 0))
-                                    .font(.system(size: 40, weight: .semibold))
-                                    .monospacedDigit()
-                                    .foregroundStyle(theme.text)
+                    if let averages = dimensionValues {
+                        LazyVGrid(
+                            columns: Array(repeating: GridItem(.flexible(), spacing: 28), count: 3),
+                            spacing: 18
+                        ) {
+                            ForEach(Dimension.allCases) { dimension in
+                                VStack(spacing: 8) {
+                                    Text(verbatim: L10n.tr(dimension.labelKey, lang: language))
+                                        .font(.system(size: 30, weight: .medium))
+                                        .foregroundStyle(contentSecondary)
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.7)
+                                    Text(verbatim: String(format: "%.1f", averages[dimension] ?? 0))
+                                        .font(.system(size: 40, weight: .semibold))
+                                        .monospacedDigit()
+                                        .foregroundStyle(contentText)
+                                }
+                                .frame(maxWidth: .infinity)
                             }
-                            .frame(maxWidth: .infinity)
                         }
+                        .padding(.top, 32)
                     }
-                    .padding(.top, 40)
-                }
 
-                HStack(spacing: 24) {
-                    Rectangle().fill(theme.separator).frame(height: 2)
-                    if let score = game.libraryScore {
-                        Text(verbatim: String(format: "%.1f", score))
-                            .font(.system(size: 96, weight: .bold))
-                            .monospacedDigit()
-                            .foregroundStyle(theme.text)
-                    } else {
-                        Text(verbatim: L10n.tr("score.unrated", lang: language))
-                            .font(.system(size: 56, weight: .medium))
-                            .foregroundStyle(theme.secondary)
+                    HStack(spacing: 24) {
+                        Rectangle().fill(Color.white.opacity(0.35)).frame(height: 2)
+                        if let score = game.libraryScore {
+                            Text(verbatim: String(format: "%.1f", score))
+                                .font(.system(size: 96, weight: .bold))
+                                .monospacedDigit()
+                                .foregroundStyle(contentText)
+                        } else {
+                            Text(verbatim: L10n.tr("score.unrated", lang: language))
+                                .font(.system(size: 56, weight: .medium))
+                                .foregroundStyle(contentSecondary)
+                        }
+                        Rectangle().fill(Color.white.opacity(0.35)).frame(height: 2)
                     }
-                    Rectangle().fill(theme.separator).frame(height: 2)
-                }
-                .padding(.vertical, 44)
+                    .padding(.vertical, 44)
 
-                BrandWatermark(theme: theme, fontSize: 28)
+                    BrandWatermark(theme: theme, fontSize: 28, tint: contentSecondary)
+                }
+                .padding(.horizontal, 72)
+                .padding(.top, 24)
+                .padding(.bottom, 56)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(.horizontal, 72)
-            .padding(.bottom, 56)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-            .background(theme.background)
+            .frame(height: 800)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+
+            // 右上角分数胶囊。
+            if let score = game.libraryScore {
+                Text(verbatim: String(format: "%.1f", score))
+                    .font(.system(size: 52, weight: .bold))
+                    .monospacedDigit()
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 26)
+                    .padding(.vertical, 12)
+                    .background(.black.opacity(0.55), in: Capsule())
+                    .padding(32)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+            }
         }
         .frame(width: 1080, height: 1920)
+        .background(theme.background)
     }
 
     @Environment(\.appLanguageCode) private var language
@@ -303,12 +323,7 @@ private struct SingleCardVertical: View {
     private var dimensionValues: [Dimension: Double]? {
         let c = game.sortedCompletions.last
         guard let c, c.hasScores else { return nil }
-        return [
-            .story: c.scoreStory ?? 0,
-            .graphics: c.scoreGraphics ?? 0,
-            .music: c.scoreMusic ?? 0,
-            .gameplay: c.scoreGameplay ?? 0,
-        ]
+        return Dictionary(uniqueKeysWithValues: Dimension.allCases.map { ($0, c.score(for: $0) ?? 0) })
     }
 }
 
@@ -321,8 +336,9 @@ private struct SingleCardHorizontal: View {
     var body: some View {
         HStack(spacing: 0) {
             ZStack(alignment: .topTrailing) {
-                CoverFill(game: game, theme: theme)
+                CoverImage(game: game, theme: theme, mode: .fit)
                     .frame(width: 820, height: 1080)
+                    .background(theme.card)
                     .clipped()
                 if let score = game.libraryScore {
                     Text(verbatim: String(format: "%.1f", score))
@@ -370,12 +386,17 @@ private struct SingleCardHorizontal: View {
                 Spacer()
 
                 if let averages = dimensionValues {
-                    HStack(spacing: 36) {
+                    LazyVGrid(
+                        columns: Array(repeating: GridItem(.flexible(), spacing: 28), count: 3),
+                        spacing: 16
+                    ) {
                         ForEach(Dimension.allCases) { dimension in
                             VStack(spacing: 6) {
                                 Text(verbatim: L10n.tr(dimension.labelKey, lang: language))
                                     .font(.system(size: 28, weight: .medium))
                                     .foregroundStyle(theme.secondary)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.7)
                                 Text(verbatim: String(format: "%.1f", averages[dimension] ?? 0))
                                     .font(.system(size: 36, weight: .semibold))
                                     .monospacedDigit()
@@ -418,12 +439,7 @@ private struct SingleCardHorizontal: View {
     private var dimensionValues: [Dimension: Double]? {
         let c = game.sortedCompletions.last
         guard let c, c.hasScores else { return nil }
-        return [
-            .story: c.scoreStory ?? 0,
-            .graphics: c.scoreGraphics ?? 0,
-            .music: c.scoreMusic ?? 0,
-            .gameplay: c.scoreGameplay ?? 0,
-        ]
+        return Dictionary(uniqueKeysWithValues: Dimension.allCases.map { ($0, c.score(for: $0) ?? 0) })
     }
 }
 
@@ -504,7 +520,7 @@ private struct OverviewCell: View {
                 if let image = game.coverImage {
                     Image(nsImage: image)
                         .resizable()
-                        .scaledToFill()
+                        .scaledToFit()
                 } else {
                     ZStack {
                         Rectangle().fill(theme.card)
@@ -514,6 +530,7 @@ private struct OverviewCell: View {
                 }
             }
             .frame(width: cellSize.width, height: cellSize.width * 4 / 3)
+            .background(theme.card)
             .clipShape(RoundedRectangle(cornerRadius: 12))
 
             Text(verbatim: game.name)

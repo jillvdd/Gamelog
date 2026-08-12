@@ -1,7 +1,7 @@
 import AppKit
 import Foundation
 
-/// 用户三项自定义（用户名 / app 图标 / 头像）的持久化与读取。
+/// 用户个性化项（用户名 / app 图标 / 头像 / 自动匹配封面开关）的持久化与读取。
 ///
 /// - 用户名：标准 UserDefaults（设置页用 `@AppStorage("customization.username")` 读写同一源）。
 /// - 头像 / app 图标：PNG 文件存 `~/Library/Application Support/GameLog/`，
@@ -15,6 +15,8 @@ enum UserCustomization {
     static let usernameKey = "customization.username"
     static let avatarFileKey = "customization.avatarFile"
     static let iconFileKey = "customization.iconFile"
+    /// 自动匹配封面开关（默认关闭，设置页读写同一源）。
+    static let autoMatchCoverKey = "customization.autoMatchCover"
 
     /// 用户名长度上限（设置页输入与导入时统一截断）。
     static let usernameMaxLength = 20

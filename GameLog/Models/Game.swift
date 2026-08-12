@@ -1,12 +1,14 @@
 import Foundation
 import SwiftData
 
-/// 四维评分维度。
+/// 六维评分维度。顺序即全局显示顺序（滑块 / 条形图 / 分享卡一致）。
 enum Dimension: String, CaseIterable, Identifiable {
-    case story
-    case graphics
-    case music
     case gameplay
+    case design
+    case story
+    case art
+    case music
+    case performance
 
     var id: String { rawValue }
 

@@ -40,11 +40,13 @@
 "completion.edit" = "編集";
 "completion.delete" = "削除";
 "completion.skipScores" = "今回はスコアを付けない";
-"completion.scores" = "4次元スコア";
-"dimension.story" = "ストーリー";
-"dimension.graphics" = "グラフィック";
-"dimension.music" = "音楽";
+"completion.scores" = "6次元スコア";
 "dimension.gameplay" = "ゲーム性";
+"dimension.design" = "デザイン";
+"dimension.story" = "ストーリー";
+"dimension.art" = "アート";
+"dimension.music" = "音楽";
+"dimension.performance" = "パフォーマンス";
 "score.average" = "平均";
 "score.unrated" = "未評価";
 "common.save" = "保存";
@@ -83,6 +85,8 @@
 "settings.chooseImage" = "画像を選択…";
 "settings.removeAvatar" = "アバターを削除";
 "settings.restoreIcon" = "デフォルトアイコンに戻す";
+"settings.autoMatchCover" = "カバー自動取得";
+"settings.autoMatchCoverHint" = "ゲーム名を入力すると SteamGridDB を検索し、最初のカバーを自動設定します（下の API Key の設定が必要です）。";
 "crop.titleAvatar" = "アバターを切り抜く";
 "crop.titleIcon" = "アイコンを切り抜く";
 "crop.zoom" = "ズーム";

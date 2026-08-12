@@ -40,11 +40,13 @@
 "completion.edit" = "编辑";
 "completion.delete" = "删除";
 "completion.skipScores" = "本次跳过评分";
-"completion.scores" = "四维评分";
-"dimension.story" = "剧情";
-"dimension.graphics" = "画面";
-"dimension.music" = "音乐";
+"completion.scores" = "六维评分";
 "dimension.gameplay" = "玩法";
+"dimension.design" = "设计";
+"dimension.story" = "剧情";
+"dimension.art" = "美术";
+"dimension.music" = "音乐";
+"dimension.performance" = "性能";
 "score.average" = "平均分";
 "score.unrated" = "未评分";
 "common.save" = "保存";
@@ -82,6 +84,8 @@
 "settings.chooseImage" = "选择图片…";
 "settings.removeAvatar" = "移除头像";
 "settings.restoreIcon" = "恢复默认图标";
+"settings.autoMatchCover" = "自动匹配封面";
+"settings.autoMatchCoverHint" = "输入游戏名后，自动搜索 SteamGridDB 并填入第一张封面（需在下方配置 API Key）。";
 "crop.titleAvatar" = "裁切头像";
 "crop.titleIcon" = "裁切图标";
 "crop.zoom" = "缩放";
