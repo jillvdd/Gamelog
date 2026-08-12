@@ -47,10 +47,10 @@ extension Completion {
         [scoreGameplay, scoreDesign, scoreStory, scoreArt, scoreMusic, scorePerformance].compactMap { $0 }
     }
 
-    /// 是否已评分（六维全部填齐才算）。
-    var hasScores: Bool { scoreValues.count == 6 }
+    /// 是否已评分：六维中至少一项有分即可（平均分按现有维度均值算）。
+    var hasScores: Bool { !scoreValues.isEmpty }
 
-    /// 单条平均分（原始均值），未评分则 nil。
+    /// 单条平均分（现有维度原始均值），未评分则 nil。
     var recordAverage: Double? {
         hasScores ? ScoreMath.recordAverage(scoreValues) : nil
     }

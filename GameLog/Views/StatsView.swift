@@ -8,10 +8,14 @@ struct StatsView: View {
 
     private var totalGames: Int { games.count }
 
+    /// 库平均分：库内每条已评分通关记录的六维平均分之均值，取整到 0.5。
+    /// 单条记录按现有六维评分求均值，一条通关记录计一次。
     private var avgScore: Double? {
-        let scores = games.compactMap(\.libraryScore)
-        guard !scores.isEmpty else { return nil }
-        return ScoreMath.roundToHalf(scores.reduce(0, +) / Double(scores.count))
+        let averages = games
+            .flatMap(\.completions)
+            .compactMap(\.recordAverage)
+        guard !averages.isEmpty else { return nil }
+        return ScoreMath.roundToHalf(averages.reduce(0, +) / Double(averages.count))
     }
 
     private var platformCounts: [(platform: String, count: Int)] {

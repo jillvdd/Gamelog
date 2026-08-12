@@ -264,7 +264,7 @@ private struct SingleCardVertical: View {
                                         .foregroundStyle(contentSecondary)
                                         .lineLimit(1)
                                         .minimumScaleFactor(0.7)
-                                    Text(verbatim: String(format: "%.1f", averages[dimension] ?? 0))
+                                    Text(verbatim: averages[dimension].map { String(format: "%.1f", $0) } ?? "—")
                                         .font(.system(size: 40, weight: .semibold))
                                         .monospacedDigit()
                                         .foregroundStyle(contentText)
@@ -323,7 +323,9 @@ private struct SingleCardVertical: View {
     private var dimensionValues: [Dimension: Double]? {
         let c = game.sortedCompletions.last
         guard let c, c.hasScores else { return nil }
-        return Dictionary(uniqueKeysWithValues: Dimension.allCases.map { ($0, c.score(for: $0) ?? 0) })
+        return Dictionary(uniqueKeysWithValues: Dimension.allCases.compactMap { dimension in
+            c.score(for: dimension).map { (dimension, $0) }
+        })
     }
 }
 
@@ -397,7 +399,7 @@ private struct SingleCardHorizontal: View {
                                     .foregroundStyle(theme.secondary)
                                     .lineLimit(1)
                                     .minimumScaleFactor(0.7)
-                                Text(verbatim: String(format: "%.1f", averages[dimension] ?? 0))
+                                Text(verbatim: averages[dimension].map { String(format: "%.1f", $0) } ?? "—")
                                     .font(.system(size: 36, weight: .semibold))
                                     .monospacedDigit()
                                     .foregroundStyle(theme.text)
@@ -439,7 +441,9 @@ private struct SingleCardHorizontal: View {
     private var dimensionValues: [Dimension: Double]? {
         let c = game.sortedCompletions.last
         guard let c, c.hasScores else { return nil }
-        return Dictionary(uniqueKeysWithValues: Dimension.allCases.map { ($0, c.score(for: $0) ?? 0) })
+        return Dictionary(uniqueKeysWithValues: Dimension.allCases.compactMap { dimension in
+            c.score(for: dimension).map { (dimension, $0) }
+        })
     }
 }
 
