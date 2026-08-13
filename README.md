@@ -53,6 +53,23 @@ xcrun simctl launch booted com.abcleg.GameLog
 
 或在 Xcode 中打开 `GameLog.xcodeproj`，选 `GameLog`（macOS）或 `GameLog-iOS`（iOS）scheme 直接 Run。
 
+## 在 iPhone 上安装（IPA）
+
+本仓库提供 Release 版 IPA（`dist/GameLog-beta-1.7.ipa`），未签名，需自行签名后安装。
+
+> 提示：模拟器或日常开发调试直接用 Xcode Run 即可，不需要 IPA。
+
+## 试用 Demo 数据
+
+仓库附带一份生成的演示数据（[GameLog-demo-backup.json](GameLog-demo-backup.json)），可用于演示本 app 的功能：50 款游戏（中 / 英 / 日名 + 发售日期）、105 条通关记录（平台分布 Nintendo Switch 2 / PS5 / Xbox Series X|S / PC，含向下兼容痕迹）、六维评分、9 个分组。
+
+导入方法：
+
+1. iOS：把 JSON 放进「文件」app；macOS：放到本地
+2. 打开 app → 设置 → 备份 → **导入** → 选择该文件 → 确定
+
+注意：导入会替换当前数据。
+
 ## 使用 SteamGridDB 封面搜索
 
 1. 到 [steamgriddb.com](https://www.steamgriddb.com) 免费注册，从个人页面获取 API Key。

@@ -53,6 +53,23 @@ xcrun simctl launch booted com.abcleg.GameLog
 
 または Xcode で `GameLog.xcodeproj` を開き、`GameLog`（macOS）または `GameLog-iOS`（iOS）スキームで Run します。
 
+## iPhone へのインストール（IPA）
+
+本リポジトリには Release 版 IPA（`dist/GameLog-beta-1.7.ipa`）がありますが、未署名のため、自分で署名してからインストールする必要があります。
+
+> ヒント：シミュレータや開発中のデバッグは Xcode で Run するだけで十分で、IPA は不要です。
+
+## Demo データを試す
+
+リポジトリには本アプリの機能を確認するための生成済みデモデータ（[GameLog-demo-backup.json](GameLog-demo-backup.json)）が付属しています：50 タイトル（中国語 / 英語 / 日本語名 + 発売日）、105 件のクリア記録（Nintendo Switch 2 / PS5 / Xbox Series X|S / PC に分散、下位互換の痕跡含む）、6 軸スコア、9 グループ。
+
+インポート方法：
+
+1. iOS：JSON を「ファイル」app に配置；macOS：ローカルに配置
+2. アプリ → 設定 → バックアップ → **インポート** → ファイルを選択 → 確定
+
+注意：インポートすると現在のデータが置き換わります。
+
 ## SteamGridDB カバー検索
 
 1. [steamgriddb.com](https://www.steamgriddb.com) で無料登録し、プロフィールページから API Key を取得。

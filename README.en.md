@@ -53,6 +53,23 @@ xcrun simctl launch booted com.abcleg.GameLog
 
 Or open `GameLog.xcodeproj` in Xcode and Run the `GameLog` (macOS) or `GameLog-iOS` (iOS) scheme.
 
+## Installing on iPhone (IPA)
+
+This repository provides a Release IPA (`dist/GameLog-beta-1.7.ipa`), unsigned — you need to sign it yourself before installing.
+
+> Tip: for simulator or daily development debugging, just Run from Xcode — no IPA needed.
+
+## Try the Demo Data
+
+The repository includes a generated demo dataset ([GameLog-demo-backup.json](GameLog-demo-backup.json)) for demonstrating this app's features: 50 games (Chinese / English / Japanese names + release dates), 105 completions (platforms spread across Nintendo Switch 2 / PS5 / Xbox Series X|S / PC, with backward-compatibility traces), six-dimension scores, and 9 groups.
+
+To import:
+
+1. iOS: put the JSON into the Files app; macOS: place it locally
+2. Open the app → Settings → Backup → **Import** → pick the file → Confirm
+
+Note: importing replaces the current data.
+
 ## SteamGridDB Cover Search
 
 1. Register for free at [steamgriddb.com](https://www.steamgriddb.com) and get an API Key from your profile page.

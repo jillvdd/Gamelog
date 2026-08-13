@@ -1,0 +1,2386 @@
+{
+  "version": 1,
+  "exportedAt": "2026-08-14T02:30:00Z",
+  "groups": [
+    {
+      "name": "任天堂第一方",
+      "review": "任天堂出品的招牌作品"
+    },
+    {
+      "name": "索尼第一方",
+      "review": "PlayStation 独占与第一方大作"
+    },
+    {
+      "name": "微软第一方",
+      "review": "Xbox / 微软发行的作品"
+    },
+    {
+      "name": "动作冒险",
+      "review": "动作与冒险为主"
+    },
+    {
+      "name": "角色扮演",
+      "review": "RPG 与成长养成"
+    },
+    {
+      "name": "射击",
+      "review": "枪战 / 竞速 / 模拟"
+    },
+    {
+      "name": "塞尔达传说",
+      "review": "海拉鲁的冒险"
+    },
+    {
+      "name": "超级马力欧",
+      "review": "水管工大叔的奇妙冒险"
+    },
+    {
+      "name": "魂系游戏",
+      "review": "FromSoftware 高难度动作"
+    }
+  ],
+  "games": [
+    {
+      "name": "The Legend of Zelda: Tears of the Kingdom",
+      "nameZh": "塞尔达传说 王国之泪",
+      "nameJa": "ゼルダの伝説 ティアーズ オブ ザ キングダム",
+      "aliases": [
+        "TOTK",
+        "王国之泪"
+      ],
+      "releaseDate": "2023-05-12T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "开放世界探索的又一次进化，物理引擎是神",
+      "reviewBody": "",
+      "groupNames": [
+        "任天堂第一方",
+        "动作冒险",
+        "塞尔达传说"
+      ],
+      "completions": [
+        {
+          "platform": "Nintendo Switch 2",
+          "date": "2025-05-21T00:00:00Z",
+          "degree": "主线通关",
+          "playtime": 52.9,
+          "notes": "",
+          "scoreGameplay": 10.0,
+          "scoreDesign": 9.7,
+          "scoreStory": 9.6,
+          "scoreArt": 9.7,
+          "scoreMusic": 10.0,
+          "scorePerformance": 9.3
+        },
+        {
+          "platform": "Nintendo Switch 2",
+          "date": "2024-06-25T00:00:00Z",
+          "degree": "全结局",
+          "playtime": 21.0,
+          "notes": "",
+          "scoreGameplay": 10.0,
+          "scoreDesign": 9.4,
+          "scoreStory": 10.0,
+          "scoreArt": 9.7,
+          "scoreMusic": 10.0,
+          "scorePerformance": 9.6
+        },
+        {
+          "platform": "Nintendo Switch 2",
+          "date": "2026-03-17T00:00:00Z",
+          "degree": "主线通关",
+          "playtime": 31.6,
+          "notes": "",
+          "scoreGameplay": 10.0,
+          "scoreDesign": 9.3,
+          "scoreStory": 9.9,
+          "scoreArt": 9.9,
+          "scoreMusic": 9.9,
+          "scorePerformance": 9.2
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "The Legend of Zelda: Breath of the Wild",
+      "nameZh": "塞尔达传说 旷野之息",
+      "nameJa": "ゼルダの伝説 ブレス オブ ザ ワイルド",
+      "aliases": [
+        "BOTW",
+        "旷野之息"
+      ],
+      "releaseDate": "2017-03-03T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "定义了现代开放世界的里程碑",
+      "reviewBody": "",
+      "groupNames": [
+        "任天堂第一方",
+        "动作冒险",
+        "塞尔达传说"
+      ],
+      "completions": [
+        {
+          "platform": "Nintendo Switch 2",
+          "date": "2017-05-20T00:00:00Z",
+          "degree": "主线通关",
+          "playtime": 33.0,
+          "notes": "",
+          "scoreGameplay": 10.0,
+          "scoreDesign": 9.5,
+          "scoreStory": 10.0,
+          "scoreArt": 9.7,
+          "scoreMusic": 9.8,
+          "scorePerformance": 9.8
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "Super Mario Odyssey",
+      "nameZh": "超级马力欧 奥德赛",
+      "nameJa": "スーパーマリオ オデッセイ",
+      "aliases": [
+        "马里奥奥德赛",
+        "マリオオデッセイ"
+      ],
+      "releaseDate": "2017-10-27T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "箱庭关卡设计的天花板",
+      "reviewBody": "",
+      "groupNames": [
+        "任天堂第一方",
+        "动作冒险",
+        "超级马力欧"
+      ],
+      "completions": [
+        {
+          "platform": "Nintendo Switch 2",
+          "date": "2025-08-03T00:00:00Z",
+          "degree": "主线通关",
+          "playtime": 18.9,
+          "notes": "和好友一起联机打通，体验翻倍",
+          "scoreGameplay": 10.0,
+          "scoreDesign": 9.6,
+          "scoreStory": 9.6,
+          "scoreArt": 9.2,
+          "scoreMusic": 9.9,
+          "scorePerformance": 9.3
+        },
+        {
+          "platform": "Nintendo Switch",
+          "date": "2021-05-04T00:00:00Z",
+          "degree": "全结局",
+          "playtime": 55.3,
+          "notes": "",
+          "scoreGameplay": 9.8,
+          "scoreDesign": 9.5,
+          "scoreStory": 9.1,
+          "scoreArt": 9.6,
+          "scoreMusic": 9.8,
+          "scorePerformance": 9.2
+        },
+        {
+          "platform": "Nintendo Switch",
+          "date": "2020-05-05T00:00:00Z",
+          "degree": "主线通关",
+          "playtime": 51.7,
+          "notes": "画面在 OLED 上真的惊艳",
+          "scoreGameplay": 10.0,
+          "scoreDesign": 9.5,
+          "scoreStory": 9.1,
+          "scoreArt": 9.1,
+          "scoreMusic": 9.7,
+          "scorePerformance": 9.0
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "Mario Kart 8 Deluxe",
+      "nameZh": "马力欧赛车8 豪华版",
+      "nameJa": "マリオカート8 デラックス",
+      "aliases": [
+        "马车8",
+        "マリカ8"
+      ],
+      "releaseDate": "2017-04-28T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "",
+      "reviewBody": "",
+      "groupNames": [
+        "任天堂第一方",
+        "动作冒险",
+        "超级马力欧"
+      ],
+      "completions": [
+        {
+          "platform": "Nintendo Switch 2",
+          "date": "2021-08-21T00:00:00Z",
+          "degree": "全结局",
+          "playtime": 52.5,
+          "notes": "",
+          "scoreGameplay": 9.4,
+          "scoreDesign": 8.9,
+          "scoreStory": 9.0,
+          "scoreArt": 8.9,
+          "scoreMusic": 9.2,
+          "scorePerformance": 8.8
+        },
+        {
+          "platform": "Nintendo Switch 2",
+          "date": "2024-04-07T00:00:00Z",
+          "degree": "全结局",
+          "playtime": 21.2,
+          "notes": "白金路上花了很久，值了",
+          "scoreGameplay": 8.9,
+          "scoreDesign": 8.5,
+          "scoreStory": 8.7,
+          "scoreArt": 8.9,
+          "scoreMusic": 8.7,
+          "scorePerformance": 8.7
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "Super Smash Bros. Ultimate",
+      "nameZh": "任天堂明星大乱斗 特别版",
+      "nameJa": "大乱闘スマッシュブラザーズ SPECIAL",
+      "aliases": [
+        "大乱斗",
+        "スマブラSP"
+      ],
+      "releaseDate": "2018-12-07T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "",
+      "reviewBody": "",
+      "groupNames": [
+        "任天堂第一方",
+        "动作冒险"
+      ],
+      "completions": [
+        {
+          "platform": "Nintendo Switch",
+          "date": "2025-11-16T00:00:00Z",
+          "degree": "全支线",
+          "playtime": 21.4,
+          "notes": "",
+          "scoreGameplay": 9.2,
+          "scoreDesign": 9.6,
+          "scoreStory": 9.0,
+          "scoreArt": 9.5,
+          "scoreMusic": 9.4,
+          "scorePerformance": 9.2
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "Metroid Dread",
+      "nameZh": "密特罗德 生存恐惧",
+      "nameJa": "メトロイド ドレッド",
+      "aliases": [
+        "密特罗德",
+        "メトロイド ドレッド"
+      ],
+      "releaseDate": "2021-10-08T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "",
+      "reviewBody": "",
+      "groupNames": [
+        "任天堂第一方",
+        "动作冒险"
+      ],
+      "completions": [
+        {
+          "platform": "Nintendo Switch",
+          "date": "2022-10-07T00:00:00Z",
+          "degree": "主线通关",
+          "playtime": 46.0,
+          "notes": "画面在 OLED 上真的惊艳",
+          "scoreGameplay": 9.5,
+          "scoreDesign": 9.0,
+          "scoreStory": 9.1,
+          "scoreArt": 9.1,
+          "scoreMusic": 8.7,
+          "scorePerformance": 8.7
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "Kirby and the Forgotten Land",
+      "nameZh": "星之卡比 探索发现",
+      "nameJa": "星のカービィ ディスカバリー",
+      "aliases": [
+        "卡比",
+        "カービィ"
+      ],
+      "releaseDate": "2022-03-25T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "",
+      "reviewBody": "",
+      "groupNames": [
+        "任天堂第一方",
+        "动作冒险"
+      ],
+      "completions": [
+        {
+          "platform": "Nintendo Switch 2",
+          "date": "2022-05-12T00:00:00Z",
+          "degree": "主线通关",
+          "playtime": 38.5,
+          "notes": "",
+          "scoreGameplay": 8.3,
+          "scoreDesign": 9.2,
+          "scoreStory": 8.4,
+          "scoreArt": 9.0,
+          "scoreMusic": 9.1,
+          "scorePerformance": 8.8
+        },
+        {
+          "platform": "Nintendo Switch",
+          "date": "2025-04-02T00:00:00Z",
+          "degree": "主线通关",
+          "playtime": 21.4,
+          "notes": "和好友一起联机打通，体验翻倍",
+          "scoreGameplay": 8.7,
+          "scoreDesign": 8.7,
+          "scoreStory": 8.5,
+          "scoreArt": 9.1,
+          "scoreMusic": 8.6,
+          "scorePerformance": 8.5
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "Splatoon 3",
+      "nameZh": "斯普拉遁3",
+      "nameJa": "スプラトゥーン3",
+      "aliases": [
+        "喷喷3",
+        "スプラ3"
+      ],
+      "releaseDate": "2022-09-09T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "",
+      "reviewBody": "",
+      "groupNames": [
+        "任天堂第一方",
+        "射击"
+      ],
+      "completions": [
+        {
+          "platform": "Nintendo Switch",
+          "date": "2025-01-25T00:00:00Z",
+          "degree": "全支线",
+          "playtime": 35.9,
+          "notes": "白金路上花了很久，值了",
+          "scoreGameplay": 9.0,
+          "scoreDesign": 8.3,
+          "scoreStory": 8.3,
+          "scoreArt": 8.7,
+          "scoreMusic": 9.1,
+          "scorePerformance": 8.8
+        },
+        {
+          "platform": "Nintendo Switch 2",
+          "date": "2024-04-01T00:00:00Z",
+          "degree": "全结局",
+          "playtime": 31.7,
+          "notes": "开 4K + 光追有点吃性能",
+          "scoreGameplay": 9.3,
+          "scoreDesign": 8.5,
+          "scoreStory": 8.9,
+          "scoreArt": 9.2,
+          "scoreMusic": 9.3,
+          "scorePerformance": 8.8
+        },
+        {
+          "platform": "Nintendo Switch",
+          "date": "2023-06-13T00:00:00Z",
+          "degree": "全支线",
+          "playtime": 25.4,
+          "notes": "Boss 卡了我一周，最后还是过了",
+          "scoreGameplay": 8.7,
+          "scoreDesign": 8.7,
+          "scoreStory": 8.6,
+          "scoreArt": 8.7,
+          "scoreMusic": 8.9,
+          "scorePerformance": 8.3
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "Xenoblade Chronicles 3",
+      "nameZh": "异度神剑3",
+      "nameJa": "ゼノブレイド3",
+      "aliases": [
+        "异度3",
+        "ゼノブレ3"
+      ],
+      "releaseDate": "2022-07-29T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "",
+      "reviewBody": "",
+      "groupNames": [
+        "任天堂第一方",
+        "角色扮演"
+      ],
+      "completions": [
+        {
+          "platform": "Nintendo Switch",
+          "date": "2023-01-09T00:00:00Z",
+          "degree": "主线通关",
+          "playtime": 40.3,
+          "notes": "白金路上花了很久，值了",
+          "scoreGameplay": 8.8,
+          "scoreDesign": 9.4,
+          "scoreStory": 8.8,
+          "scoreArt": 8.5,
+          "scoreMusic": 9.0,
+          "scorePerformance": 8.5
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "Fire Emblem: Three Houses",
+      "nameZh": "火焰纹章 风花雪月",
+      "nameJa": "ファイアーエムブレム 風花雪月",
+      "aliases": [
+        "火纹",
+        "風花雪月"
+      ],
+      "releaseDate": "2019-07-26T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "",
+      "reviewBody": "",
+      "groupNames": [
+        "任天堂第一方",
+        "角色扮演"
+      ],
+      "completions": [
+        {
+          "platform": "Nintendo Switch",
+          "date": "2025-10-05T00:00:00Z",
+          "degree": "多周目",
+          "playtime": 56.6,
+          "notes": "",
+          "scoreGameplay": 9.3,
+          "scoreDesign": 8.7,
+          "scoreStory": 9.7,
+          "scoreArt": 8.6,
+          "scoreMusic": 9.1,
+          "scorePerformance": 9.0
+        },
+        {
+          "platform": "Nintendo Switch",
+          "date": "2022-12-06T00:00:00Z",
+          "degree": "主线通关",
+          "playtime": 42.9,
+          "notes": "",
+          "scoreGameplay": 9.6,
+          "scoreDesign": 9.1,
+          "scoreStory": 9.1,
+          "scoreArt": 8.8,
+          "scoreMusic": 9.1,
+          "scorePerformance": 9.2
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "God of War Ragnarök",
+      "nameZh": "战神 诸神黄昏",
+      "nameJa": "ゴッド・オブ・ウォー ラグナロク",
+      "aliases": [
+        "战神5",
+        "GOWR"
+      ],
+      "releaseDate": "2022-11-09T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "一镜到底叙事的巅峰",
+      "reviewBody": "",
+      "groupNames": [
+        "索尼第一方",
+        "动作冒险"
+      ],
+      "completions": [
+        {
+          "platform": "PS5",
+          "date": "2025-11-28T00:00:00Z",
+          "degree": "主线通关",
+          "playtime": 33.4,
+          "notes": "",
+          "scoreGameplay": 9.7,
+          "scoreDesign": 9.3,
+          "scoreStory": 10.0,
+          "scoreArt": 9.8,
+          "scoreMusic": 9.4,
+          "scorePerformance": 9.4
+        },
+        {
+          "platform": "PS4",
+          "date": "2023-06-14T00:00:00Z",
+          "degree": "全支线",
+          "playtime": 29.3,
+          "notes": "地图探索的奖励设计很合理",
+          "scoreGameplay": 9.5,
+          "scoreDesign": 9.0,
+          "scoreStory": 9.8,
+          "scoreArt": 9.7,
+          "scoreMusic": 9.3,
+          "scorePerformance": 9.8
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "The Last of Us Part I",
+      "nameZh": "最后生还者 第一部",
+      "nameJa": "ラスト・オブ・アス Part I",
+      "aliases": [
+        "TLOU",
+        "最后生还者"
+      ],
+      "releaseDate": "2022-09-02T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "重制版的画面演出无可挑剔",
+      "reviewBody": "",
+      "groupNames": [
+        "索尼第一方",
+        "动作冒险"
+      ],
+      "completions": [
+        {
+          "platform": "PS4",
+          "date": "2023-07-16T00:00:00Z",
+          "degree": "全结局",
+          "playtime": 31.2,
+          "notes": "开 4K + 光追有点吃性能",
+          "scoreGameplay": 9.2,
+          "scoreDesign": 9.2,
+          "scoreStory": 10.0,
+          "scoreArt": 9.2,
+          "scoreMusic": 9.8,
+          "scorePerformance": 9.5
+        },
+        {
+          "platform": "PS4",
+          "date": "2023-04-17T00:00:00Z",
+          "degree": "速通",
+          "playtime": 33.0,
+          "notes": "",
+          "scoreGameplay": 9.5,
+          "scoreDesign": 9.5,
+          "scoreStory": 9.9,
+          "scoreArt": 9.1,
+          "scoreMusic": 9.4,
+          "scorePerformance": 9.4
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "Horizon Forbidden West",
+      "nameZh": "地平线 西之绝境",
+      "nameJa": "ホライゾン フォビドゥン・ウェスト",
+      "aliases": [
+        "地平线2"
+      ],
+      "releaseDate": "2022-02-18T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "",
+      "reviewBody": "",
+      "groupNames": [
+        "索尼第一方",
+        "动作冒险"
+      ],
+      "completions": [
+        {
+          "platform": "PS4",
+          "date": "2025-01-01T00:00:00Z",
+          "degree": "全收集/白金",
+          "playtime": 43.1,
+          "notes": "",
+          "scoreGameplay": 8.6,
+          "scoreDesign": 9.3,
+          "scoreStory": 8.8,
+          "scoreArt": 9.4,
+          "scoreMusic": 8.7,
+          "scorePerformance": 9.3
+        },
+        {
+          "platform": "PC",
+          "date": "2023-08-05T00:00:00Z",
+          "degree": "主线通关",
+          "playtime": 59.8,
+          "notes": "剧情太顶了，后劲很足",
+          "scoreGameplay": 9.1,
+          "scoreDesign": 9.3,
+          "scoreStory": 8.7,
+          "scoreArt": 9.5,
+          "scoreMusic": 9.1,
+          "scorePerformance": 8.9
+        },
+        {
+          "platform": "PC",
+          "date": "2024-03-12T00:00:00Z",
+          "degree": "全支线",
+          "playtime": 45.3,
+          "notes": "",
+          "scoreGameplay": 8.4,
+          "scoreDesign": 9.6,
+          "scoreStory": 8.9,
+          "scoreArt": 9.1,
+          "scoreMusic": 8.6,
+          "scorePerformance": 9.3
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "Marvel's Spider-Man: Miles Morales",
+      "nameZh": "蜘蛛侠 迈尔斯·莫拉莱斯",
+      "nameJa": "Marvel's Spider-Man: Miles Morales",
+      "aliases": [
+        "蜘蛛侠 迈尔斯",
+        "スパイダーマン マイルズ"
+      ],
+      "releaseDate": "2020-11-12T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "",
+      "reviewBody": "",
+      "groupNames": [
+        "索尼第一方",
+        "动作冒险"
+      ],
+      "completions": [
+        {
+          "platform": "PC",
+          "date": "2021-04-14T00:00:00Z",
+          "degree": "全收集/白金",
+          "playtime": 36.2,
+          "notes": "",
+          "scoreGameplay": 8.8,
+          "scoreDesign": 8.4,
+          "scoreStory": 8.9,
+          "scoreArt": 8.8,
+          "scoreMusic": 8.3,
+          "scorePerformance": 8.8
+        },
+        {
+          "platform": "PC",
+          "date": "2025-04-15T00:00:00Z",
+          "degree": "全收集/白金",
+          "playtime": 20.3,
+          "notes": "和好友一起联机打通，体验翻倍",
+          "scoreGameplay": 9.2,
+          "scoreDesign": 8.2,
+          "scoreStory": 8.9,
+          "scoreArt": 9.3,
+          "scoreMusic": 8.3,
+          "scorePerformance": 9.4
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "Ghost of Tsushima Director's Cut",
+      "nameZh": "对马岛之魂 导演剪辑版",
+      "nameJa": "ゴースト・オブ・ツシマ DIRECTOR'S CUT",
+      "aliases": [
+        "对马岛",
+        "GOT"
+      ],
+      "releaseDate": "2021-08-20T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "和风写意下的武士物语",
+      "reviewBody": "",
+      "groupNames": [
+        "索尼第一方",
+        "动作冒险"
+      ],
+      "completions": [
+        {
+          "platform": "PC",
+          "date": "2025-01-08T00:00:00Z",
+          "degree": "主线通关",
+          "playtime": 23.6,
+          "notes": "",
+          "scoreGameplay": 9.0,
+          "scoreDesign": 9.3,
+          "scoreStory": 9.1,
+          "scoreArt": 9.0,
+          "scoreMusic": 9.1,
+          "scorePerformance": 9.2
+        },
+        {
+          "platform": "PC",
+          "date": "2025-01-09T00:00:00Z",
+          "degree": "全收集/白金",
+          "playtime": 23.3,
+          "notes": "",
+          "scoreGameplay": 9.2,
+          "scoreDesign": 9.1,
+          "scoreStory": 9.1,
+          "scoreArt": 9.7,
+          "scoreMusic": 8.5,
+          "scorePerformance": 8.8
+        },
+        {
+          "platform": "PS5",
+          "date": "2026-02-11T00:00:00Z",
+          "degree": "多周目",
+          "playtime": 59.4,
+          "notes": "",
+          "scoreGameplay": 9.7,
+          "scoreDesign": 8.7,
+          "scoreStory": 9.5,
+          "scoreArt": 9.1,
+          "scoreMusic": 8.5,
+          "scorePerformance": 8.9
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "Bloodborne",
+      "nameZh": "血源诅咒",
+      "nameJa": "ブラッドボーン",
+      "aliases": [
+        "血源",
+        "ブラボ"
+      ],
+      "releaseDate": "2015-03-24T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "克苏鲁哥特美学与快节奏狩猎",
+      "reviewBody": "",
+      "groupNames": [
+        "索尼第一方",
+        "动作冒险",
+        "魂系游戏"
+      ],
+      "completions": [
+        {
+          "platform": "PS5",
+          "date": "2026-05-19T00:00:00Z",
+          "degree": "多周目",
+          "playtime": 37.5,
+          "notes": "剧情转折没想到，意难平",
+          "scoreGameplay": 9.5,
+          "scoreDesign": 9.4,
+          "scoreStory": 9.2,
+          "scoreArt": 9.7,
+          "scoreMusic": 9.2,
+          "scorePerformance": 9.1
+        },
+        {
+          "platform": "PS5",
+          "date": "2017-03-13T00:00:00Z",
+          "degree": "全结局",
+          "playtime": 38.9,
+          "notes": "",
+          "scoreGameplay": 10.0,
+          "scoreDesign": 9.6,
+          "scoreStory": 9.5,
+          "scoreArt": 9.8,
+          "scoreMusic": 9.4,
+          "scorePerformance": 9.4
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "DEATH STRANDING DIRECTOR'S CUT",
+      "nameZh": "死亡搁浅 导演剪辑版",
+      "nameJa": "DEATH STRANDING DIRECTOR'S CUT",
+      "aliases": [
+        "死亡搁浅",
+        "デススト"
+      ],
+      "releaseDate": "2021-09-24T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "送快递送出的诗意",
+      "reviewBody": "",
+      "groupNames": [
+        "索尼第一方",
+        "动作冒险"
+      ],
+      "completions": [
+        {
+          "platform": "PC",
+          "date": "2022-11-19T00:00:00Z",
+          "degree": "全收集/白金",
+          "playtime": 46.3,
+          "notes": "音效和音乐太加分了",
+          "scoreGameplay": 8.3,
+          "scoreDesign": 8.6,
+          "scoreStory": 8.8,
+          "scoreArt": 8.9,
+          "scoreMusic": 9.5,
+          "scorePerformance": 9.4
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "Marvel's Spider-Man 2",
+      "nameZh": "漫威蜘蛛侠2",
+      "nameJa": "Marvel's Spider-Man 2",
+      "aliases": [
+        "蜘蛛侠2"
+      ],
+      "releaseDate": "2023-10-20T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "荡蛛丝与战斗演出全面升级",
+      "reviewBody": "",
+      "groupNames": [
+        "索尼第一方",
+        "动作冒险"
+      ],
+      "completions": [
+        {
+          "platform": "PS4",
+          "date": "2024-11-11T00:00:00Z",
+          "degree": "全收集/白金",
+          "playtime": 16.9,
+          "notes": "",
+          "scoreGameplay": 9.5,
+          "scoreDesign": 9.2,
+          "scoreStory": 8.9,
+          "scoreArt": 9.1,
+          "scoreMusic": 9.0,
+          "scorePerformance": 9.7
+        },
+        {
+          "platform": "PS5",
+          "date": "2024-06-16T00:00:00Z",
+          "degree": "全收集/白金",
+          "playtime": 41.7,
+          "notes": "",
+          "scoreGameplay": 9.2,
+          "scoreDesign": 9.1,
+          "scoreStory": 8.7,
+          "scoreArt": 9.6,
+          "scoreMusic": 9.4,
+          "scorePerformance": 9.7
+        },
+        {
+          "platform": "PS4",
+          "date": "2026-06-03T00:00:00Z",
+          "degree": "主线通关",
+          "playtime": 50.6,
+          "notes": "音效和音乐太加分了",
+          "scoreGameplay": 9.4,
+          "scoreDesign": 9.1,
+          "scoreStory": 8.9,
+          "scoreArt": 9.5,
+          "scoreMusic": 9.3,
+          "scorePerformance": 9.2
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "Ratchet & Clank: Rift Apart",
+      "nameZh": "瑞奇与叮当 时空跳转",
+      "nameJa": "ラチェット&クランク パラレル・トラブル",
+      "aliases": [
+        "瑞奇与叮当",
+        "ラチェクラ"
+      ],
+      "releaseDate": "2021-06-11T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "SSD 秒切世界的视觉盛宴",
+      "reviewBody": "",
+      "groupNames": [
+        "索尼第一方",
+        "动作冒险"
+      ],
+      "completions": [
+        {
+          "platform": "PC",
+          "date": "2024-09-13T00:00:00Z",
+          "degree": "全收集/白金",
+          "playtime": 40.3,
+          "notes": "",
+          "scoreGameplay": 9.1,
+          "scoreDesign": 8.6,
+          "scoreStory": 8.7,
+          "scoreArt": 9.4,
+          "scoreMusic": 8.8,
+          "scorePerformance": 9.1
+        },
+        {
+          "platform": "PC",
+          "date": "2021-11-10T00:00:00Z",
+          "degree": "全支线",
+          "playtime": 28.9,
+          "notes": "",
+          "scoreGameplay": 8.8,
+          "scoreDesign": 8.7,
+          "scoreStory": 8.5,
+          "scoreArt": 8.9,
+          "scoreMusic": 8.4,
+          "scorePerformance": 9.2
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "Forza Horizon 5",
+      "nameZh": "极限竞速 地平线5",
+      "nameJa": "Forza Horizon 5",
+      "aliases": [
+        "FH5",
+        "地平线5"
+      ],
+      "releaseDate": "2021-11-09T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "开放世界竞速的天花板",
+      "reviewBody": "",
+      "groupNames": [
+        "微软第一方",
+        "动作冒险"
+      ],
+      "completions": [
+        {
+          "platform": "Xbox Series X|S",
+          "date": "2026-01-12T00:00:00Z",
+          "degree": "速通",
+          "playtime": 42.3,
+          "notes": "画面在 OLED 上真的惊艳",
+          "scoreGameplay": 9.3,
+          "scoreDesign": 9.0,
+          "scoreStory": 9.1,
+          "scoreArt": 9.5,
+          "scoreMusic": 9.6,
+          "scorePerformance": 9.2
+        },
+        {
+          "platform": "PC",
+          "date": "2022-12-27T00:00:00Z",
+          "degree": "全支线",
+          "playtime": 57.2,
+          "notes": "手感调教得恰到好处",
+          "scoreGameplay": 9.3,
+          "scoreDesign": 9.3,
+          "scoreStory": 9.0,
+          "scoreArt": 9.5,
+          "scoreMusic": 9.2,
+          "scorePerformance": 9.3
+        },
+        {
+          "platform": "PS5",
+          "date": "2023-04-16T00:00:00Z",
+          "degree": "主线通关",
+          "playtime": 39.2,
+          "notes": "地图探索的奖励设计很合理",
+          "scoreGameplay": 9.3,
+          "scoreDesign": 9.6,
+          "scoreStory": 9.4,
+          "scoreArt": 9.6,
+          "scoreMusic": 9.1,
+          "scorePerformance": 9.4
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "Halo Infinite",
+      "nameZh": "光环 无限",
+      "nameJa": "HALO INFINITE",
+      "aliases": [
+        "光环",
+        "HALO"
+      ],
+      "releaseDate": "2021-12-08T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "",
+      "reviewBody": "",
+      "groupNames": [
+        "微软第一方",
+        "射击"
+      ],
+      "completions": [
+        {
+          "platform": "Xbox Series X|S",
+          "date": "2025-07-12T00:00:00Z",
+          "degree": "全支线",
+          "playtime": 37.7,
+          "notes": "",
+          "scoreGameplay": 8.8,
+          "scoreDesign": 8.1,
+          "scoreStory": 7.6,
+          "scoreArt": 8.1,
+          "scoreMusic": 8.0,
+          "scorePerformance": 8.1
+        },
+        {
+          "platform": "PC",
+          "date": "2023-01-24T00:00:00Z",
+          "degree": "全支线",
+          "playtime": 22.2,
+          "notes": "画面在 OLED 上真的惊艳",
+          "scoreGameplay": 8.4,
+          "scoreDesign": 8.4,
+          "scoreStory": 7.9,
+          "scoreArt": 8.4,
+          "scoreMusic": 8.2,
+          "scorePerformance": 8.2
+        },
+        {
+          "platform": "Xbox One",
+          "date": "2026-04-02T00:00:00Z",
+          "degree": "主线通关",
+          "playtime": 25.6,
+          "notes": "剧情太顶了，后劲很足",
+          "scoreGameplay": 8.6,
+          "scoreDesign": 8.6,
+          "scoreStory": 8.0,
+          "scoreArt": 7.9,
+          "scoreMusic": 7.9,
+          "scorePerformance": 8.3
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "Gears 5",
+      "nameZh": "战争机器5",
+      "nameJa": "Gears 5",
+      "aliases": [
+        "战争机器",
+        "ギアーズ5"
+      ],
+      "releaseDate": "2019-09-10T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "",
+      "reviewBody": "",
+      "groupNames": [
+        "微软第一方",
+        "射击"
+      ],
+      "completions": [
+        {
+          "platform": "Xbox Series X|S",
+          "date": "2025-11-20T00:00:00Z",
+          "degree": "主线通关",
+          "playtime": 39.4,
+          "notes": "",
+          "scoreGameplay": 8.9,
+          "scoreDesign": 8.6,
+          "scoreStory": 8.9,
+          "scoreArt": 8.1,
+          "scoreMusic": 8.2,
+          "scorePerformance": 9.0
+        },
+        {
+          "platform": "PC",
+          "date": "2022-05-15T00:00:00Z",
+          "degree": "速通",
+          "playtime": 18.7,
+          "notes": "",
+          "scoreGameplay": 9.0,
+          "scoreDesign": 7.9,
+          "scoreStory": 8.9,
+          "scoreArt": 8.2,
+          "scoreMusic": 8.5,
+          "scorePerformance": 8.9
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "Ori and the Will of the Wisps",
+      "nameZh": "奥日与萤火意志",
+      "nameJa": "Ori and the Will of the Wisps",
+      "aliases": [
+        "奥日2",
+        "オリ2"
+      ],
+      "releaseDate": "2020-03-11T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "手绘美术与配乐美到窒息",
+      "reviewBody": "",
+      "groupNames": [
+        "微软第一方",
+        "动作冒险"
+      ],
+      "completions": [
+        {
+          "platform": "Xbox Series X|S",
+          "date": "2021-08-25T00:00:00Z",
+          "degree": "全结局",
+          "playtime": 49.9,
+          "notes": "",
+          "scoreGameplay": 9.3,
+          "scoreDesign": 8.6,
+          "scoreStory": 9.1,
+          "scoreArt": 9.4,
+          "scoreMusic": 9.2,
+          "scorePerformance": 8.8
+        },
+        {
+          "platform": "PC",
+          "date": "2026-05-30T00:00:00Z",
+          "degree": "全结局",
+          "playtime": 30.4,
+          "notes": "",
+          "scoreGameplay": 9.7,
+          "scoreDesign": 9.4,
+          "scoreStory": 9.1,
+          "scoreArt": 9.4,
+          "scoreMusic": 9.1,
+          "scorePerformance": 8.8
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "As Dusk Falls",
+      "nameZh": "日落黄昏时",
+      "nameJa": "As Dusk Falls",
+      "aliases": [],
+      "releaseDate": "2022-07-19T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "",
+      "reviewBody": "",
+      "groupNames": [
+        "微软第一方",
+        "动作冒险"
+      ],
+      "completions": [
+        {
+          "platform": "Xbox Series X|S",
+          "date": "2025-12-25T00:00:00Z",
+          "degree": "多周目",
+          "playtime": 42.8,
+          "notes": "支线也全清了，内容量惊人",
+          "scoreGameplay": 7.5,
+          "scoreDesign": 8.5,
+          "scoreStory": 8.3,
+          "scoreArt": 7.6,
+          "scoreMusic": 7.9,
+          "scorePerformance": 7.5
+        },
+        {
+          "platform": "PC",
+          "date": "2024-10-22T00:00:00Z",
+          "degree": "速通",
+          "playtime": 29.5,
+          "notes": "音效和音乐太加分了",
+          "scoreGameplay": 7.4,
+          "scoreDesign": 8.2,
+          "scoreStory": 8.1,
+          "scoreArt": 7.5,
+          "scoreMusic": 7.5,
+          "scorePerformance": 8.0
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "Age of Empires IV",
+      "nameZh": "帝国时代4",
+      "nameJa": "Age of Empires IV",
+      "aliases": [
+        "帝国时代",
+        "AOE4"
+      ],
+      "releaseDate": "2021-10-28T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "",
+      "reviewBody": "",
+      "groupNames": [
+        "微软第一方",
+        "射击"
+      ],
+      "completions": [
+        {
+          "platform": "Xbox Series X|S",
+          "date": "2023-06-09T00:00:00Z",
+          "degree": "主线通关",
+          "playtime": 34.8,
+          "notes": "手感调教得恰到好处",
+          "scoreGameplay": 8.3,
+          "scoreDesign": 8.9,
+          "scoreStory": 8.7,
+          "scoreArt": 8.1,
+          "scoreMusic": 8.2,
+          "scorePerformance": 7.9
+        },
+        {
+          "platform": "PC",
+          "date": "2025-02-11T00:00:00Z",
+          "degree": "全结局",
+          "playtime": 25.0,
+          "notes": "支线也全清了，内容量惊人",
+          "scoreGameplay": 8.5,
+          "scoreDesign": 8.8,
+          "scoreStory": 8.9,
+          "scoreArt": 8.3,
+          "scoreMusic": 7.8,
+          "scorePerformance": 8.2
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "Microsoft Flight Simulator",
+      "nameZh": "微软模拟飞行",
+      "nameJa": "Microsoft Flight Simulator",
+      "aliases": [
+        "模拟飞行",
+        "MSFS"
+      ],
+      "releaseDate": "2020-08-18T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "",
+      "reviewBody": "",
+      "groupNames": [
+        "微软第一方",
+        "射击"
+      ],
+      "completions": [
+        {
+          "platform": "Xbox Series X|S",
+          "date": "2025-07-07T00:00:00Z",
+          "degree": "主线通关",
+          "playtime": 34.5,
+          "notes": "",
+          "scoreGameplay": 8.7,
+          "scoreDesign": 8.8,
+          "scoreStory": 8.4,
+          "scoreArt": 8.7,
+          "scoreMusic": 8.5,
+          "scorePerformance": 9.0
+        },
+        {
+          "platform": "PC",
+          "date": "2023-08-24T00:00:00Z",
+          "degree": "速通",
+          "playtime": 28.5,
+          "notes": "Boss 卡了我一周，最后还是过了",
+          "scoreGameplay": 8.5,
+          "scoreDesign": 8.6,
+          "scoreStory": 8.8,
+          "scoreArt": 9.1,
+          "scoreMusic": 8.4,
+          "scorePerformance": 9.3
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "Psychonauts 2",
+      "nameZh": "意航员2",
+      "nameJa": "Psychonauts 2",
+      "aliases": [
+        "脑航员2"
+      ],
+      "releaseDate": "2021-08-25T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "脑洞大开的平台解谜佳作",
+      "reviewBody": "",
+      "groupNames": [
+        "微软第一方",
+        "动作冒险"
+      ],
+      "completions": [
+        {
+          "platform": "Xbox Series X|S",
+          "date": "2024-08-31T00:00:00Z",
+          "degree": "全结局",
+          "playtime": 58.5,
+          "notes": "",
+          "scoreGameplay": 9.4,
+          "scoreDesign": 9.2,
+          "scoreStory": 9.7,
+          "scoreArt": 9.4,
+          "scoreMusic": 9.2,
+          "scorePerformance": 8.7
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "Hi-Fi RUSH",
+      "nameZh": "完美音浪",
+      "nameJa": "Hi-Fi RUSH",
+      "aliases": [
+        "音浪"
+      ],
+      "releaseDate": "2023-01-25T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "踩着节拍打架，玩起来太爽了",
+      "reviewBody": "",
+      "groupNames": [
+        "微软第一方",
+        "动作冒险"
+      ],
+      "completions": [
+        {
+          "platform": "Xbox Series X|S",
+          "date": "2023-07-28T00:00:00Z",
+          "degree": "全结局",
+          "playtime": 34.9,
+          "notes": "剧情太顶了，后劲很足",
+          "scoreGameplay": 9.3,
+          "scoreDesign": 9.0,
+          "scoreStory": 8.8,
+          "scoreArt": 9.0,
+          "scoreMusic": 9.6,
+          "scorePerformance": 8.9
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "Grounded",
+      "nameZh": "禁闭求生",
+      "nameJa": "Grounded",
+      "aliases": [
+        "微缩世界"
+      ],
+      "releaseDate": "2022-09-27T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "",
+      "reviewBody": "",
+      "groupNames": [
+        "微软第一方",
+        "角色扮演"
+      ],
+      "completions": [
+        {
+          "platform": "Xbox Series X|S",
+          "date": "2023-08-27T00:00:00Z",
+          "degree": "全收集/白金",
+          "playtime": 98.3,
+          "notes": "",
+          "scoreGameplay": 8.0,
+          "scoreDesign": 8.6,
+          "scoreStory": 8.4,
+          "scoreArt": 8.1,
+          "scoreMusic": 7.6,
+          "scorePerformance": 8.3
+        },
+        {
+          "platform": "PC",
+          "date": "2023-09-05T00:00:00Z",
+          "degree": "全支线",
+          "playtime": 88.8,
+          "notes": "剧情太顶了，后劲很足",
+          "scoreGameplay": 8.2,
+          "scoreDesign": 8.5,
+          "scoreStory": 7.7,
+          "scoreArt": 8.6,
+          "scoreMusic": 7.8,
+          "scorePerformance": 8.1
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "God of War",
+      "nameZh": "战神",
+      "nameJa": "ゴッド・オブ・ウォー",
+      "aliases": [
+        "战神4",
+        "GOW"
+      ],
+      "releaseDate": "2018-04-20T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "奎托斯父子的北欧物语",
+      "reviewBody": "",
+      "groupNames": [
+        "索尼第一方",
+        "动作冒险"
+      ],
+      "completions": [
+        {
+          "platform": "PC",
+          "date": "2018-06-29T00:00:00Z",
+          "degree": "主线通关",
+          "playtime": 18.2,
+          "notes": "",
+          "scoreGameplay": 10.0,
+          "scoreDesign": 9.4,
+          "scoreStory": 9.7,
+          "scoreArt": 9.2,
+          "scoreMusic": 10.0,
+          "scorePerformance": 9.7
+        },
+        {
+          "platform": "PC",
+          "date": "2020-10-17T00:00:00Z",
+          "degree": "全结局",
+          "playtime": 33.3,
+          "notes": "",
+          "scoreGameplay": 9.8,
+          "scoreDesign": 9.6,
+          "scoreStory": 9.8,
+          "scoreArt": 9.7,
+          "scoreMusic": 9.9,
+          "scorePerformance": 9.5
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "FINAL FANTASY XVI",
+      "nameZh": "最终幻想16",
+      "nameJa": "FINAL FANTASY XVI",
+      "aliases": [
+        "FF16",
+        "ファイナルファンタジー16"
+      ],
+      "releaseDate": "2023-06-22T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "",
+      "reviewBody": "",
+      "groupNames": [
+        "角色扮演"
+      ],
+      "completions": [
+        {
+          "platform": "PS5",
+          "date": "2023-10-28T00:00:00Z",
+          "degree": "全支线",
+          "playtime": 102.3,
+          "notes": "",
+          "scoreGameplay": 8.2,
+          "scoreDesign": 8.1,
+          "scoreStory": 9.1,
+          "scoreArt": 8.6,
+          "scoreMusic": 9.2,
+          "scorePerformance": 9.0
+        },
+        {
+          "platform": "PS5",
+          "date": "2024-11-21T00:00:00Z",
+          "degree": "主线通关",
+          "playtime": 80.2,
+          "notes": "二周目解锁的内容更爽",
+          "scoreGameplay": 8.4,
+          "scoreDesign": 8.5,
+          "scoreStory": 9.0,
+          "scoreArt": 8.3,
+          "scoreMusic": 9.1,
+          "scorePerformance": 9.2
+        },
+        {
+          "platform": "PS5",
+          "date": "2025-07-04T00:00:00Z",
+          "degree": "速通",
+          "playtime": 74.5,
+          "notes": "",
+          "scoreGameplay": 8.2,
+          "scoreDesign": 8.1,
+          "scoreStory": 8.7,
+          "scoreArt": 8.6,
+          "scoreMusic": 8.6,
+          "scorePerformance": 8.8
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "ELDEN RING",
+      "nameZh": "艾尔登法环",
+      "nameJa": "ELDEN RING",
+      "aliases": [
+        "法环",
+        "エルデンリング"
+      ],
+      "releaseDate": "2022-02-25T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "开放世界与魂系玩法的完美结合",
+      "reviewBody": "",
+      "groupNames": [
+        "角色扮演",
+        "魂系游戏"
+      ],
+      "completions": [
+        {
+          "platform": "PS5",
+          "date": "2022-12-25T00:00:00Z",
+          "degree": "主线通关",
+          "playtime": 78.4,
+          "notes": "",
+          "scoreGameplay": 10.0,
+          "scoreDesign": 10.0,
+          "scoreStory": 9.5,
+          "scoreArt": 10.0,
+          "scoreMusic": 9.5,
+          "scorePerformance": 9.8
+        },
+        {
+          "platform": "PS5",
+          "date": "2024-02-16T00:00:00Z",
+          "degree": "全支线",
+          "playtime": 111.2,
+          "notes": "",
+          "scoreGameplay": 10.0,
+          "scoreDesign": 10.0,
+          "scoreStory": 9.6,
+          "scoreArt": 10.0,
+          "scoreMusic": 9.8,
+          "scorePerformance": 9.5
+        },
+        {
+          "platform": "Xbox Series X|S",
+          "date": "2023-06-23T00:00:00Z",
+          "degree": "全结局",
+          "playtime": 46.1,
+          "notes": "",
+          "scoreGameplay": 10.0,
+          "scoreDesign": 10.0,
+          "scoreStory": 9.7,
+          "scoreArt": 9.6,
+          "scoreMusic": 9.3,
+          "scorePerformance": 10.0
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "The Witcher 3: Wild Hunt",
+      "nameZh": "巫师3 狂猎",
+      "nameJa": "ウィッチャー3 ワイルドハント",
+      "aliases": [
+        "巫师3",
+        "ウィッチャー3"
+      ],
+      "releaseDate": "2015-05-19T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "支线任务比主线还精彩的标杆",
+      "reviewBody": "",
+      "groupNames": [
+        "角色扮演"
+      ],
+      "completions": [
+        {
+          "platform": "PC",
+          "date": "2022-01-23T00:00:00Z",
+          "degree": "主线通关",
+          "playtime": 83.2,
+          "notes": "",
+          "scoreGameplay": 10.0,
+          "scoreDesign": 9.2,
+          "scoreStory": 9.7,
+          "scoreArt": 9.5,
+          "scoreMusic": 9.7,
+          "scorePerformance": 9.4
+        },
+        {
+          "platform": "Nintendo Switch 2",
+          "date": "2021-03-11T00:00:00Z",
+          "degree": "全结局",
+          "playtime": 85.0,
+          "notes": "",
+          "scoreGameplay": 9.6,
+          "scoreDesign": 9.7,
+          "scoreStory": 9.8,
+          "scoreArt": 9.7,
+          "scoreMusic": 9.8,
+          "scorePerformance": 9.6
+        },
+        {
+          "platform": "Nintendo Switch 2",
+          "date": "2021-12-23T00:00:00Z",
+          "degree": "全收集/白金",
+          "playtime": 79.6,
+          "notes": "支线也全清了，内容量惊人",
+          "scoreGameplay": 9.9,
+          "scoreDesign": 9.2,
+          "scoreStory": 10.0,
+          "scoreArt": 9.9,
+          "scoreMusic": 10.0,
+          "scorePerformance": 9.4
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "Cyberpunk 2077",
+      "nameZh": "赛博朋克2077",
+      "nameJa": "サイバーパンク2077",
+      "aliases": [
+        "2077"
+      ],
+      "releaseDate": "2020-12-10T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "2.0 补完后的夜之城值得再玩一遍",
+      "reviewBody": "",
+      "groupNames": [
+        "角色扮演"
+      ],
+      "completions": [
+        {
+          "platform": "PS5",
+          "date": "2021-05-12T00:00:00Z",
+          "degree": "全结局",
+          "playtime": 51.5,
+          "notes": "地图探索的奖励设计很合理",
+          "scoreGameplay": 8.7,
+          "scoreDesign": 8.7,
+          "scoreStory": 9.0,
+          "scoreArt": 9.1,
+          "scoreMusic": 9.1,
+          "scorePerformance": 8.8
+        },
+        {
+          "platform": "Xbox Series X|S",
+          "date": "2021-12-07T00:00:00Z",
+          "degree": "多周目",
+          "playtime": 98.6,
+          "notes": "剧情转折没想到，意难平",
+          "scoreGameplay": 8.5,
+          "scoreDesign": 8.2,
+          "scoreStory": 9.2,
+          "scoreArt": 8.7,
+          "scoreMusic": 8.5,
+          "scorePerformance": 8.3
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "Red Dead Redemption 2",
+      "nameZh": "荒野大镖客2",
+      "nameJa": "レッド・デッド・リデンプション2",
+      "aliases": [
+        "RDR2",
+        "大镖客2"
+      ],
+      "releaseDate": "2018-10-26T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "西部世界的慢节奏神作",
+      "reviewBody": "",
+      "groupNames": [
+        "动作冒险"
+      ],
+      "completions": [
+        {
+          "platform": "Xbox Series X|S",
+          "date": "2021-10-02T00:00:00Z",
+          "degree": "主线通关",
+          "playtime": 56.3,
+          "notes": "",
+          "scoreGameplay": 9.4,
+          "scoreDesign": 9.5,
+          "scoreStory": 10.0,
+          "scoreArt": 9.7,
+          "scoreMusic": 9.8,
+          "scorePerformance": 10.0
+        },
+        {
+          "platform": "PS5",
+          "date": "2025-05-14T00:00:00Z",
+          "degree": "全收集/白金",
+          "playtime": 44.5,
+          "notes": "",
+          "scoreGameplay": 9.6,
+          "scoreDesign": 9.6,
+          "scoreStory": 10.0,
+          "scoreArt": 10.0,
+          "scoreMusic": 9.9,
+          "scorePerformance": 10.0
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "Grand Theft Auto V",
+      "nameZh": "侠盗猎车手5",
+      "nameJa": "グランド・セフト・オートV",
+      "aliases": [
+        "GTA5"
+      ],
+      "releaseDate": "2013-09-17T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "",
+      "reviewBody": "",
+      "groupNames": [
+        "动作冒险"
+      ],
+      "completions": [
+        {
+          "platform": "PS5",
+          "date": "2015-03-03T00:00:00Z",
+          "degree": "多周目",
+          "playtime": 19.7,
+          "notes": "白金路上花了很久，值了",
+          "scoreGameplay": 9.1,
+          "scoreDesign": 9.1,
+          "scoreStory": 9.3,
+          "scoreArt": 8.8,
+          "scoreMusic": 9.4,
+          "scorePerformance": 9.2
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "Baldur's Gate 3",
+      "nameZh": "博德之门3",
+      "nameJa": "バルダーズ・ゲート3",
+      "aliases": [
+        "BG3",
+        "博德之门"
+      ],
+      "releaseDate": "2023-08-03T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "CRPG 的复兴之作",
+      "reviewBody": "",
+      "groupNames": [
+        "角色扮演"
+      ],
+      "completions": [
+        {
+          "platform": "Xbox Series X|S",
+          "date": "2023-11-16T00:00:00Z",
+          "degree": "速通",
+          "playtime": 108.6,
+          "notes": "支线也全清了，内容量惊人",
+          "scoreGameplay": 9.8,
+          "scoreDesign": 10.0,
+          "scoreStory": 10.0,
+          "scoreArt": 9.7,
+          "scoreMusic": 9.3,
+          "scorePerformance": 10.0
+        },
+        {
+          "platform": "PS5",
+          "date": "2024-10-18T00:00:00Z",
+          "degree": "主线通关",
+          "playtime": 97.5,
+          "notes": "",
+          "scoreGameplay": 10.0,
+          "scoreDesign": 9.9,
+          "scoreStory": 9.8,
+          "scoreArt": 9.2,
+          "scoreMusic": 9.9,
+          "scorePerformance": 9.7
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "Assassin's Creed Mirage",
+      "nameZh": "刺客信条 幻景",
+      "nameJa": "アサシン クリード ミラージュ",
+      "aliases": [
+        "AC幻景"
+      ],
+      "releaseDate": "2023-10-05T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "",
+      "reviewBody": "",
+      "groupNames": [
+        "动作冒险"
+      ],
+      "completions": [
+        {
+          "platform": "Xbox Series X|S",
+          "date": "2026-06-09T00:00:00Z",
+          "degree": "全收集/白金",
+          "playtime": 42.1,
+          "notes": "",
+          "scoreGameplay": 8.0,
+          "scoreDesign": 7.9,
+          "scoreStory": 7.9,
+          "scoreArt": 8.3,
+          "scoreMusic": 7.6,
+          "scorePerformance": 8.5
+        },
+        {
+          "platform": "PS5",
+          "date": "2024-06-21T00:00:00Z",
+          "degree": "全收集/白金",
+          "playtime": 23.2,
+          "notes": "二周目解锁的内容更爽",
+          "scoreGameplay": 8.2,
+          "scoreDesign": 8.0,
+          "scoreStory": 8.6,
+          "scoreArt": 8.4,
+          "scoreMusic": 8.1,
+          "scorePerformance": 8.1
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "Resident Evil 4",
+      "nameZh": "生化危机4 重制版",
+      "nameJa": "バイオハザード RE:4",
+      "aliases": [
+        "RE4",
+        "生化4"
+      ],
+      "releaseDate": "2023-03-24T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "重制比原作更上一层楼",
+      "reviewBody": "",
+      "groupNames": [
+        "射击"
+      ],
+      "completions": [
+        {
+          "platform": "Xbox Series X|S",
+          "date": "2026-03-14T00:00:00Z",
+          "degree": "主线通关",
+          "playtime": 39.7,
+          "notes": "",
+          "scoreGameplay": 9.7,
+          "scoreDesign": 8.8,
+          "scoreStory": 9.4,
+          "scoreArt": 9.1,
+          "scoreMusic": 8.9,
+          "scorePerformance": 9.4
+        },
+        {
+          "platform": "PS5",
+          "date": "2024-01-07T00:00:00Z",
+          "degree": "多周目",
+          "playtime": 20.0,
+          "notes": "",
+          "scoreGameplay": 9.4,
+          "scoreDesign": 9.1,
+          "scoreStory": 9.4,
+          "scoreArt": 9.4,
+          "scoreMusic": 9.3,
+          "scorePerformance": 9.2
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "FINAL FANTASY VII REBIRTH",
+      "nameZh": "最终幻想7 重生",
+      "nameJa": "FINAL FANTASY VII REBIRTH",
+      "aliases": [
+        "FF7重生",
+        "リバース"
+      ],
+      "releaseDate": "2024-02-29T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "金蝶游乐园与克劳德的物语",
+      "reviewBody": "",
+      "groupNames": [
+        "角色扮演"
+      ],
+      "completions": [
+        {
+          "platform": "PS5",
+          "date": "2024-03-15T00:00:00Z",
+          "degree": "主线通关",
+          "playtime": 111.8,
+          "notes": "",
+          "scoreGameplay": 9.5,
+          "scoreDesign": 9.2,
+          "scoreStory": 9.6,
+          "scoreArt": 9.1,
+          "scoreMusic": 9.6,
+          "scorePerformance": 9.4
+        },
+        {
+          "platform": "PS5",
+          "date": "2025-12-10T00:00:00Z",
+          "degree": "全收集/白金",
+          "playtime": 42.5,
+          "notes": "Boss 卡了我一周，最后还是过了",
+          "scoreGameplay": 9.9,
+          "scoreDesign": 9.6,
+          "scoreStory": 9.7,
+          "scoreArt": 9.4,
+          "scoreMusic": 9.4,
+          "scorePerformance": 8.8
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "Like a Dragon: Infinite Wealth",
+      "nameZh": "如龙8 无限财富",
+      "nameJa": "龍が如く8",
+      "aliases": [
+        "如龙8",
+        "龍が如く8"
+      ],
+      "releaseDate": "2024-01-26T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "如龙系列剧情巅峰",
+      "reviewBody": "",
+      "groupNames": [
+        "角色扮演"
+      ],
+      "completions": [
+        {
+          "platform": "Xbox Series X|S",
+          "date": "2024-04-08T00:00:00Z",
+          "degree": "全收集/白金",
+          "playtime": 96.9,
+          "notes": "开 4K + 光追有点吃性能",
+          "scoreGameplay": 9.3,
+          "scoreDesign": 8.7,
+          "scoreStory": 9.7,
+          "scoreArt": 9.4,
+          "scoreMusic": 8.7,
+          "scorePerformance": 9.2
+        },
+        {
+          "platform": "Xbox Series X|S",
+          "date": "2025-10-26T00:00:00Z",
+          "degree": "主线通关",
+          "playtime": 99.6,
+          "notes": "",
+          "scoreGameplay": 9.6,
+          "scoreDesign": 8.9,
+          "scoreStory": 9.0,
+          "scoreArt": 9.1,
+          "scoreMusic": 9.1,
+          "scorePerformance": 8.6
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "Stardew Valley",
+      "nameZh": "星露谷物语",
+      "nameJa": "Stardew Valley",
+      "aliases": [
+        "星露谷"
+      ],
+      "releaseDate": "2016-02-26T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "种田二十年也不腻",
+      "reviewBody": "",
+      "groupNames": [
+        "角色扮演"
+      ],
+      "completions": [
+        {
+          "platform": "Nintendo Switch 2",
+          "date": "2024-05-31T00:00:00Z",
+          "degree": "主线通关",
+          "playtime": 44.3,
+          "notes": "剧情太顶了，后劲很足",
+          "scoreGameplay": 9.6,
+          "scoreDesign": 9.2,
+          "scoreStory": 8.6,
+          "scoreArt": 9.2,
+          "scoreMusic": 9.7,
+          "scorePerformance": 9.3
+        },
+        {
+          "platform": "Nintendo Switch 2",
+          "date": "2018-05-05T00:00:00Z",
+          "degree": "多周目",
+          "playtime": 51.4,
+          "notes": "支线也全清了，内容量惊人",
+          "scoreGameplay": 9.5,
+          "scoreDesign": 9.3,
+          "scoreStory": 9.0,
+          "scoreArt": 9.4,
+          "scoreMusic": 9.2,
+          "scorePerformance": 9.2
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "Minecraft",
+      "nameZh": "我的世界",
+      "nameJa": "Minecraft",
+      "aliases": [
+        "MC",
+        "当个创世神"
+      ],
+      "releaseDate": "2011-11-18T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "永远玩不完的沙盒",
+      "reviewBody": "",
+      "groupNames": [
+        "角色扮演"
+      ],
+      "completions": [
+        {
+          "platform": "Nintendo Switch 2",
+          "date": "2019-06-05T00:00:00Z",
+          "degree": "全收集/白金",
+          "playtime": 58.7,
+          "notes": "",
+          "scoreGameplay": 9.5,
+          "scoreDesign": 9.3,
+          "scoreStory": 9.5,
+          "scoreArt": 10.0,
+          "scoreMusic": 9.0,
+          "scorePerformance": 9.2
+        },
+        {
+          "platform": "Nintendo Switch 2",
+          "date": "2022-07-14T00:00:00Z",
+          "degree": "全收集/白金",
+          "playtime": 84.2,
+          "notes": "",
+          "scoreGameplay": 9.3,
+          "scoreDesign": 9.2,
+          "scoreStory": 9.2,
+          "scoreArt": 9.3,
+          "scoreMusic": 9.4,
+          "scorePerformance": 9.5
+        },
+        {
+          "platform": "Nintendo Switch 2",
+          "date": "2021-06-15T00:00:00Z",
+          "degree": "全结局",
+          "playtime": 94.4,
+          "notes": "",
+          "scoreGameplay": 9.4,
+          "scoreDesign": 9.7,
+          "scoreStory": 9.4,
+          "scoreArt": 9.9,
+          "scoreMusic": 8.9,
+          "scorePerformance": 8.9
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "Overwatch 2",
+      "nameZh": "守望先锋2",
+      "nameJa": "Overwatch 2",
+      "aliases": [
+        "OW2",
+        "守望2"
+      ],
+      "releaseDate": "2022-10-04T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "",
+      "reviewBody": "",
+      "groupNames": [
+        "射击"
+      ],
+      "completions": [
+        {
+          "platform": "Nintendo Switch 2",
+          "date": "2025-01-27T00:00:00Z",
+          "degree": "全收集/白金",
+          "playtime": 28.8,
+          "notes": "",
+          "scoreGameplay": 7.7,
+          "scoreDesign": 7.6,
+          "scoreStory": 7.2,
+          "scoreArt": 7.7,
+          "scoreMusic": 7.3,
+          "scorePerformance": 7.6
+        },
+        {
+          "platform": "Nintendo Switch 2",
+          "date": "2025-03-02T00:00:00Z",
+          "degree": "全收集/白金",
+          "playtime": 17.8,
+          "notes": "",
+          "scoreGameplay": 7.8,
+          "scoreDesign": 7.8,
+          "scoreStory": 7.2,
+          "scoreArt": 7.9,
+          "scoreMusic": 7.6,
+          "scorePerformance": 7.8
+        },
+        {
+          "platform": "Xbox Series X|S",
+          "date": "2026-07-19T00:00:00Z",
+          "degree": "全结局",
+          "playtime": 29.0,
+          "notes": "音效和音乐太加分了",
+          "scoreGameplay": 7.9,
+          "scoreDesign": 7.2,
+          "scoreStory": 7.4,
+          "scoreArt": 8.2,
+          "scoreMusic": 7.2,
+          "scorePerformance": 7.7
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "It Takes Two",
+      "nameZh": "双人成行",
+      "nameJa": "It Takes Two",
+      "aliases": [
+        "双人游戏"
+      ],
+      "releaseDate": "2021-03-26T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "和对象一起玩的最佳双人游戏",
+      "reviewBody": "",
+      "groupNames": [
+        "动作冒险"
+      ],
+      "completions": [
+        {
+          "platform": "Nintendo Switch 2",
+          "date": "2026-05-31T00:00:00Z",
+          "degree": "全收集/白金",
+          "playtime": 23.3,
+          "notes": "画面在 OLED 上真的惊艳",
+          "scoreGameplay": 9.6,
+          "scoreDesign": 9.2,
+          "scoreStory": 9.1,
+          "scoreArt": 9.3,
+          "scoreMusic": 8.9,
+          "scorePerformance": 9.3
+        },
+        {
+          "platform": "PS5",
+          "date": "2023-11-14T00:00:00Z",
+          "degree": "速通",
+          "playtime": 54.2,
+          "notes": "剧情太顶了，后劲很足",
+          "scoreGameplay": 9.4,
+          "scoreDesign": 9.9,
+          "scoreStory": 9.6,
+          "scoreArt": 9.0,
+          "scoreMusic": 8.8,
+          "scorePerformance": 8.9
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "Persona 5 Royal",
+      "nameZh": "女神异闻录5 皇家版",
+      "nameJa": "ペルソナ5 ザ・ロイヤル",
+      "aliases": [
+        "P5R",
+        "P5皇家版"
+      ],
+      "releaseDate": "2019-10-31T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "天下第一的青春 RPG",
+      "reviewBody": "",
+      "groupNames": [
+        "角色扮演"
+      ],
+      "completions": [
+        {
+          "platform": "Xbox Series X|S",
+          "date": "2022-06-24T00:00:00Z",
+          "degree": "主线通关",
+          "playtime": 90.8,
+          "notes": "",
+          "scoreGameplay": 9.5,
+          "scoreDesign": 9.3,
+          "scoreStory": 9.5,
+          "scoreArt": 9.6,
+          "scoreMusic": 9.5,
+          "scorePerformance": 9.4
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "Sekiro: Shadows Die Twice",
+      "nameZh": "只狼 影逝二度",
+      "nameJa": "SEKIRO: SHADOWS DIE TWICE",
+      "aliases": [
+        "只狼",
+        "隻狼"
+      ],
+      "releaseDate": "2019-03-22T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "拼刀与弹反的极致爽快",
+      "reviewBody": "",
+      "groupNames": [
+        "动作冒险",
+        "魂系游戏"
+      ],
+      "completions": [
+        {
+          "platform": "PC",
+          "date": "2025-05-07T00:00:00Z",
+          "degree": "速通",
+          "playtime": 25.6,
+          "notes": "白金路上花了很久，值了",
+          "scoreGameplay": 9.8,
+          "scoreDesign": 9.4,
+          "scoreStory": 9.4,
+          "scoreArt": 9.6,
+          "scoreMusic": 9.0,
+          "scorePerformance": 9.3
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "Dark Souls III",
+      "nameZh": "黑暗之魂3",
+      "nameJa": "DARK SOULS III",
+      "aliases": [
+        "黑魂3",
+        "DARK SOULS III"
+      ],
+      "releaseDate": "2016-04-12T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "",
+      "reviewBody": "",
+      "groupNames": [
+        "角色扮演",
+        "魂系游戏"
+      ],
+      "completions": [
+        {
+          "platform": "PS5",
+          "date": "2026-01-20T00:00:00Z",
+          "degree": "主线通关",
+          "playtime": 101.5,
+          "notes": "",
+          "scoreGameplay": 9.9,
+          "scoreDesign": 9.9,
+          "scoreStory": 9.6,
+          "scoreArt": 9.8,
+          "scoreMusic": 9.1,
+          "scorePerformance": 9.5
+        },
+        {
+          "platform": "Xbox Series X|S",
+          "date": "2019-07-12T00:00:00Z",
+          "degree": "全结局",
+          "playtime": 94.7,
+          "notes": "音效和音乐太加分了",
+          "scoreGameplay": 9.6,
+          "scoreDesign": 9.3,
+          "scoreStory": 9.0,
+          "scoreArt": 9.7,
+          "scoreMusic": 9.7,
+          "scorePerformance": 9.2
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "Alan Wake 2",
+      "nameZh": "心灵杀手2",
+      "nameJa": "Alan Wake 2",
+      "aliases": [
+        "阿兰醒醒2"
+      ],
+      "releaseDate": "2023-10-27T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "媒体叙事的杰作",
+      "reviewBody": "",
+      "groupNames": [
+        "动作冒险"
+      ],
+      "completions": [
+        {
+          "platform": "PS5",
+          "date": "2025-05-28T00:00:00Z",
+          "degree": "多周目",
+          "playtime": 17.7,
+          "notes": "支线也全清了，内容量惊人",
+          "scoreGameplay": 9.1,
+          "scoreDesign": 9.3,
+          "scoreStory": 9.4,
+          "scoreArt": 9.4,
+          "scoreMusic": 8.9,
+          "scorePerformance": 9.5
+        },
+        {
+          "platform": "Xbox Series X|S",
+          "date": "2026-06-15T00:00:00Z",
+          "degree": "全结局",
+          "playtime": 41.0,
+          "notes": "画面在 OLED 上真的惊艳",
+          "scoreGameplay": 8.9,
+          "scoreDesign": 9.1,
+          "scoreStory": 9.3,
+          "scoreArt": 9.6,
+          "scoreMusic": 9.0,
+          "scorePerformance": 9.8
+        },
+        {
+          "platform": "PC",
+          "date": "2025-12-02T00:00:00Z",
+          "degree": "主线通关",
+          "playtime": 36.8,
+          "notes": "",
+          "scoreGameplay": 9.4,
+          "scoreDesign": 9.1,
+          "scoreStory": 9.2,
+          "scoreArt": 9.6,
+          "scoreMusic": 8.7,
+          "scorePerformance": 9.0
+        }
+      ],
+      "copies": null
+    },
+    {
+      "name": "Titanfall 2",
+      "nameZh": "泰坦陨落2",
+      "nameJa": "Titanfall 2",
+      "aliases": [
+        "泰坦2",
+        "TF2"
+      ],
+      "releaseDate": "2016-10-28T00:00:00Z",
+      "coverBase64": null,
+      "reviewTitle": "单人战役的良心之作",
+      "reviewBody": "",
+      "groupNames": [
+        "射击"
+      ],
+      "completions": [
+        {
+          "platform": "PS5",
+          "date": "2021-11-30T00:00:00Z",
+          "degree": "多周目",
+          "playtime": 35.3,
+          "notes": "剧情太顶了，后劲很足",
+          "scoreGameplay": 9.3,
+          "scoreDesign": 8.6,
+          "scoreStory": 9.2,
+          "scoreArt": 8.8,
+          "scoreMusic": 8.5,
+          "scorePerformance": 8.9
+        },
+        {
+          "platform": "Xbox Series X|S",
+          "date": "2020-10-22T00:00:00Z",
+          "degree": "全支线",
+          "playtime": 14.5,
+          "notes": "",
+          "scoreGameplay": 9.3,
+          "scoreDesign": 8.6,
+          "scoreStory": 9.2,
+          "scoreArt": 9.2,
+          "scoreMusic": 8.7,
+          "scorePerformance": 9.0
+        },
+        {
+          "platform": "PC",
+          "date": "2020-02-22T00:00:00Z",
+          "degree": "主线通关",
+          "playtime": 37.0,
+          "notes": "",
+          "scoreGameplay": 9.1,
+          "scoreDesign": 8.5,
+          "scoreStory": 9.1,
+          "scoreArt": 8.6,
+          "scoreMusic": 8.8,
+          "scorePerformance": 9.6
+        }
+      ],
+      "copies": null
+    }
+  ],
+  "username": "游戏收藏家",
+  "avatarBase64": null,
+  "iconBase64": null
+}
