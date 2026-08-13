@@ -112,6 +112,7 @@
 "copy.addVersion" = "Add Edition";
 "copy.noCopies" = "No holdings yet";
 "copy.deleteConfirm" = "Delete edition \"%@\"? Photos for this edition will also be deleted.";
+"copy.deleteImageConfirm" = "Delete this photo? This action cannot be undone.";
 "copy.count" = "Quantity";
 "copy.addImage" = "Add Images";
 "copy.viewImage" = "View Full Image";

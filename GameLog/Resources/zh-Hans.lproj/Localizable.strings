@@ -111,6 +111,7 @@
 "copy.addVersion" = "新增版本";
 "copy.noCopies" = "还没有持有记录";
 "copy.deleteConfirm" = "确定删除版本「%@」？该版本的照片也会被删除。";
+"copy.deleteImageConfirm" = "确定删除这张照片吗？此操作无法撤销。";
 "copy.count" = "数量";
 "copy.addImage" = "添加图片";
 "copy.viewImage" = "查看大图";

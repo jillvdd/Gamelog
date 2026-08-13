@@ -200,7 +200,10 @@ struct SettingsView: View {
     private func export() {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.json]
-        panel.nameFieldStringValue = "GameLog-backup.json"
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd-HH-mm"
+        panel.nameFieldStringValue = "GameLog-backup-\(formatter.string(from: Date())).json"
         panel.canCreateDirectories = true
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {

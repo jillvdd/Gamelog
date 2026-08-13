@@ -112,6 +112,7 @@
 "copy.addVersion" = "版を追加";
 "copy.noCopies" = "所持記録がありません";
 "copy.deleteConfirm" = "版「%@」を削除しますか？この版の写真も削除されます。";
+"copy.deleteImageConfirm" = "この写真を削除しますか？この操作は元に戻せません。";
 "copy.count" = "数量";
 "copy.addImage" = "写真を追加";
 "copy.viewImage" = "画像を拡大表示";

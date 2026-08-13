@@ -149,6 +149,8 @@ private struct CopyCardView: View {
     var onRename: () -> Void = {}
     var onDelete: () -> Void = {}
     var onEnlarge: (Data) -> Void = { _ in }
+    /// 待删除照片的下标（非 nil 时弹确认，防止误触）。
+    @State private var pendingDeleteImage: Int?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -175,7 +177,7 @@ private struct CopyCardView: View {
                 ForEach(Array(copy.images.enumerated()), id: \.offset) { index, data in
                     ThumbnailView(
                         data: data,
-                        onDelete: { removeImage(at: index) },
+                        onDelete: { pendingDeleteImage = index },
                         onEnlarge: { onEnlarge(data) }
                     )
                 }
@@ -194,6 +196,26 @@ private struct CopyCardView: View {
             RoundedRectangle(cornerRadius: 10)
                 .stroke(Color(nsColor: .separatorColor))
         )
+        .confirmationDialog(
+            L10n.tr("common.confirmDelete", lang: language),
+            isPresented: Binding(
+                get: { pendingDeleteImage != nil },
+                set: { if !$0 { pendingDeleteImage = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button(L10n.tr("common.delete", lang: language), role: .destructive) {
+                if let index = pendingDeleteImage {
+                    removeImage(at: index)
+                }
+                pendingDeleteImage = nil
+            }
+            Button(L10n.tr("common.cancel", lang: language), role: .cancel) {
+                pendingDeleteImage = nil
+            }
+        } message: {
+            Text(verbatim: L10n.tr("copy.deleteImageConfirm", lang: language))
+        }
     }
 
     /// 数量控件：− ×N +（数字清晰可见，最少 1 份）。
