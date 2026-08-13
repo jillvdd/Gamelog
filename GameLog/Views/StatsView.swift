@@ -6,6 +6,8 @@ struct StatsView: View {
     @Query private var games: [Game]
     @Environment(\.appLanguageCode) private var language
     @State private var showingOverall = false
+    /// 点击榜单游戏名 → 编程式 push 到详情。
+    @State private var selectedGame: Game?
 
     private var totalGames: Int { games.count }
 
@@ -91,7 +93,7 @@ struct StatsView: View {
                 }
             }
             .navigationTitle(L10n.tr("library.stats", lang: language))
-            .navigationDestination(for: Game.self) { GameDetailView(game: $0) }
+            .navigationDestination(item: $selectedGame) { GameDetailView(game: $0) }
             .navigationDestination(isPresented: $showingOverall) { OverallRankingView() }
         }
     }
@@ -105,7 +107,8 @@ struct StatsView: View {
             RankingBoard(
                 title: L10n.tr("group.avgScore", lang: language),
                 entries: Rankings.byAverage(games: games, platform: nil),
-                limit: 10
+                limit: 10,
+                onSelect: { selectedGame = $0 }
             )
 
             LazyVGrid(columns: rankingColumns(for: width), spacing: 12) {
@@ -113,7 +116,8 @@ struct StatsView: View {
                     RankingBoard(
                         title: L10n.tr(dimension.labelKey, lang: language),
                         entries: Rankings.byDimension(dimension, games: games, platform: nil),
-                        limit: 5
+                        limit: 5,
+                        onSelect: { selectedGame = $0 }
                     )
                 }
             }

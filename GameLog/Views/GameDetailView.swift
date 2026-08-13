@@ -169,13 +169,21 @@ private struct LocalizedNamesSubtitle: View {
     }
 }
 
-/// 游戏详情页：信息 + 评价 + 通关记录列表。
+/// 详情页内部页签（收藏家模式开启时显示分段切换）：详情 = 现有内容，持有 = 收藏记录。
+private enum DetailTab: Hashable {
+    case details
+    case holdings
+}
+
+/// 游戏详情页：信息 + 评价 + 通关记录列表（收藏家模式开启时多一个「持有」页签）。
 struct GameDetailView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.appLanguageCode) private var language
     @Environment(\.dismiss) private var dismiss
+    @AppStorage(UserCustomization.collectorModeKey) private var collectorMode = false
     let game: Game
 
+    @State private var detailTab: DetailTab = .details
     @State private var showingEditGame = false
     @State private var showingAddCompletion = false
     @State private var editingCompletion: Completion?
@@ -197,15 +205,13 @@ struct GameDetailView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 28) {
                     header
-                    if geo.size.width >= 1000 {
-                        if hasReview {
-                            wideContent(contentWidth: min(1500, geo.size.width) - 56)
-                        } else {
-                            completionsSection
-                        }
+                    if collectorMode {
+                        detailTabPicker
+                    }
+                    if collectorMode && detailTab == .holdings {
+                        HoldingsView(game: game)
                     } else {
-                        reviewSection
-                        completionsSection
+                        detailsContent(width: geo.size.width)
                     }
                 }
                 .padding(28)
@@ -385,6 +391,32 @@ struct GameDetailView: View {
     }
 
     // MARK: - 通关记录
+
+    /// 详情页内容（现有评价 + 通关记录）。收藏家模式关时直接显示；开时在「详情」页签显示。
+    @ViewBuilder
+    private func detailsContent(width: CGFloat) -> some View {
+        if width >= 1000 {
+            if hasReview {
+                wideContent(contentWidth: min(1500, width) - 56)
+            } else {
+                completionsSection
+            }
+        } else {
+            reviewSection
+            completionsSection
+        }
+    }
+
+    /// 「详情 / 持有」分段切换（收藏家模式开启时显示在分数下方）。
+    private var detailTabPicker: some View {
+        Picker("", selection: $detailTab) {
+            Text(verbatim: L10n.tr("detail.details", lang: language)).tag(DetailTab.details)
+            Text(verbatim: L10n.tr("detail.holdings", lang: language)).tag(DetailTab.holdings)
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .frame(maxWidth: 280, alignment: .leading)
+    }
 
     /// 宽窗口双列：评价标题与正文占约 58% 宽度，通关记录占剩余。
     /// 评价标题与「通关记录」标题同为 title3 粗体，两列顶部天然对齐。

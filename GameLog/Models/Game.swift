@@ -37,6 +37,10 @@ final class Game {
     @Relationship(deleteRule: .cascade, inverse: \Completion.game)
     var completions: [Completion]
 
+    /// 持有记录（收藏家模式）：删除游戏级联删版本与照片。
+    @Relationship(deleteRule: .cascade, inverse: \PhysicalCopy.game)
+    var copies: [PhysicalCopy]
+
     /// 多对多：一个游戏可进多个分组。删除游戏不应级联删分组（分组可能属于其他游戏）。
     @Relationship(deleteRule: .nullify, inverse: \GameGroup.games)
     var groups: [GameGroup]
@@ -55,6 +59,7 @@ final class Game {
         self.reviewBody = reviewBody
         self.createdAt = createdAt
         self.completions = []
+        self.copies = []
         self.groups = []
     }
 }

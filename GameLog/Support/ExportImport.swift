@@ -32,6 +32,15 @@ struct GameDTO: Codable {
     var reviewBody: String
     var groupNames: [String]
     var completions: [CompletionDTO]
+    /// 持有记录（收藏家模式；旧版备份缺字段 → nil，导入保持现状）。
+    var copies: [CopyDTO]?
+}
+
+/// 一条持有记录（版本 + 数量 + 最多 6 张照片 base64）。
+struct CopyDTO: Codable {
+    var version: String
+    var count: Int
+    var images: [String]
 }
 
 struct CompletionDTO: Codable {
@@ -84,6 +93,13 @@ enum BackupManager {
                             scoreArt: completion.scoreArt,
                             scoreMusic: completion.scoreMusic,
                             scorePerformance: completion.scorePerformance
+                        )
+                    },
+                    copies: game.copies.map { copy in
+                        CopyDTO(
+                            version: copy.version,
+                            count: copy.count,
+                            images: copy.images.map { $0.base64EncodedString() }
                         )
                     }
                 )
@@ -153,6 +169,19 @@ enum BackupManager {
                 )
                 completion.game = game
                 context.insert(completion)
+            }
+
+            // 持有记录（旧版备份缺字段 → 保持现状不创建）
+            if let copies = gameDTO.copies {
+                for copyDTO in copies {
+                    let copy = PhysicalCopy(
+                        version: copyDTO.version,
+                        count: max(1, copyDTO.count),
+                        images: copyDTO.images.compactMap { Data(base64Encoded: $0) }
+                    )
+                    copy.game = game
+                    context.insert(copy)
+                }
             }
         }
 

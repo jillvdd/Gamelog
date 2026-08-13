@@ -19,6 +19,10 @@ enum UserCustomization {
     static let autoMatchCoverKey = "customization.autoMatchCover"
     /// 隐藏工具栏毛玻璃开关（默认关闭=保留玻璃+标题；开启=方案 B：无标题、完全无毛玻璃）。
     static let hideToolbarGlassKey = "customization.hideToolbarGlass"
+    /// 收藏家模式开关（默认关闭；开启后详情页出现「详情/持有」分段切换）。
+    static let collectorModeKey = "customization.collectorMode"
+    /// 保存原图开关（默认关闭=收藏照片导入时压缩；开启=存原图，只影响之后新增的图）。
+    static let keepOriginalImagesKey = "customization.keepOriginalImages"
 
     /// 用户名长度上限（设置页输入与导入时统一截断）。
     static let usernameMaxLength = 20
@@ -102,5 +106,34 @@ enum UserCustomization {
               let rep = NSBitmapImageRep(data: tiff),
               let data = rep.representation(using: .png, properties: [:]) else { return nil }
         return data
+    }
+
+    // MARK: - 收藏照片处理（收藏家模式）
+
+    /// 导入收藏照片：keepOriginal=true 存原文件数据；false 压缩（最长边 ≤ maxEdge、JPEG quality）。
+    static func collectionImageData(from url: URL, keepOriginal: Bool) -> Data? {
+        if keepOriginal { return try? Data(contentsOf: url) }
+        guard let image = NSImage(contentsOf: url) else { return nil }
+        return compressedJPEGData(from: image)
+    }
+
+    /// 压缩为 JPEG：最长边 ≤ maxEdge、quality。尺寸未超限时只转 JPEG 不放大。
+    static func compressedJPEGData(from image: NSImage, maxEdge: CGFloat = 1600, quality: CGFloat = 0.8) -> Data? {
+        let size = image.size
+        let maxDim = max(size.width, size.height)
+        let scale = maxDim > maxEdge ? maxEdge / maxDim : 1.0
+        let target = NSSize(width: max(1, size.width * scale), height: max(1, size.height * scale))
+        guard let rep = NSBitmapImageRep(
+            bitmapDataPlanes: nil, pixelsWide: Int(target.width), pixelsHigh: Int(target.height),
+            bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+            colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0
+        ) else { return nil }
+        rep.size = target
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+        image.draw(in: NSRect(origin: .zero, size: target))
+        NSGraphicsContext.current?.flushGraphics()
+        NSGraphicsContext.restoreGraphicsState()
+        return rep.representation(using: .jpeg, properties: [.compressionFactor: quality])
     }
 }

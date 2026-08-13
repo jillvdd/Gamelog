@@ -15,6 +15,8 @@ struct SettingsView: View {
     @AppStorage(UserCustomization.iconFileKey) private var iconFile = ""
     @AppStorage(UserCustomization.autoMatchCoverKey) private var autoMatchCover = false
     @AppStorage(UserCustomization.hideToolbarGlassKey) private var hideToolbarGlass = false
+    @AppStorage(UserCustomization.collectorModeKey) private var collectorMode = false
+    @AppStorage(UserCustomization.keepOriginalImagesKey) private var keepOriginalImages = false
 
     /// 用户名绑定：写入时截断到上限。用 Binding 替代 `.onChange`——`.onChange` 挂 TextField 在 macOS 会吞尾随空格。
     private var usernameBinding: Binding<String> {
@@ -78,6 +80,18 @@ struct SettingsView: View {
                 LText("settings.hideToolbarGlassHint")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+
+                Toggle(L10n.tr("settings.collectorMode", lang: language), isOn: $collectorMode)
+                LText("settings.collectorModeHint")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                if collectorMode {
+                    Toggle(L10n.tr("settings.keepOriginalImages", lang: language), isOn: $keepOriginalImages)
+                    LText("settings.keepOriginalImagesHint")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Section(L10n.tr("settings.steamgriddb", lang: language)) {

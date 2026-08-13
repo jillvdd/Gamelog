@@ -47,11 +47,14 @@ enum Rankings {
 // MARK: - 榜单卡片
 
 /// 排名卡片：标题 + 名次行；游戏名可点进详情。`limit` 为 nil 时显示全部。行背景隔行铺色（斑马纹）。
+/// 点击游戏名走 `onSelect` 回调（由父视图决定导航方式，避免推入视图内 NavigationLink 找不到目标）。
 struct RankingBoard: View {
     @Environment(\.appLanguageCode) private var language
     let title: String
     let entries: [RankingEntry]
     var limit: Int? = nil
+    /// 点击游戏名的回调。
+    var onSelect: (Game) -> Void = { _ in }
 
     /// 隔行强调色：偶数行铺在卡片底色上加深一档。
     private var stripeColor: Color {
@@ -100,7 +103,9 @@ struct RankingBoard: View {
                 .font(.callout.monospacedDigit())
                 .foregroundStyle(.secondary)
                 .frame(width: 26, alignment: .leading)
-            NavigationLink(value: entry.game) {
+            Button {
+                onSelect(entry.game)
+            } label: {
                 Text(verbatim: entry.game.displayName(for: language))
                     .font(.callout)
                     .foregroundStyle(.primary)
@@ -124,6 +129,8 @@ struct OverallRankingView: View {
     @State private var selectedPlatform: String?
     @State private var selectedBoard = 0
     @State private var page = 0
+    /// 点击榜单游戏名 → 编程式 push 到详情（避免推入视图内 NavigationLink 找不到目标）。
+    @State private var selectedGame: Game?
 
     private static let pageSize = 100
 
@@ -172,7 +179,8 @@ struct OverallRankingView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     RankingBoard(
                         title: boardTitles[selectedBoard],
-                        entries: currentEntries
+                        entries: currentEntries,
+                        onSelect: { selectedGame = $0 }
                     )
                 }
                 .padding(.horizontal, 28)
@@ -205,6 +213,9 @@ struct OverallRankingView: View {
             .padding(.vertical, 10)
         }
         .navigationTitle(L10n.tr("stats.overallRanking", lang: language))
+        // 点击榜单游戏名 → 编程式 push 详情（本页由 navigationDestination(isPresented:) 推入，
+        // 用 item: 在本地注册，避免父级根视图的 Game 目标对本页不可见）。
+        .navigationDestination(item: $selectedGame) { GameDetailView(game: $0) }
         .toolbar {
             ToolbarItem {
                 platformMenu

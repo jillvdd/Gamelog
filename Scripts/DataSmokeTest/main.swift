@@ -1,12 +1,13 @@
 // GameLog 数据层回归冒烟测试（可重复运行，编译进产物但不编进 app）。
 // 覆盖：多对多双向、级联删除、删分组不删游戏、评分集成、零记录、别名搜索、
-//       备份全字段往返、重复导入幂等、导入替换语义、日期保真。
+//       备份全字段往返、重复导入幂等、导入替换语义、日期保真、持有记录往返。
 //
 // 编译运行（Xcode 工具链 + 宏插件路径，勿用 CLT swiftc）：
 //   xcrun swiftc -o /tmp/gamelog_datasmoke \
 //     Scripts/DataSmokeTest/main.swift \
 //     GameLog/Models/Game.swift GameLog/Models/Completion.swift GameLog/Models/GameGroup.swift \
-//     GameLog/Models/Presets.swift GameLog/Support/ScoreMath.swift GameLog/Support/ExportImport.swift \
+//     GameLog/Models/PhysicalCopy.swift GameLog/Models/Presets.swift \
+//     GameLog/Support/ScoreMath.swift GameLog/Support/ExportImport.swift \
 //     GameLog/Support/UserCustomization.swift \
 //     -plugin-path /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib/swift/host/plugins
 //   /tmp/gamelog_datasmoke
@@ -228,6 +229,26 @@ check("英文模式显示英文名", ml.displayName(for: "en") == "The Legend of
 check("中文未设回退英文", mlPlain.displayName(for: "zh-Hans") == "Xenoblade")
 check("搜中文名命中", ml.matches(search: "塞尔达"))
 check("搜日文名命中", ml.matches(search: "ゼルダ"))
+
+// --- 13. 持有记录（收藏家模式）备份往返 ---
+let holdGame = Game(name: "Holding Test", reviewTitle: "")
+let holdCopy = PhysicalCopy(version: "日版初版", count: 2, images: [Data([1, 2, 3]), Data([4, 5, 6])])
+holdCopy.game = holdGame
+context.insert(holdGame)
+context.insert(holdCopy)
+try? context.save()
+check("持有：版本名", holdGame.copies.first?.version == "日版初版")
+check("持有：数量", holdGame.copies.first?.count == 2)
+check("持有：图片数", holdGame.copies.first?.images.count == 2)
+check("持有：级联关系", holdCopy.game?.persistentModelID == holdGame.persistentModelID)
+
+let holdBackup = try BackupManager.encode(games: [holdGame], groups: [])
+try BackupManager.decodeAndReplace(holdBackup, into: context)
+try context.save()
+let holdImported = (try? context.fetch(FetchDescriptor<Game>()))?.first { $0.name == "Holding Test" }
+check("持有：备份往返版本名", holdImported?.copies.first?.version == "日版初版")
+check("持有：备份往返数量", holdImported?.copies.first?.count == 2)
+check("持有：备份往返图片", holdImported?.copies.first?.images == [Data([1, 2, 3]), Data([4, 5, 6])])
 
 print(failures == 0 ? "DATA SMOKE TEST PASSED" : "DATA SMOKE TEST FAILED: \(failures) failures")
 exit(failures == 0 ? 0 : 1)
