@@ -10,41 +10,58 @@ struct CompletionCardView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                if let date = completion.date {
-                    Text(verbatim: date.formatted(date: .abbreviated, time: .omitted))
-                        .font(.system(size: 12, weight: .semibold))
+            Group {
+                #if os(macOS)
+                HStack(spacing: 8) {
+                    if let date = completion.date {
+                        Text(verbatim: date.formatted(date: .abbreviated, time: .omitted))
+                            .font(.system(size: 12, weight: .semibold))
+                    }
+                    if !completion.platform.isEmpty {
+                        chip(Presets.display(completion.platform, category: .platform, language: language))
+                    }
+                    if !completion.degree.isEmpty {
+                        chip(Presets.display(completion.degree, category: .degree, language: language))
+                    }
+                    if let playtime = completion.playtime {
+                        Text(verbatim: L10n.tr("completion.playtimeFormat", [playtime], lang: language))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    scoreView
+                    editButton
+                    deleteButton
                 }
-                if !completion.platform.isEmpty {
-                    chip(Presets.display(completion.platform, category: .platform, language: language))
+                #else
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 8) {
+                        if let date = completion.date {
+                            Text(verbatim: date.formatted(date: .abbreviated, time: .omitted))
+                                .font(.system(size: 12, weight: .semibold))
+                        }
+                        if let playtime = completion.playtime {
+                            Text(verbatim: L10n.tr("completion.playtimeFormat", [playtime], lang: language))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        scoreView
+                        editButton
+                        deleteButton
+                    }
+                    if !completion.platform.isEmpty || !completion.degree.isEmpty {
+                        HStack(spacing: 8) {
+                            if !completion.platform.isEmpty {
+                                chip(Presets.display(completion.platform, category: .platform, language: language))
+                            }
+                            if !completion.degree.isEmpty {
+                                chip(Presets.display(completion.degree, category: .degree, language: language))
+                            }
+                        }
+                    }
                 }
-                if !completion.degree.isEmpty {
-                    chip(Presets.display(completion.degree, category: .degree, language: language))
-                }
-                if let playtime = completion.playtime {
-                    Text(verbatim: L10n.tr("completion.playtimeFormat", [playtime], lang: language))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                if let avg = completion.displayAverage {
-                    Text(verbatim: String(format: "%.1f", avg))
-                        .font(.system(size: 18, weight: .bold))
-                        .monospacedDigit()
-                } else {
-                    LText("score.unrated")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                }
-                Button(action: onEdit) {
-                    Image(systemName: "pencil")
-                }
-                .buttonStyle(.borderless)
-                Button(action: onDelete) {
-                    Image(systemName: "trash")
-                }
-                .buttonStyle(.borderless)
-                .foregroundStyle(.red)
+                #endif
             }
 
             if completion.hasScores {
@@ -75,12 +92,41 @@ struct CompletionCardView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 10)
-                .fill(Color(nsColor: .controlBackgroundColor))
+                .fill(Color.semantic(.controlBackground))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 10)
-                .stroke(Color(nsColor: .separatorColor))
+                .stroke(Color.semantic(.separator))
         )
+    }
+
+    /// 平均分显示（已评分显示数字，未评分显示「未评分」）。
+    @ViewBuilder
+    private var scoreView: some View {
+        if let avg = completion.displayAverage {
+            Text(verbatim: String(format: "%.1f", avg))
+                .font(.system(size: 18, weight: .bold))
+                .monospacedDigit()
+        } else {
+            LText("score.unrated")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var editButton: some View {
+        Button(action: onEdit) {
+            Image(systemName: "pencil")
+        }
+        .buttonStyle(.borderless)
+    }
+
+    private var deleteButton: some View {
+        Button(action: onDelete) {
+            Image(systemName: "trash")
+        }
+        .buttonStyle(.borderless)
+        .foregroundStyle(.red)
     }
 
     private func chip(_ text: String) -> some View {
@@ -108,7 +154,7 @@ private struct DimensionScoreBars: View {
                         .minimumScaleFactor(0.7)
                         .frame(width: 96, alignment: .leading)
                     ZStack(alignment: .leading) {
-                        Capsule().fill(Color(nsColor: .quaternarySystemFill))
+                        Capsule().fill(Color.semantic(.quaternarySystemFill))
                         if let value {
                             Capsule()
                                 .fill(dimension.barColor)
@@ -214,7 +260,11 @@ struct GameDetailView: View {
                         detailsContent(width: geo.size.width)
                     }
                 }
+                #if os(macOS)
                 .padding(28)
+                #else
+                .padding(16)
+                #endif
                 .frame(maxWidth: 1500)
                 .frame(maxWidth: .infinity, alignment: .top)
             }
@@ -244,118 +294,158 @@ struct GameDetailView: View {
                 }
             }
         }
-        .sheet(isPresented: $showingEditGame) { GameEditView(game: game) }
-        .sheet(isPresented: $showingAddCompletion) { CompletionEditView(game: game, completion: nil) }
+        .sheet(isPresented: $showingEditGame) {
+            #if os(macOS)
+            GameEditView(game: game)
+            #else
+            NavigationStack { GameEditView(game: game) }
+            #endif
+        }
+        .sheet(isPresented: $showingAddCompletion) {
+            #if os(macOS)
+            CompletionEditView(game: game, completion: nil)
+            #else
+            NavigationStack { CompletionEditView(game: game, completion: nil) }
+            #endif
+        }
         .sheet(item: $editingCompletion) { completion in
+            #if os(macOS)
             CompletionEditView(game: game, completion: completion)
+            #else
+            NavigationStack { CompletionEditView(game: game, completion: completion) }
+            #endif
         }
         .sheet(isPresented: $showingShare) { SharePanelView(preselected: [game]) }
-        .confirmationDialog(
+        .platformConfirmDialog(
             L10n.tr("common.confirmDelete", lang: language),
             isPresented: Binding(
                 get: { pendingDeleteCompletion != nil },
                 set: { if !$0 { pendingDeleteCompletion = nil } }
             ),
-            titleVisibility: .visible
-        ) {
-            Button(L10n.tr("common.confirmDelete", lang: language), role: .destructive) {
-                if let completion = pendingDeleteCompletion {
-                    context.delete(completion)
+            message: L10n.tr("completion.delete", lang: language),
+            cancelTitle: L10n.tr("common.cancel", lang: language),
+            actions: [
+                ConfirmAction(
+                    title: L10n.tr("common.confirmDelete", lang: language),
+                    isDestructive: true
+                ) {
+                    if let completion = pendingDeleteCompletion {
+                        context.delete(completion)
+                    }
                 }
-            }
-        } message: {
-            LText("completion.delete")
-        }
-        .confirmationDialog(
+            ]
+        )
+        .platformConfirmDialog(
             L10n.tr("common.confirmDelete", lang: language),
             isPresented: $showingDeleteGame,
-            titleVisibility: .visible
-        ) {
-            Button(L10n.tr("common.confirmDelete", lang: language), role: .destructive) {
-                context.delete(game)
-                dismiss()
-            }
-        } message: {
-            Text(verbatim: L10n.tr("delete.confirmGame", [game.displayName(for: language)], lang: language))
-        }
+            message: L10n.tr("delete.confirmGame", [game.displayName(for: language)], lang: language),
+            cancelTitle: L10n.tr("common.cancel", lang: language),
+            actions: [
+                ConfirmAction(
+                    title: L10n.tr("common.confirmDelete", lang: language),
+                    isDestructive: true
+                ) {
+                    context.delete(game)
+                    dismiss()
+                }
+            ]
+        )
     }
 
     // MARK: - 头部
 
     private var header: some View {
-        HStack(alignment: .top, spacing: 24) {
-            Group {
-                if let image = game.coverImage {
-                    Image(nsImage: image)
-                        .resizable()
-                        .scaledToFit()
-                } else {
-                    ZStack {
-                        Rectangle().fill(Color(nsColor: .quaternarySystemFill))
-                        Image(systemName: "gamecontroller")
-                            .font(.system(size: 40))
-                            .foregroundStyle(.tertiary)
+        Group {
+            #if os(macOS)
+            HStack(alignment: .top, spacing: 24) {
+                coverBlock
+                infoBlock
+                Spacer()
+            }
+            #else
+            VStack(alignment: .leading, spacing: 16) {
+                coverBlock
+                infoBlock
+            }
+            #endif
+        }
+    }
+
+    /// 封面块：160×213 竖版封面（无封面时占位图标）。
+    private var coverBlock: some View {
+        Group {
+            if let image = game.coverImage {
+                Image(appImage: image)
+                    .resizable()
+                    .scaledToFit()
+            } else {
+                ZStack {
+                    Rectangle().fill(Color.semantic(.quaternarySystemFill))
+                    Image(systemName: "gamecontroller")
+                        .font(.system(size: 40))
+                        .foregroundStyle(.tertiary)
+                }
+            }
+        }
+        .frame(width: 160, height: 213)
+        .background(Rectangle().fill(Color.semantic(.quaternarySystemFill)))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .shadow(color: .black.opacity(0.15), radius: 6, y: 2)
+    }
+
+    /// 信息块：主名/其他语言名/发售日/平台/分组/评分与条形图。
+    private var infoBlock: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(verbatim: game.displayName(for: language))
+                .font(.system(size: 26, weight: .bold))
+            LocalizedNamesSubtitle(game: game, currentLanguage: language)
+
+            if let date = game.releaseDate {
+                Text(verbatim: date.formatted(date: .long, time: .omitted))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+
+            if !platforms.isEmpty {
+                Text(verbatim: platforms
+                    .map { Presets.display($0, category: .platform, language: language) }
+                    .joined(separator: " · "))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+
+            if !game.groups.isEmpty {
+                HStack(spacing: 6) {
+                    ForEach(game.groups) { group in
+                        Text(verbatim: group.name)
+                            .font(.caption)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Capsule().fill(Color.accentColor.opacity(0.12)))
                     }
                 }
             }
-            .frame(width: 160, height: 213)
-            .background(Rectangle().fill(Color(nsColor: .quaternarySystemFill)))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .shadow(color: .black.opacity(0.15), radius: 6, y: 2)
 
             VStack(alignment: .leading, spacing: 10) {
-                Text(verbatim: game.displayName(for: language))
-                    .font(.system(size: 26, weight: .bold))
-                LocalizedNamesSubtitle(game: game, currentLanguage: language)
-
-                if let date = game.releaseDate {
-                    Text(verbatim: date.formatted(date: .long, time: .omitted))
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                }
-
-                if !platforms.isEmpty {
-                    Text(verbatim: platforms
-                        .map { Presets.display($0, category: .platform, language: language) }
-                        .joined(separator: " · "))
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                }
-
-                if !game.groups.isEmpty {
-                    HStack(spacing: 6) {
-                        ForEach(game.groups) { group in
-                            Text(verbatim: group.name)
-                                .font(.caption)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .background(Capsule().fill(Color.accentColor.opacity(0.12)))
-                        }
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    if let score = game.libraryScore {
+                        Text(verbatim: String(format: "%.1f", score))
+                            .font(.system(size: 44, weight: .bold))
+                            .monospacedDigit()
+                        LText("score.average")
+                            .font(.headline)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        LText("score.unrated")
+                            .font(.title2)
+                            .foregroundStyle(.secondary)
                     }
                 }
-
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        if let score = game.libraryScore {
-                            Text(verbatim: String(format: "%.1f", score))
-                                .font(.system(size: 44, weight: .bold))
-                                .monospacedDigit()
-                            LText("score.average")
-                                .font(.headline)
-                                .foregroundStyle(.secondary)
-                        } else {
-                            LText("score.unrated")
-                                .font(.title2)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    if game.libraryScore != nil {
-                        DimensionScoreBars(game: game)
-                    }
+                if game.libraryScore != nil {
+                    DimensionScoreBars(game: game)
                 }
-                .padding(.top, 6)
             }
-            Spacer()
+            .padding(.top, 6)
         }
     }
 
@@ -372,7 +462,7 @@ struct GameDetailView: View {
                 .lineSpacing(4)
                 .padding(16)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(RoundedRectangle(cornerRadius: 10).fill(Color(nsColor: .controlBackgroundColor)))
+                .background(RoundedRectangle(cornerRadius: 10).fill(Color.semantic(.controlBackground)))
         }
     }
 
@@ -415,7 +505,11 @@ struct GameDetailView: View {
         }
         .pickerStyle(.segmented)
         .labelsHidden()
+        #if os(macOS)
         .frame(maxWidth: 280, alignment: .leading)
+        #else
+        .frame(maxWidth: .infinity)
+        #endif
     }
 
     /// 宽窗口双列：评价标题与正文占约 58% 宽度，通关记录占剩余。

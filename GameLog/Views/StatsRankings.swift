@@ -58,7 +58,7 @@ struct RankingBoard: View {
 
     /// 隔行强调色：偶数行铺在卡片底色上加深一档。
     private var stripeColor: Color {
-        Color(nsColor: .quaternarySystemFill)
+        Color.semantic(.quaternarySystemFill)
     }
 
     private var shown: [RankingEntry] {
@@ -92,7 +92,7 @@ struct RankingBoard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 10)
-                .fill(Color(nsColor: .controlBackgroundColor))
+                .fill(Color.semantic(.controlBackground))
         )
         .clipShape(RoundedRectangle(cornerRadius: 10))
     }
@@ -164,13 +164,40 @@ struct OverallRankingView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Picker("", selection: $selectedBoard) {
-                ForEach(Array(boardTitles.enumerated()), id: \.offset) { index, title in
-                    Text(verbatim: title).tag(index)
+            Group {
+                #if os(macOS)
+                Picker("", selection: $selectedBoard) {
+                    ForEach(Array(boardTitles.enumerated()), id: \.offset) { index, title in
+                        Text(verbatim: title).tag(index)
+                    }
                 }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                #else
+                // iOS：7 段 segmented 每段约 52pt 会截断长标签，改用 Menu 展示当前榜单 + 下拉切换。
+                Menu {
+                    ForEach(Array(boardTitles.enumerated()), id: \.offset) { index, title in
+                        Button {
+                            selectedBoard = index
+                        } label: {
+                            if selectedBoard == index {
+                                Label(title, systemImage: "checkmark")
+                            } else {
+                                Text(verbatim: title)
+                            }
+                        }
+                    }
+                } label: {
+                    Label(boardTitles[selectedBoard], systemImage: "list.number")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(Color.semantic(.controlBackground))
+                        )
+                }
+                #endif
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
             .padding(16)
             .onChange(of: selectedBoard) { _, _ in page = 0 }
             .onChange(of: selectedPlatform) { _, _ in page = 0 }
@@ -183,7 +210,11 @@ struct OverallRankingView: View {
                         onSelect: { selectedGame = $0 }
                     )
                 }
+                #if os(macOS)
                 .padding(.horizontal, 28)
+                #else
+                .padding(.horizontal, 16)
+                #endif
                 .padding(.top, 8)
                 .padding(.bottom, 20)
                 .frame(maxWidth: 1500)

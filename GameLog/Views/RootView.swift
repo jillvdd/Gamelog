@@ -99,7 +99,7 @@ struct RootView: View {
             .safeAreaInset(edge: .bottom) {
                 HStack(spacing: 8) {
                     if !avatarFile.isEmpty, let avatar = UserCustomization.avatarImage() {
-                        Image(nsImage: avatar)
+                        Image(appImage: avatar)
                             .resizable()
                             .frame(width: 32, height: 32)
                             .clipShape(Circle())

@@ -74,11 +74,19 @@ struct GroupGamePickerView: View {
                     }
                     .padding(2)
                 }
+                #if os(macOS)
                 .frame(maxHeight: 460)
+                #else
+                .frame(maxHeight: .infinity)
+                #endif
             }
         }
         .padding(16)
+        #if os(macOS)
         .frame(width: 460)
+        #else
+        .frame(maxWidth: .infinity)
+        #endif
     }
 
     @ViewBuilder
@@ -109,12 +117,12 @@ struct GroupGamePickerView: View {
     private func cover(for game: Game) -> some View {
         Group {
             if let image = game.coverImage {
-                Image(nsImage: image)
+                Image(appImage: image)
                     .resizable()
                     .scaledToFill()
             } else {
                 ZStack {
-                    Rectangle().fill(Color(nsColor: .quaternarySystemFill))
+                    Rectangle().fill(Color.semantic(.quaternarySystemFill))
                     Image(systemName: "gamecontroller")
                         .font(.system(size: 22))
                         .foregroundStyle(.tertiary)
@@ -154,7 +162,11 @@ struct GroupGamePickerView: View {
                     .lineLimit(1)
             }
         }
+        #if os(macOS)
         .fixedSize()
+        #else
+        .frame(maxWidth: 140)
+        #endif
         .help(L10n.tr("library.filterPlatform", lang: language))
     }
 

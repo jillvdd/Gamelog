@@ -10,7 +10,11 @@ struct PlatformBarRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Text(verbatim: Presets.display(platform, category: .platform, language: language))
+                #if os(macOS)
                 .frame(width: 160, alignment: .leading)
+                #else
+                .frame(width: 110, alignment: .leading)
+                #endif
                 .lineLimit(1)
             GeometryReader { proxy in
                 ZStack(alignment: .leading) {
@@ -84,7 +88,7 @@ struct GroupStatsSection: View {
             .padding(20)
             .background(
                 RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(nsColor: .controlBackgroundColor))
+                    .fill(Color.semantic(.controlBackground))
             )
 
             if !platformCounts.isEmpty {
@@ -104,7 +108,7 @@ struct GroupStatsSection: View {
                 .padding(14)
                 .background(
                     RoundedRectangle(cornerRadius: 10)
-                        .fill(Color(nsColor: .controlBackgroundColor))
+                        .fill(Color.semantic(.controlBackground))
                 )
             }
         }
@@ -139,7 +143,7 @@ struct GroupReviewSection: View {
                 .padding(14)
                 .background(
                     RoundedRectangle(cornerRadius: 10)
-                        .fill(Color(nsColor: .controlBackgroundColor))
+                        .fill(Color.semantic(.controlBackground))
                 )
         }
         .sheet(isPresented: $showingEditor) {
@@ -165,7 +169,11 @@ struct GroupReviewEditSheet: View {
             LText("group.reviewEdit")
                 .font(.headline)
             BorderedTextEditor(text: $text, minHeight: 180)
+                #if os(macOS)
                 .frame(width: 460)
+                #else
+                .frame(maxWidth: .infinity)
+                #endif
             HStack {
                 Button(L10n.tr("common.cancel", lang: language)) { dismiss() }
                     .keyboardShortcut(.cancelAction)
@@ -177,6 +185,10 @@ struct GroupReviewEditSheet: View {
             }
         }
         .padding(24)
+        #if os(macOS)
         .frame(width: 540)
+        #else
+        .frame(maxWidth: .infinity)
+        #endif
     }
 }

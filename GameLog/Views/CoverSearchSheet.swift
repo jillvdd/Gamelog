@@ -1,5 +1,4 @@
 import SwiftUI
-import AppKit
 
 /// 封面搜索面板：SteamGridDB 按名字搜游戏 → 选游戏 → 选一张封面。
 struct CoverSearchSheet: View {
@@ -61,7 +60,11 @@ struct CoverSearchSheet: View {
             }
         }
         .padding(16)
+        #if os(macOS)
         .frame(width: 620, height: 500, alignment: .top)
+        #else
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        #endif
     }
 
     // MARK: - 搜索结果
@@ -131,10 +134,10 @@ struct CoverSearchSheet: View {
                 case .success(let image):
                     image.resizable().scaledToFill()
                 case .failure:
-                    Rectangle().fill(Color(nsColor: .quaternarySystemFill))
+                    Rectangle().fill(Color.semantic(.quaternarySystemFill))
                         .overlay(Image(systemName: "photo").foregroundStyle(.tertiary))
                 default:
-                    Rectangle().fill(Color(nsColor: .quaternarySystemFill))
+                    Rectangle().fill(Color.semantic(.quaternarySystemFill))
                         .overlay(ProgressView())
                 }
             }

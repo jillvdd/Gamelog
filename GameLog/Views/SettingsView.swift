@@ -1,7 +1,13 @@
 import SwiftUI
 import SwiftData
+
+#if os(macOS)
 import AppKit
 import UniformTypeIdentifiers
+#else
+import PhotosUI
+import UniformTypeIdentifiers
+#endif
 
 /// 设置：语言（中日英）、个性化（用户名/头像/图标）、SteamGridDB key、数据备份。
 struct SettingsView: View {
@@ -12,9 +18,13 @@ struct SettingsView: View {
 
     @AppStorage(UserCustomization.usernameKey) private var username = ""
     @AppStorage(UserCustomization.avatarFileKey) private var avatarFile = ""
+    #if os(macOS)
     @AppStorage(UserCustomization.iconFileKey) private var iconFile = ""
+    #endif
     @AppStorage(UserCustomization.autoMatchCoverKey) private var autoMatchCover = false
+    #if os(macOS)
     @AppStorage(UserCustomization.hideToolbarGlassKey) private var hideToolbarGlass = false
+    #endif
     @AppStorage(UserCustomization.collectorModeKey) private var collectorMode = false
     @AppStorage(UserCustomization.keepOriginalImagesKey) private var keepOriginalImages = false
 
@@ -32,6 +42,12 @@ struct SettingsView: View {
     @State private var statusMessage: String?
     @State private var showingImportConfirm = false
     @State private var cropSession: CropSession?
+    #if !os(macOS)
+    @State private var showingAvatarPicker = false
+    @State private var showingBackupImporter = false
+    @State private var backupShareURL: URL?
+    @State private var showingShareSheet = false
+    #endif
 
     var body: some View {
         Form {
@@ -56,12 +72,17 @@ struct SettingsView: View {
                 LabeledContent(L10n.tr("settings.avatar", lang: language)) {
                     HStack {
                         avatarPreview
+                        #if os(macOS)
                         Button(L10n.tr("settings.chooseImage", lang: language)) { pickImage(for: .avatar) }
+                        #else
+                        Button(L10n.tr("settings.chooseImage", lang: language)) { showingAvatarPicker = true }
+                        #endif
                         Button(L10n.tr("settings.removeAvatar", lang: language)) { UserCustomization.removeAvatar() }
                             .disabled(avatarFile.isEmpty)
                     }
                 }
 
+                #if os(macOS)
                 LabeledContent(L10n.tr("settings.icon", lang: language)) {
                     HStack {
                         iconPreview
@@ -70,16 +91,19 @@ struct SettingsView: View {
                             .disabled(iconFile.isEmpty)
                     }
                 }
+                #endif
 
                 Toggle(L10n.tr("settings.autoMatchCover", lang: language), isOn: $autoMatchCover)
                 LText("settings.autoMatchCoverHint")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
+                #if os(macOS)
                 Toggle(L10n.tr("settings.hideToolbarGlass", lang: language), isOn: $hideToolbarGlass)
                 LText("settings.hideToolbarGlassHint")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                #endif
 
                 Toggle(L10n.tr("settings.collectorMode", lang: language), isOn: $collectorMode)
                 LText("settings.collectorModeHint")
@@ -103,8 +127,13 @@ struct SettingsView: View {
             }
 
             Section(L10n.tr("settings.backup", lang: language)) {
+                #if os(macOS)
                 Button(L10n.tr("backup.export", lang: language)) { export() }
                 Button(L10n.tr("backup.import", lang: language)) { showingImportConfirm = true }
+                #else
+                Button(L10n.tr("backup.export", lang: language)) { prepareBackupShare() }
+                Button(L10n.tr("backup.import", lang: language)) { showingBackupImporter = true }
+                #endif
                 if let statusMessage {
                     Text(verbatim: statusMessage)
                         .font(.callout)
@@ -113,7 +142,9 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
+        #if os(macOS)
         .frame(width: 520, height: 720)
+        #endif
         .confirmationDialog(
             L10n.tr("common.confirm", lang: language),
             isPresented: $showingImportConfirm,
@@ -135,6 +166,34 @@ struct SettingsView: View {
                 }
             )
         }
+        #if !os(macOS)
+        .imageSourcePicker(isPresented: $showingAvatarPicker, onImages: { datas in
+            if let data = datas.first, let image = AppImage(data: data) {
+                cropSession = CropSession(kind: .avatar, image: image)
+            }
+        })
+        .fileImporter(isPresented: $showingBackupImporter, allowedContentTypes: [.json]) { result in
+            if case .success(let url) = result {
+                do {
+                    let data = try Data(contentsOf: url)
+                    try BackupManager.decodeAndReplace(data, into: context)
+                    try context.save()
+                    statusMessage = L10n.tr("backup.importDone", lang: language)
+                } catch {
+                    statusMessage = L10n.tr("backup.importFailed", lang: language)
+                }
+            }
+        }
+        .sheet(isPresented: $showingShareSheet) {
+            if let url = backupShareURL {
+                ShareLink(item: url) {
+                    Label(L10n.tr("backup.export", lang: language), systemImage: "square.and.arrow.up")
+                }
+                .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
+            }
+        }
+        #endif
     }
 
     // MARK: - 个性化预览
@@ -142,7 +201,7 @@ struct SettingsView: View {
     private var avatarPreview: some View {
         Group {
             if let img = UserCustomization.avatarImage() {
-                Image(nsImage: img)
+                Image(appImage: img)
                     .resizable()
                     .frame(width: 32, height: 32)
                     .clipShape(Circle())
@@ -155,10 +214,11 @@ struct SettingsView: View {
         }
     }
 
+    #if os(macOS)
     private var iconPreview: some View {
         Group {
             if let img = UserCustomization.iconImage() {
-                Image(nsImage: img)
+                Image(appImage: img)
                     .resizable()
                     .frame(width: 32, height: 32)
                     .clipShape(RoundedRectangle(cornerRadius: 7))
@@ -170,21 +230,26 @@ struct SettingsView: View {
             }
         }
     }
+    #endif
 
     // MARK: - 选图 + 裁切
 
     private func pickImage(for kind: CropKind) {
+        #if os(macOS)
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.png, .jpeg, .tiff, .heic]
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        guard let image = NSImage(contentsOf: url) else { return }
+        guard let image = loadAppImage(from: url) else { return }
         cropSession = CropSession(kind: kind, image: image)
+        #else
+        // iOS：阶段 3 用 PhotosPicker 实现选图 + 裁切。
+        #endif
     }
 
-    private func saveCrop(kind: CropKind, image: NSImage) {
-        guard let data = UserCustomization.pngData(from: image) else { return }
+    private func saveCrop(kind: CropKind, image: AppImage) {
+        guard let data = image.pngData() else { return }
         do {
             switch kind {
             case .avatar: try UserCustomization.saveAvatarPNG(data)
@@ -198,6 +263,7 @@ struct SettingsView: View {
     // MARK: - 备份
 
     private func export() {
+        #if os(macOS)
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.json]
         let formatter = DateFormatter()
@@ -213,9 +279,30 @@ struct SettingsView: View {
         } catch {
             statusMessage = L10n.tr("backup.exportFailed", lang: language)
         }
+        #else
+        // iOS：阶段 3 用 ShareLink（系统分享单，含 AirDrop）导出备份。
+        #endif
     }
 
+    #if !os(macOS)
+    /// iOS 备份导出：编码成 JSON → 写临时文件 → 打开系统分享单（含 AirDrop）。
+    private func prepareBackupShare() {
+        guard let data = try? BackupManager.encode(games: games, groups: groups) else {
+            statusMessage = L10n.tr("backup.exportFailed", lang: language)
+            return
+        }
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("GameLog-backup.json")
+        if (try? data.write(to: url)) != nil {
+            backupShareURL = url
+            showingShareSheet = true
+        } else {
+            statusMessage = L10n.tr("backup.exportFailed", lang: language)
+        }
+    }
+    #endif
+
     private func importBackup() {
+        #if os(macOS)
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.json]
         panel.allowsMultipleSelection = false
@@ -229,6 +316,9 @@ struct SettingsView: View {
         } catch {
             statusMessage = L10n.tr("backup.importFailed", lang: language)
         }
+        #else
+        // iOS：阶段 3 用 fileImporter 实现备份导入。
+        #endif
     }
 }
 
@@ -236,5 +326,5 @@ struct SettingsView: View {
 private struct CropSession: Identifiable {
     let id = UUID()
     let kind: CropKind
-    let image: NSImage
+    let image: AppImage
 }

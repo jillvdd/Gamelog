@@ -1,14 +1,10 @@
 import SwiftUI
-import AppKit
 
-extension NSImage {
-    /// 转成 PNG 数据。
-    func pngData() -> Data? {
-        guard let tiff = tiffRepresentation,
-              let rep = NSBitmapImageRep(data: tiff) else { return nil }
-        return rep.representation(using: .png, properties: [:])
-    }
-}
+#if os(macOS)
+import AppKit
+#else
+import UIKit
+#endif
 
 /// 把分享卡片视图渲染成目标像素尺寸的 PNG。
 /// 主题跟随系统当前深浅色；文字语言使用传入的 appLanguageCode。
@@ -29,12 +25,21 @@ enum ShareCardRenderer {
         let renderer = ImageRenderer(content: view)
         renderer.scale = 1
         renderer.proposedSize = .init(width: canvas.width, height: canvas.height)
+        #if os(macOS)
         guard let nsImage = renderer.nsImage else { return nil }
         return nsImage.pngData()
+        #else
+        guard let uiImage = renderer.uiImage else { return nil }
+        return uiImage.pngData()
+        #endif
     }
 
     private static func currentScheme() -> ColorScheme {
+        #if os(macOS)
         let match = NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua])
         return match == .darkAqua ? .dark : .light
+        #else
+        return UITraitCollection.current.userInterfaceStyle == .dark ? .dark : .light
+        #endif
     }
 }

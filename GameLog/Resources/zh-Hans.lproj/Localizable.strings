@@ -168,3 +168,17 @@
 "date.year" = "年";
 "date.day" = "日";
 "date.earlierYears" = "更早年份…";
+
+// iOS 专属
+"tab.library" = "库";
+"tab.settings" = "设置";
+"library.filterGroup" = "分组";
+"library.allGroups" = "全部分组";
+"group.manage" = "管理分组";
+
+"image.pickSource" = "添加图片";
+"image.fromPhotos" = "从相册选择";
+"image.fromFiles" = "从文件选择";
+"image.takePhoto" = "拍照";
+"image.cameraUnavailable" = "当前设备不支持拍照";
+"library.filter" = "筛选";

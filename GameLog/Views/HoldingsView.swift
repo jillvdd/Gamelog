@@ -1,9 +1,16 @@
 import SwiftUI
 import SwiftData
+
+#if os(macOS)
 import AppKit
 import UniformTypeIdentifiers
 import Quartz
+#else
+import PhotosUI
+import QuickLook
+#endif
 
+#if os(macOS)
 /// Quick Look 预览协调器：把收藏照片写入临时文件，交给系统 Quick Look 面板显示（原生缩放/平移/旋转/全屏）。
 /// 持有强引用直到面板用完；deinit 清理临时文件。
 final class QuickLookCoordinator: NSObject, QLPreviewPanelDataSource, QLPreviewPanelDelegate {
@@ -36,6 +43,7 @@ final class QuickLookCoordinator: NSObject, QLPreviewPanelDataSource, QLPreviewP
         panel.delegate = nil
     }
 }
+#endif
 
 /// 持有记录视图（收藏家模式，详情页「持有」页签）：
 /// 版本卡片列表（版本名 + 数量步进器 + 最多 6 张缩略图），新增/改名/删除版本，添加/删除/放大照片。
@@ -47,8 +55,13 @@ struct HoldingsView: View {
     @State private var showingAddVersion = false
     @State private var renamingCopy: PhysicalCopy?
     @State private var pendingDeleteCopy: PhysicalCopy?
+    #if os(macOS)
     /// 持有 Quick Look 协调器强引用（防止面板使用期间被释放），换图/视图消失时自动释放并清理临时文件。
     @State private var quickLook: QuickLookCoordinator?
+    #else
+    /// iOS 照片预览（QLPreviewController sheet）用的临时文件 URL。
+    @State private var previewItem: PhotoPreviewItem?
+    #endif
 
     /// 按添加先后排序。
     private var sortedCopies: [PhysicalCopy] {
@@ -57,6 +70,7 @@ struct HoldingsView: View {
 
     /// 用系统 Quick Look 查看一张收藏照片（原生缩放/平移/旋转/全屏）。
     private func showQuickLook(_ data: Data) {
+        #if os(macOS)
         let url = Self.writeTempImage(data)
         let coordinator = QuickLookCoordinator(url: url)
         quickLook = coordinator
@@ -65,6 +79,10 @@ struct HoldingsView: View {
         panel?.delegate = coordinator
         panel?.reloadData()
         panel?.makeKeyAndOrderFront(nil)
+        #else
+        // iOS：用 QLPreviewController 全屏查看。
+        previewItem = PhotoPreviewItem(url: Self.writeTempImage(data))
+        #endif
     }
 
     /// 图片数据 → 临时文件（按 PNG magic 判断扩展名，其余按 JPEG）。
@@ -114,29 +132,38 @@ struct HoldingsView: View {
         .sheet(item: $renamingCopy) { copy in
             RenameCopySheet(copy: copy)
         }
-        .confirmationDialog(
+        #if !os(macOS)
+        .sheet(item: $previewItem) { item in
+            PhotoPreviewController(url: item.url)
+                .ignoresSafeArea()
+                .onDisappear {
+                    try? FileManager.default.removeItem(at: item.url)
+                }
+        }
+        #endif
+        .platformConfirmDialog(
             L10n.tr("common.confirmDelete", lang: language),
             isPresented: Binding(
                 get: { pendingDeleteCopy != nil },
                 set: { if !$0 { pendingDeleteCopy = nil } }
             ),
-            titleVisibility: .visible
-        ) {
-            Button(L10n.tr("common.delete", lang: language), role: .destructive) {
-                if let copy = pendingDeleteCopy {
-                    context.delete(copy)
-                    try? context.save()
+            message: pendingDeleteCopy.map {
+                L10n.tr("copy.deleteConfirm", [$0.version], lang: language)
+            },
+            cancelTitle: L10n.tr("common.cancel", lang: language),
+            actions: [
+                ConfirmAction(
+                    title: L10n.tr("common.delete", lang: language),
+                    isDestructive: true
+                ) {
+                    if let copy = pendingDeleteCopy {
+                        context.delete(copy)
+                        try? context.save()
+                    }
+                    pendingDeleteCopy = nil
                 }
-                pendingDeleteCopy = nil
-            }
-            Button(L10n.tr("common.cancel", lang: language), role: .cancel) {
-                pendingDeleteCopy = nil
-            }
-        } message: {
-            if let copy = pendingDeleteCopy {
-                Text(verbatim: L10n.tr("copy.deleteConfirm", [copy.version], lang: language))
-            }
-        }
+            ]
+        )
     }
 }
 
@@ -151,24 +178,40 @@ private struct CopyCardView: View {
     var onEnlarge: (Data) -> Void = { _ in }
     /// 待删除照片的下标（非 nil 时弹确认，防止误触）。
     @State private var pendingDeleteImage: Int?
+    #if !os(macOS)
+    /// iOS「添加图片」菜单开关（弹底部菜单选相册/文件/拍照）。
+    @State private var showImageSource = false
+    #endif
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
                 Text(verbatim: copy.version)
                     .font(.headline)
+                    #if os(macOS)
                     .lineLimit(1)
+                    #else
+                    .lineLimit(2)
+                    #endif
                 quantityControl
                 Spacer()
                 Button(action: onRename) {
                     Image(systemName: "pencil")
                 }
                 .buttonStyle(.borderless)
+                #if !os(macOS)
+                .frame(width: 36, height: 36)
+                .contentShape(Rectangle())
+                #endif
                 .help(L10n.tr("common.edit", lang: language))
                 Button(action: onDelete) {
                     Image(systemName: "trash")
                 }
                 .buttonStyle(.borderless)
+                #if !os(macOS)
+                .frame(width: 36, height: 36)
+                .contentShape(Rectangle())
+                #endif
                 .foregroundStyle(.red)
                 .help(L10n.tr("common.delete", lang: language))
             }
@@ -190,32 +233,39 @@ private struct CopyCardView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(
             RoundedRectangle(cornerRadius: 10)
-                .fill(Color(nsColor: .controlBackgroundColor))
+                .fill(Color.semantic(.controlBackground))
         )
         .overlay(
             RoundedRectangle(cornerRadius: 10)
-                .stroke(Color(nsColor: .separatorColor))
+                .stroke(Color.semantic(.separator))
         )
-        .confirmationDialog(
+        .platformConfirmDialog(
             L10n.tr("common.confirmDelete", lang: language),
             isPresented: Binding(
                 get: { pendingDeleteImage != nil },
                 set: { if !$0 { pendingDeleteImage = nil } }
             ),
-            titleVisibility: .visible
-        ) {
-            Button(L10n.tr("common.delete", lang: language), role: .destructive) {
-                if let index = pendingDeleteImage {
-                    removeImage(at: index)
+            message: L10n.tr("copy.deleteImageConfirm", lang: language),
+            cancelTitle: L10n.tr("common.cancel", lang: language),
+            actions: [
+                ConfirmAction(
+                    title: L10n.tr("common.delete", lang: language),
+                    isDestructive: true
+                ) {
+                    if let index = pendingDeleteImage {
+                        removeImage(at: index)
+                    }
+                    pendingDeleteImage = nil
                 }
-                pendingDeleteImage = nil
-            }
-            Button(L10n.tr("common.cancel", lang: language), role: .cancel) {
-                pendingDeleteImage = nil
-            }
-        } message: {
-            Text(verbatim: L10n.tr("copy.deleteImageConfirm", lang: language))
-        }
+            ]
+        )
+        #if !os(macOS)
+        .imageSourcePicker(
+            isPresented: $showImageSource,
+            maxSelectionCount: max(1, 6 - copy.images.count),
+            onImages: processImages
+        )
+        #endif
     }
 
     /// 数量控件：− ×N +（数字清晰可见，最少 1 份）。
@@ -248,41 +298,56 @@ private struct CopyCardView: View {
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 3)
-        .background(Capsule().fill(Color(nsColor: .quaternarySystemFill)))
+        .background(Capsule().fill(Color.semantic(.quaternarySystemFill)))
         .help(L10n.tr("copy.count", lang: language))
     }
 
     @ViewBuilder
     private var addImageButton: some View {
+        #if os(macOS)
         Button {
             pickImages()
         } label: {
-            Color.clear
-                .aspectRatio(1, contentMode: .fit)
-                .overlay {
-                    VStack(spacing: 6) {
-                        Image(systemName: "plus")
-                            .font(.system(size: 22, weight: .medium))
-                        Text(verbatim: "\(copy.images.count)/6")
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .background(
-                    RoundedRectangle(cornerRadius: 8)
-                        .fill(Color(nsColor: .quaternarySystemFill))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [4]))
-                        .foregroundStyle(.tertiary)
-                )
+            addImageLabel
         }
         .buttonStyle(.plain)
         .help(L10n.tr("copy.addImage", lang: language))
+        #else
+        Button {
+            showImageSource = true
+        } label: {
+            addImageLabel
+        }
+        .buttonStyle(.plain)
+        #endif
+    }
+
+    /// 「添加图片」占位格的视觉内容（macOS/iOS 共用）。
+    private var addImageLabel: some View {
+        Color.clear
+            .aspectRatio(1, contentMode: .fit)
+            .overlay {
+                VStack(spacing: 6) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 22, weight: .medium))
+                    Text(verbatim: "\(copy.images.count)/6")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(Color.semantic(.quaternarySystemFill))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(style: StrokeStyle(lineWidth: 1, dash: [4]))
+                    .foregroundStyle(.tertiary)
+            )
     }
 
     private func pickImages() {
+        #if os(macOS)
         let panel = NSOpenPanel()
         panel.allowsMultipleSelection = true
         panel.canChooseDirectories = false
@@ -299,12 +364,28 @@ private struct CopyCardView: View {
         images.append(contentsOf: datas)
         copy.images = images
         try? context.save()
+        #else
+        // iOS：阶段 3 用 PhotosPicker 实现多选添加照片。
+        #endif
     }
 
     private func removeImage(at index: Int) {
         guard index < copy.images.count else { return }
         var images = copy.images
         images.remove(at: index)
+        copy.images = images
+        try? context.save()
+    }
+
+    /// iOS：把用户选中的图片（相册 / 文件 / 拍照）按「保存原图」开关处理后追加，上限 6 张。
+    private func processImages(_ datas: [Data]) {
+        var images = copy.images
+        for data in datas {
+            guard images.count < 6 else { break }
+            if let processed = UserCustomization.collectionImageData(from: data, keepOriginal: keepOriginal) {
+                images.append(processed)
+            }
+        }
         copy.images = images
         try? context.save()
     }
@@ -324,30 +405,46 @@ private struct ThumbnailView: View {
             Color.clear
                 .aspectRatio(1, contentMode: .fit)
                 .overlay {
-                    if let image = NSImage(data: data) {
-                        Image(nsImage: image)
+                    if let image = AppImage(data: data) {
+                        Image(appImage: image)
                             .resizable()
                             .scaledToFill()
                     } else {
-                        Rectangle().fill(Color(nsColor: .quaternarySystemFill))
+                        Rectangle().fill(Color.semantic(.quaternarySystemFill))
                     }
                 }
                 .clipShape(RoundedRectangle(cornerRadius: 6))
 
-            if hovering {
-                Button(action: onDelete) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 16))
-                        .foregroundStyle(.white, .red)
+            Group {
+                #if os(macOS)
+                if hovering {
+                    deleteBadge
+                        .transition(.opacity)
                 }
-                .buttonStyle(.plain)
-                .padding(4)
-                .transition(.opacity)
+                #else
+                deleteBadge
+                #endif
             }
         }
+        #if os(macOS)
         .onHover { hovering = $0 }
+        #endif
         .onTapGesture(perform: onEnlarge)
         .help(L10n.tr("copy.viewImage", lang: language))
+    }
+
+    private var deleteBadge: some View {
+        Button(action: onDelete) {
+            Image(systemName: "xmark.circle.fill")
+                #if os(macOS)
+                .font(.system(size: 16))
+                #else
+                .font(.system(size: 20))
+                #endif
+                .foregroundStyle(.white, .red)
+        }
+        .buttonStyle(.plain)
+        .padding(4)
     }
 }
 
@@ -373,7 +470,11 @@ private struct AddCopySheet: View {
             LText("copy.addVersion")
                 .font(.headline)
             BorderedTextField(text: $version, placeholder: L10n.tr("copy.versionPlaceholder", lang: language))
+                #if os(macOS)
                 .frame(width: 280)
+                #else
+                .frame(maxWidth: .infinity)
+                #endif
             Stepper(value: $count, in: 1...999) {
                 HStack {
                     LText("copy.count")
@@ -382,7 +483,11 @@ private struct AddCopySheet: View {
                         .monospacedDigit()
                 }
             }
+            #if os(macOS)
             .frame(width: 280)
+            #else
+            .frame(maxWidth: .infinity)
+            #endif
             HStack {
                 Button(L10n.tr("common.cancel", lang: language)) { dismiss() }
                     .keyboardShortcut(.cancelAction)
@@ -398,7 +503,11 @@ private struct AddCopySheet: View {
             }
         }
         .padding(24)
+        #if os(macOS)
         .frame(width: 360)
+        #else
+        .frame(maxWidth: .infinity)
+        #endif
     }
 }
 
@@ -422,7 +531,11 @@ private struct RenameCopySheet: View {
             LText("copy.rename")
                 .font(.headline)
             BorderedTextField(text: $version, placeholder: L10n.tr("copy.version", lang: language))
+                #if os(macOS)
                 .frame(width: 280)
+                #else
+                .frame(maxWidth: .infinity)
+                #endif
             HStack {
                 Button(L10n.tr("common.cancel", lang: language)) { dismiss() }
                     .keyboardShortcut(.cancelAction)
@@ -436,7 +549,45 @@ private struct RenameCopySheet: View {
             }
         }
         .padding(24)
+        #if os(macOS)
         .frame(width: 360)
+        #else
+        .frame(maxWidth: .infinity)
+        #endif
     }
 }
 
+
+#if !os(macOS)
+/// iOS 照片预览用的临时文件 URL（Identifiable 驱动 sheet）。
+struct PhotoPreviewItem: Identifiable {
+    let id = UUID()
+    let url: URL
+}
+
+/// iOS 收藏照片查看：QLPreviewController（原生缩放/分享/全屏）。
+struct PhotoPreviewController: UIViewControllerRepresentable {
+    let url: URL
+
+    func makeUIViewController(context: Context) -> QLPreviewController {
+        let controller = QLPreviewController()
+        controller.dataSource = context.coordinator
+        return controller
+    }
+
+    func updateUIViewController(_ uiViewController: QLPreviewController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(url: url)
+    }
+
+    final class Coordinator: NSObject, QLPreviewControllerDataSource {
+        let url: URL
+        init(url: URL) { self.url = url }
+        func numberOfPreviewItems(in controller: QLPreviewController) -> Int { 1 }
+        func previewController(_ controller: QLPreviewController, previewItemAt index: Int) -> QLPreviewItem {
+            url as NSURL
+        }
+    }
+}
+#endif

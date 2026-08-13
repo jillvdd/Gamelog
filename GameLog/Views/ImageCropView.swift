@@ -1,5 +1,4 @@
 import SwiftUI
-import AppKit
 
 /// 裁切目标：头像（圆形）或 app 图标（macOS 圆角矩形）。
 enum CropKind {
@@ -38,9 +37,9 @@ enum CropShape {
 /// 确定后把遮罩内的图像区域按目标形状裁出，输出指定尺寸的 PNG（avatar 256² / icon 1024²）。
 struct ImageCropSheet: View {
     let kind: CropKind
-    let sourceImage: NSImage
+    let sourceImage: AppImage
     var onCancel: () -> Void
-    var onConfirm: (NSImage) -> Void
+    var onConfirm: (AppImage) -> Void
 
     @Environment(\.appLanguageCode) private var language
     @State private var offset: CGSize = .zero
@@ -56,7 +55,12 @@ struct ImageCropSheet: View {
                 .font(.headline)
 
             canvas
+                #if os(macOS)
                 .frame(width: 440, height: 440)
+                #else
+                .aspectRatio(1, contentMode: .fit)
+                .frame(maxWidth: .infinity)
+                #endif
 
             HStack(spacing: 12) {
                 LText("crop.zoom")
@@ -72,7 +76,11 @@ struct ImageCropSheet: View {
                 .buttonStyle(.borderless)
                 .help("重置")
             }
+            #if os(macOS)
             .frame(width: 440)
+            #else
+            .frame(maxWidth: .infinity)
+            #endif
 
             HStack {
                 Button(L10n.tr("common.cancel", lang: language)) { onCancel() }
@@ -81,9 +89,17 @@ struct ImageCropSheet: View {
                 Button(L10n.tr("common.save", lang: language)) { confirm() }
                     .keyboardShortcut(.defaultAction)
             }
+            #if os(macOS)
             .frame(width: 440)
+            #else
+            .frame(maxWidth: .infinity)
+            #endif
         }
+        #if os(macOS)
         .padding(24)
+        #else
+        .padding(16)
+        #endif
     }
 
     // MARK: - 画布
@@ -94,9 +110,9 @@ struct ImageCropSheet: View {
             let maskSide = side * maskRatio
             ZStack {
                 Rectangle()
-                    .fill(Color(nsColor: .textBackgroundColor))
+                    .fill(Color.semantic(.textBackground))
 
-                Image(nsImage: sourceImage)
+                Image(appImage: sourceImage)
                     .resizable()
                     .scaledToFit()
                     .frame(width: side, height: side)
@@ -158,9 +174,8 @@ struct ImageCropSheet: View {
 
     // MARK: - 几何映射与渲染
 
-    private static func cgImage(from image: NSImage) -> CGImage? {
-        var rect = CGRect(origin: .zero, size: image.size)
-        return image.cgImage(forProposedRect: &rect, context: nil, hints: nil)
+    private static func cgImage(from image: AppImage) -> CGImage? {
+        image.cgImageValue
     }
 
     /// 把「遮罩框在画布中的区域」映射回源图像素，按目标形状裁出并放大到目标尺寸。
@@ -172,7 +187,7 @@ struct ImageCropSheet: View {
         scale: CGFloat,
         maskSide: CGFloat,
         kind: CropKind
-    ) -> NSImage? {
+    ) -> AppImage? {
         let pw = CGFloat(source.width)
         let ph = CGFloat(source.height)
         let fitted = min(canvasSide / pw, canvasSide / ph)
@@ -210,6 +225,6 @@ struct ImageCropSheet: View {
         ctx.restoreGState()
 
         guard let outCG = ctx.makeImage() else { return nil }
-        return NSImage(cgImage: outCG, size: NSSize(width: t, height: t))
+        return AppImage.fromCGImage(outCG, pixelSize: CGSize(width: t, height: t))
     }
 }

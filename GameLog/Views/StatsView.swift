@@ -49,17 +49,34 @@ struct StatsView: View {
                                 LText("stats.noData")
                             }
                         } else {
-                            HStack(spacing: 16) {
-                                statTile(
-                                    value: "\(totalGames)",
-                                    label: L10n.tr("stats.totalGames", lang: language),
-                                    icon: "gamecontroller"
-                                )
-                                statTile(
-                                    value: avgScore.map { String(format: "%.1f", $0) } ?? "—",
-                                    label: L10n.tr("stats.avgScore", lang: language),
-                                    icon: "star"
-                                )
+                            Group {
+                                #if os(macOS)
+                                HStack(spacing: 16) {
+                                    statTile(
+                                        value: "\(totalGames)",
+                                        label: L10n.tr("stats.totalGames", lang: language),
+                                        icon: "gamecontroller"
+                                    )
+                                    statTile(
+                                        value: avgScore.map { String(format: "%.1f", $0) } ?? "—",
+                                        label: L10n.tr("stats.avgScore", lang: language),
+                                        icon: "star"
+                                    )
+                                }
+                                #else
+                                VStack(spacing: 16) {
+                                    statTile(
+                                        value: "\(totalGames)",
+                                        label: L10n.tr("stats.totalGames", lang: language),
+                                        icon: "gamecontroller"
+                                    )
+                                    statTile(
+                                        value: avgScore.map { String(format: "%.1f", $0) } ?? "—",
+                                        label: L10n.tr("stats.avgScore", lang: language),
+                                        icon: "star"
+                                    )
+                                }
+                                #endif
                             }
 
                             if !platformCounts.isEmpty {
@@ -79,7 +96,7 @@ struct StatsView: View {
                                     .padding(14)
                                     .background(
                                         RoundedRectangle(cornerRadius: 10)
-                                            .fill(Color(nsColor: .controlBackgroundColor))
+                                            .fill(Color.semantic(.controlBackground))
                                     )
                                 }
                             }
@@ -87,7 +104,11 @@ struct StatsView: View {
                             rankingsSection(width: geo.size.width)
                         }
                     }
+                    #if os(macOS)
                     .padding(28)
+                    #else
+                    .padding(16)
+                    #endif
                     .frame(maxWidth: 1500)
                     .frame(maxWidth: .infinity, alignment: .top)
                 }
@@ -130,7 +151,7 @@ struct StatsView: View {
                     .padding(14)
                     .background(
                         RoundedRectangle(cornerRadius: 10)
-                            .fill(Color(nsColor: .controlBackgroundColor))
+                            .fill(Color.semantic(.controlBackground))
                     )
             }
             .buttonStyle(.plain)
@@ -170,7 +191,7 @@ struct StatsView: View {
         .padding(20)
         .background(
             RoundedRectangle(cornerRadius: 12)
-                .fill(Color(nsColor: .controlBackgroundColor))
+                .fill(Color.semantic(.controlBackground))
         )
     }
 }

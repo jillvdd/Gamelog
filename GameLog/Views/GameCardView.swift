@@ -1,11 +1,10 @@
 import SwiftUI
 import SwiftData
-import AppKit
 
 extension Game {
-    var coverImage: NSImage? {
+    var coverImage: AppImage? {
         guard let data = coverData else { return nil }
-        return NSImage(data: data)
+        return AppImage(data: data)
     }
 }
 
@@ -17,13 +16,13 @@ struct GameCardView: View {
     private var cover: some View {
         Group {
             if let image = game.coverImage {
-                Image(nsImage: image)
+                Image(appImage: image)
                     .resizable()
                     .scaledToFill()
             } else {
                 ZStack {
                     Rectangle()
-                        .fill(Color(nsColor: .quaternarySystemFill))
+                        .fill(Color.semantic(.quaternarySystemFill))
                     Image(systemName: "gamecontroller")
                         .font(.system(size: 32))
                         .foregroundStyle(.tertiary)
@@ -105,12 +104,12 @@ struct GameRowView: View {
         HStack(spacing: 12) {
             Group {
                 if let image = game.coverImage {
-                    Image(nsImage: image)
+                    Image(appImage: image)
                         .resizable()
                         .scaledToFill()
                 } else {
                     ZStack {
-                        Rectangle().fill(Color(nsColor: .quaternarySystemFill))
+                        Rectangle().fill(Color.semantic(.quaternarySystemFill))
                         Image(systemName: "gamecontroller").foregroundStyle(.tertiary)
                     }
                 }
@@ -162,7 +161,11 @@ struct NewGroupSheet: View {
             LText("group.newGroup")
                 .font(.headline)
             BorderedTextField(text: $name, placeholder: L10n.tr("group.name", lang: language))
+                #if os(macOS)
                 .frame(width: 280)
+                #else
+                .frame(maxWidth: .infinity)
+                #endif
             // 固定高度占位，避免错误出现时窗口跳动
             Text(verbatim: isDuplicate ? L10n.tr("group.nameExists", lang: language) : " ")
                 .font(.caption)
@@ -180,6 +183,10 @@ struct NewGroupSheet: View {
             }
         }
         .padding(24)
+        #if os(macOS)
         .frame(width: 360)
+        #else
+        .frame(maxWidth: .infinity)
+        #endif
     }
 }

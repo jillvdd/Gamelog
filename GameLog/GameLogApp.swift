@@ -4,7 +4,9 @@ import SwiftData
 @main
 struct GameLogApp: App {
     @AppStorage("appLanguage") private var languageCode = AppLanguage.chinese.localeCode
+    #if os(macOS)
     @Environment(\.openWindow) private var openWindow
+    #endif
 
     /// 各场景共享同一个容器实例。
     private let container: ModelContainer = {
@@ -21,12 +23,21 @@ struct GameLogApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView()
-                .environment(\.appLanguageCode, languageCode)
-                .environment(\.locale, Locale(identifier: languageCode))
-                .onAppear { UserCustomization.applyDockIcon() }
+            Group {
+                #if os(macOS)
+                RootView()
+                #else
+                iOSRootView()
+                #endif
+            }
+            .environment(\.appLanguageCode, languageCode)
+            .environment(\.locale, Locale(identifier: languageCode))
+            #if os(macOS)
+            .onAppear { UserCustomization.applyDockIcon() }
+            #endif
         }
         .modelContainer(container)
+        #if os(macOS)
         .commands {
             CommandGroup(replacing: .appInfo) {
                 Button {
@@ -36,7 +47,9 @@ struct GameLogApp: App {
                 }
             }
         }
+        #endif
 
+        #if os(macOS)
         Settings {
             SettingsView()
                 .environment(\.appLanguageCode, languageCode)
@@ -51,5 +64,6 @@ struct GameLogApp: App {
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 380, height: 300)
+        #endif
     }
 }

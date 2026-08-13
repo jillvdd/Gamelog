@@ -1,6 +1,9 @@
 import SwiftUI
 import SwiftData
+
+#if os(macOS)
 import AppKit
+#endif
 
 /// 库排序选项。
 enum LibrarySort: String, CaseIterable, Identifiable {
@@ -11,6 +14,7 @@ enum LibrarySort: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+#if os(macOS)
 /// 工具栏毛玻璃控制（设置「隐藏分组毛玻璃」开关）。
 /// macOS 15+ 用 `.toolbarBackgroundVisibility`（能真正隐藏窗口工具栏玻璃）；
 /// macOS 14 无对应 API，开启时尽力用透明背景（实际可能仍显示系统玻璃，但 app 照常可用）。
@@ -28,6 +32,7 @@ private struct ToolbarGlassModifier: ViewModifier {
         }
     }
 }
+#endif
 
 /// 主界面：网格/列表切换、搜索、平台筛选、排序、分享、新建入口。
 struct LibraryView: View {
@@ -49,6 +54,8 @@ struct LibraryView: View {
     @State private var isFullScreen = false
 
     @State private var path = NavigationPath()
+    /// iOS：详情页编程式 push 的目标（复用外层导航栈，避免双层 NavigationStack）。
+    @State private var selectedGame: Game?
     @State private var pendingDeleteGame: Game?
     @State private var editingGame: Game?
     @State private var groupPickerGame: Game?
@@ -68,17 +75,20 @@ struct LibraryView: View {
         if let groupFilter {
             // 分组视图直接以双向关系为准：关系变化（右键移出/加入）立即反映
             result = groupFilter.games
+            #if os(macOS)
             if !groupPlatformFilter.isEmpty {
                 result = result.filter { game in
                     game.completions.contains { $0.platform == groupPlatformFilter }
                 }
             }
+            #endif
         } else {
             result = games
-            if let platform {
-                result = result.filter { game in
-                    game.completions.contains { $0.platform == platform }
-                }
+        }
+        // 平台过滤在分组/非分组两种模式下都生效（iOS 由分组/平台两个菜单驱动；macOS 分组模式用 groupPlatformFilter）。
+        if let platform {
+            result = result.filter { game in
+                game.completions.contains { $0.platform == platform }
             }
         }
         if !searchText.isEmpty {
@@ -102,10 +112,14 @@ struct LibraryView: View {
         return groupFilter?.name ?? L10n.tr("library.all", lang: language)
     }
 
-    /// 当前窗口是否全屏（启动时用于初始化状态）。
+    /// 当前窗口是否全屏（启动时用于初始化状态；iOS 无窗口全屏概念，恒 false）。
     private var windowIsFullScreen: Bool {
+        #if os(macOS)
         let win = NSApp.windows.first(where: { $0.isVisible }) ?? NSApp.mainWindow
         return win?.styleMask.contains(.fullScreen) ?? false
+        #else
+        return false
+        #endif
     }
 
     /// 异步更新全屏状态：推迟到下一轮 runloop，避免在视图更新期间同步改 @State（曾导致 UI 挂死）。
@@ -172,7 +186,13 @@ struct LibraryView: View {
     private func gameCard(_ game: Game) -> some View {
         GameCardView(game: game)
             .contentShape(Rectangle())
-            .onTapGesture { path.append(game) }
+            .onTapGesture {
+                #if os(macOS)
+                path.append(game)
+                #else
+                selectedGame = game
+                #endif
+            }
             .contextMenu { cardMenu(for: game) }
     }
 
@@ -180,7 +200,13 @@ struct LibraryView: View {
     private func gameRow(_ game: Game) -> some View {
         GameRowView(game: game)
             .contentShape(Rectangle())
-            .onTapGesture { path.append(game) }
+            .onTapGesture {
+                #if os(macOS)
+                path.append(game)
+                #else
+                selectedGame = game
+                #endif
+            }
             .contextMenu { cardMenu(for: game) }
     }
 
@@ -205,187 +231,277 @@ struct LibraryView: View {
     }
 
     var body: some View {
-        NavigationStack(path: $path) {
-            Group {
-                if let group = groupFilter {
-                    groupContent(group: group)
-                } else if games.isEmpty {
-                    ContentUnavailableView {
-                        Image(systemName: "gamecontroller")
-                            .font(.system(size: 48))
-                    } description: {
-                        LText("library.noGames")
-                    }
-                } else if visibleGames.isEmpty {
-                    ContentUnavailableView {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 48))
-                    } description: {
-                        LText("library.noResult")
-                    }
-                } else if useGridView {
-                    ScrollView {
-                        gameGrid(visibleGames)
-                            .padding()
-                    }
-                } else {
-                    List {
-                        ForEach(visibleGames) { game in
-                            gameRow(game)
-                        }
-                    }
-                }
+        Group {
+            #if os(macOS)
+            NavigationStack(path: $path) {
+                libraryContent
             }
-            .onAppear {
-                setFullScreen(windowIsFullScreen)
-            }
-            .onReceive(NotificationCenter.default.publisher(for: NSWindow.willEnterFullScreenNotification)) { _ in
-                setFullScreen(true)
-            }
-            .onReceive(NotificationCenter.default.publisher(for: NSWindow.willExitFullScreenNotification)) { _ in
-                setFullScreen(false)
-            }
-            .navigationDestination(for: Game.self) { game in
-                GameDetailView(game: game)
-            }
-            .searchable(text: $searchText, placement: .toolbar, prompt: L10n.tr("library.search", lang: language))
-            .navigationTitle(hideToolbarGlass ? "" : navigationTitleText)
-            // 隐藏毛玻璃开关开启（方案 B）：无标题 + 无毛玻璃，全屏也无需下推内容。
-            // 关闭（默认）：保留玻璃+标题；全屏下玻璃比工具栏布局多延伸一行（系统行为，无法压缩），
-            // 把内容顶部往下推一行避开遮挡。
-            .modifier(ToolbarGlassModifier(hidden: hideToolbarGlass))
-            .safeAreaPadding(.top, (!hideToolbarGlass && isFullScreen) ? 24 : 0)
-            .toolbar {
-                if groupFilter != nil {
-                    ToolbarItem {
-                        Menu {
-                            Button {
-                                groupPlatformFilter = ""
-                            } label: {
-                                if groupPlatformFilter.isEmpty {
-                                    Label(L10n.tr("library.allPlatforms", lang: language), systemImage: "checkmark")
-                                } else {
-                                    Text(verbatim: L10n.tr("library.allPlatforms", lang: language))
-                                }
-                            }
-                            ForEach(groupPlatforms, id: \.self) { p in
-                                Button {
-                                    groupPlatformFilter = p
-                                } label: {
-                                    if groupPlatformFilter == p {
-                                        Label(Presets.display(p, category: .platform, language: language), systemImage: "checkmark")
-                                    } else {
-                                        Text(verbatim: Presets.display(p, category: .platform, language: language))
-                                    }
-                                }
-                            }
-                        } label: {
-                            Image(systemName: "line.3.horizontal.decrease")
-                        }
-                        .help(L10n.tr("library.filterPlatform", lang: language))
-                    }
-                }
-
-                ToolbarItem {
-                    Menu {
-                        Button {
-                            sortRaw = LibrarySort.name.rawValue
-                        } label: {
-                            if sortOption == .name {
-                                Label(L10n.tr("library.sortByName", lang: language), systemImage: "checkmark")
-                            } else {
-                                Text(verbatim: L10n.tr("library.sortByName", lang: language))
-                            }
-                        }
-                        Button {
-                            sortRaw = LibrarySort.releaseDate.rawValue
-                        } label: {
-                            if sortOption == .releaseDate {
-                                Label(L10n.tr("library.sortByRelease", lang: language), systemImage: "checkmark")
-                            } else {
-                                Text(verbatim: L10n.tr("library.sortByRelease", lang: language))
-                            }
-                        }
-                        Button {
-                            sortRaw = LibrarySort.completionDate.rawValue
-                        } label: {
-                            if sortOption == .completionDate {
-                                Label(L10n.tr("library.sortByCompletion", lang: language), systemImage: "checkmark")
-                            } else {
-                                Text(verbatim: L10n.tr("library.sortByCompletion", lang: language))
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "arrow.up.arrow.down")
-                    }
-                    .help(L10n.tr("library.sort", lang: language))
-                }
-
-                ToolbarItem {
-                    Button {
-                        useGridView.toggle()
-                    } label: {
-                        Image(systemName: useGridView ? "list.bullet" : "square.grid.2x2")
-                    }
-                    .help(useGridView ? L10n.tr("library.listView", lang: language) : L10n.tr("library.gridView", lang: language))
-                }
-
-                ToolbarItem {
-                    Button {
-                        showingShare = true
-                    } label: {
-                        Image(systemName: "square.and.arrow.up")
-                    }
-                    .help(L10n.tr("library.share", lang: language))
-                }
-
-                ToolbarItem {
-                    Button {
-                        showingNewGame = true
-                    } label: {
-                        Image(systemName: "plus")
-                    }
-                    .help(L10n.tr("library.addGame", lang: language))
-                }
-            }
-            .sheet(isPresented: $showingNewGame) {
-                GameEditView(game: nil)
-            }
-            .sheet(isPresented: $showingShare) {
-                SharePanelView()
-            }
-            .sheet(item: $editingGame) { game in
-                GameEditView(game: game)
-            }
-            .sheet(item: $groupPickerGame) { game in
-                GroupPickerSheet(game: game)
-            }
-            .confirmationDialog(
-                L10n.tr("common.confirmDelete", lang: language),
-                isPresented: Binding(
-                    get: { pendingDeleteGame != nil },
-                    set: { if !$0 { pendingDeleteGame = nil } }
-                ),
-                titleVisibility: .visible
-            ) {
-                Button(L10n.tr("common.confirmDelete", lang: language), role: .destructive) {
+            #else
+            // iOS：复用外层（iOSLibraryTab 的）NavigationStack，这里不再建栈，避免双导航栏。
+            libraryContent
+            #endif
+        }
+        .onChange(of: groupFilter?.persistentModelID) { _, _ in
+            // 切换分组即重置组内平台过滤（切换页面重置过滤状态）。
+            groupPlatformFilter = ""
+        }
+        .sheet(isPresented: $showingNewGame) {
+            #if os(macOS)
+            GameEditView(game: nil)
+            #else
+            NavigationStack { GameEditView(game: nil) }
+            #endif
+        }
+        .sheet(isPresented: $showingShare) {
+            SharePanelView()
+        }
+        .sheet(item: $editingGame) { game in
+            #if os(macOS)
+            GameEditView(game: game)
+            #else
+            NavigationStack { GameEditView(game: game) }
+            #endif
+        }
+        .sheet(item: $groupPickerGame) { game in
+            GroupPickerSheet(game: game)
+        }
+        .platformConfirmDialog(
+            L10n.tr("common.confirmDelete", lang: language),
+            isPresented: Binding(
+                get: { pendingDeleteGame != nil },
+                set: { if !$0 { pendingDeleteGame = nil } }
+            ),
+            message: pendingDeleteGame.map {
+                L10n.tr("delete.confirmGame", [$0.displayName(for: language)], lang: language)
+            },
+            cancelTitle: L10n.tr("common.cancel", lang: language),
+            actions: [
+                ConfirmAction(
+                    title: L10n.tr("common.confirmDelete", lang: language),
+                    isDestructive: true
+                ) {
                     if let game = pendingDeleteGame {
                         context.delete(game)
                     }
                     pendingDeleteGame = nil
                 }
-                Button(L10n.tr("common.cancel", lang: language), role: .cancel) {
-                    pendingDeleteGame = nil
+            ]
+        )
+    }
+
+    /// 库内容（不含 NavigationStack；macOS 由本视图自己的栈包装，iOS 复用外层栈）。
+    private var libraryContent: some View {
+        Group {
+            if let group = groupFilter {
+                groupContent(group: group)
+            } else if games.isEmpty {
+                ContentUnavailableView {
+                    Image(systemName: "gamecontroller")
+                        .font(.system(size: 48))
+                } description: {
+                    LText("library.noGames")
                 }
-            } message: {
-                if let game = pendingDeleteGame {
-                    Text(verbatim: L10n.tr("delete.confirmGame", [game.displayName(for: language)], lang: language))
+            } else if visibleGames.isEmpty {
+                ContentUnavailableView {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 48))
+                } description: {
+                    LText("library.noResult")
+                }
+            } else if useGridView {
+                ScrollView {
+                    gameGrid(visibleGames)
+                        .padding()
+                }
+            } else {
+                List {
+                    ForEach(visibleGames) { game in
+                        gameRow(game)
+                    }
                 }
             }
-            .onChange(of: groupFilter?.persistentModelID) { _, _ in
-                // 切换分组即重置组内平台过滤（切换页面重置过滤状态）。
-                groupPlatformFilter = ""
+        }
+        .onAppear {
+            setFullScreen(windowIsFullScreen)
+        }
+        #if os(macOS)
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.willEnterFullScreenNotification)) { _ in
+            setFullScreen(true)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.willExitFullScreenNotification)) { _ in
+            setFullScreen(false)
+        }
+        .navigationDestination(for: Game.self) { game in
+            GameDetailView(game: game)
+        }
+        #else
+        .navigationDestination(item: $selectedGame) { game in
+            GameDetailView(game: game)
+        }
+        #endif
+        .searchable(text: $searchText, placement: .toolbar, prompt: L10n.tr("library.search", lang: language))
+        #if os(macOS)
+        .navigationTitle(hideToolbarGlass ? "" : navigationTitleText)
+        #else
+        .navigationTitle(navigationTitleText)
+        #endif
+        // 隐藏毛玻璃开关开启（方案 B）：无标题 + 无毛玻璃，全屏也无需下推内容。
+        // 关闭（默认）：保留玻璃+标题；全屏下玻璃比工具栏布局多延伸一行（系统行为，无法压缩），
+        // 把内容顶部往下推一行避开遮挡。
+        #if os(macOS)
+        .modifier(ToolbarGlassModifier(hidden: hideToolbarGlass))
+        #endif
+        .safeAreaPadding(.top, (!hideToolbarGlass && isFullScreen) ? 24 : 0)
+        .toolbar {
+            #if os(macOS)
+            if groupFilter != nil {
+                ToolbarItem {
+                    Menu {
+                        Button {
+                            groupPlatformFilter = ""
+                        } label: {
+                            if groupPlatformFilter.isEmpty {
+                                Label(L10n.tr("library.allPlatforms", lang: language), systemImage: "checkmark")
+                            } else {
+                                Text(verbatim: L10n.tr("library.allPlatforms", lang: language))
+                            }
+                        }
+                        ForEach(groupPlatforms, id: \.self) { p in
+                            Button {
+                                groupPlatformFilter = p
+                            } label: {
+                                if groupPlatformFilter == p {
+                                    Label(Presets.display(p, category: .platform, language: language), systemImage: "checkmark")
+                                } else {
+                                    Text(verbatim: Presets.display(p, category: .platform, language: language))
+                                }
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "line.3.horizontal.decrease")
+                    }
+                    .help(L10n.tr("library.filterPlatform", lang: language))
+                }
             }
+            #endif
+            #if os(macOS)
+            ToolbarItem {
+                Menu {
+                    Button {
+                        sortRaw = LibrarySort.name.rawValue
+                    } label: {
+                        if sortOption == .name {
+                            Label(L10n.tr("library.sortByName", lang: language), systemImage: "checkmark")
+                        } else {
+                            Text(verbatim: L10n.tr("library.sortByName", lang: language))
+                        }
+                    }
+                    Button {
+                        sortRaw = LibrarySort.releaseDate.rawValue
+                    } label: {
+                        if sortOption == .releaseDate {
+                            Label(L10n.tr("library.sortByRelease", lang: language), systemImage: "checkmark")
+                        } else {
+                            Text(verbatim: L10n.tr("library.sortByRelease", lang: language))
+                        }
+                    }
+                    Button {
+                        sortRaw = LibrarySort.completionDate.rawValue
+                    } label: {
+                        if sortOption == .completionDate {
+                            Label(L10n.tr("library.sortByCompletion", lang: language), systemImage: "checkmark")
+                        } else {
+                            Text(verbatim: L10n.tr("library.sortByCompletion", lang: language))
+                        }
+                    }
+                } label: {
+                    Image(systemName: "arrow.up.arrow.down")
+                }
+                .help(L10n.tr("library.sort", lang: language))
+            }
+            ToolbarItem {
+                Button {
+                    useGridView.toggle()
+                } label: {
+                    Image(systemName: useGridView ? "list.bullet" : "square.grid.2x2")
+                }
+                .help(useGridView ? L10n.tr("library.listView", lang: language) : L10n.tr("library.gridView", lang: language))
+            }
+            ToolbarItem {
+                Button {
+                    showingShare = true
+                } label: {
+                    Image(systemName: "square.and.arrow.up")
+                }
+                .help(L10n.tr("library.share", lang: language))
+            }
+            ToolbarItem {
+                Button {
+                    showingNewGame = true
+                } label: {
+                    Image(systemName: "plus")
+                }
+                .help(L10n.tr("library.addGame", lang: language))
+            }
+            #else
+            // iOS：仅保留「新建游戏」+ 一个「更多」菜单（排序/网格/分享收进去），
+            // 避免工具栏按钮过多触发系统折叠「…」在 iOS 26 下点击无响应的问题。
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    showingNewGame = true
+                } label: {
+                    Image(systemName: "plus")
+                }
+                .help(L10n.tr("library.addGame", lang: language))
+            }
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button {
+                        sortRaw = LibrarySort.name.rawValue
+                    } label: {
+                        if sortOption == .name {
+                            Label(L10n.tr("library.sortByName", lang: language), systemImage: "checkmark")
+                        } else {
+                            Text(verbatim: L10n.tr("library.sortByName", lang: language))
+                        }
+                    }
+                    Button {
+                        sortRaw = LibrarySort.releaseDate.rawValue
+                    } label: {
+                        if sortOption == .releaseDate {
+                            Label(L10n.tr("library.sortByRelease", lang: language), systemImage: "checkmark")
+                        } else {
+                            Text(verbatim: L10n.tr("library.sortByRelease", lang: language))
+                        }
+                    }
+                    Button {
+                        sortRaw = LibrarySort.completionDate.rawValue
+                    } label: {
+                        if sortOption == .completionDate {
+                            Label(L10n.tr("library.sortByCompletion", lang: language), systemImage: "checkmark")
+                        } else {
+                            Text(verbatim: L10n.tr("library.sortByCompletion", lang: language))
+                        }
+                    }
+                    Divider()
+                    Button {
+                        useGridView.toggle()
+                    } label: {
+                        Label(
+                            L10n.tr(useGridView ? "library.listView" : "library.gridView", lang: language),
+                            systemImage: useGridView ? "list.bullet" : "square.grid.2x2"
+                        )
+                    }
+                    Button {
+                        showingShare = true
+                    } label: {
+                        Label(L10n.tr("library.share", lang: language), systemImage: "square.and.arrow.up")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                }
+            }
+            #endif
         }
     }
 }

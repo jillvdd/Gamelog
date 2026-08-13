@@ -1,3 +1,4 @@
+#if os(macOS)
 import SwiftUI
 import AppKit
 
@@ -49,3 +50,5 @@ struct AboutView: View {
         .frame(width: 340)
     }
 }
+
+#endif

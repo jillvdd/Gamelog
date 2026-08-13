@@ -1,6 +1,9 @@
 import SwiftUI
 import SwiftData
+
+#if os(macOS)
 import AppKit
+#endif
 
 /// 分享面板左栏模式：按游戏 / 按分组。
 private enum ShareMode: String, CaseIterable {
@@ -60,19 +63,34 @@ struct SharePanelView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            header
-            Divider()
-            HStack(spacing: 0) {
+        Group {
+            #if os(macOS)
+            VStack(spacing: 0) {
+                header
+                Divider()
+                HStack(spacing: 0) {
+                    selectionList
+                        .frame(width: 300)
+                    Divider()
+                    previewColumn
+                }
+                Divider()
+                controls
+            }
+            .frame(width: 1040, height: 680)
+            #else
+            VStack(spacing: 0) {
+                header
+                Divider()
                 selectionList
-                    .frame(width: 300)
                 Divider()
                 previewColumn
+                    .frame(minHeight: 240)
+                Divider()
+                controls
             }
-            Divider()
-            controls
+            #endif
         }
-        .frame(width: 1040, height: 680)
         .onAppear(perform: setup)
         .onChange(of: mode) { _, _ in scheduleRerender() }
         .onChange(of: selectedIDs) { _, _ in scheduleRerender() }
@@ -162,10 +180,10 @@ struct SharePanelView: View {
     private func coverThumb(_ game: Game) -> some View {
         Group {
             if let image = game.coverImage {
-                Image(nsImage: image).resizable().scaledToFill()
+                Image(appImage: image).resizable().scaledToFill()
             } else {
                 ZStack {
-                    Rectangle().fill(Color(nsColor: .quaternarySystemFill))
+                    Rectangle().fill(Color.semantic(.quaternarySystemFill))
                     Image(systemName: "gamecontroller").font(.system(size: 8)).foregroundStyle(.tertiary)
                 }
             }
@@ -196,13 +214,13 @@ struct SharePanelView: View {
 
     private var previewColumn: some View {
         VStack(spacing: 0) {
-            if let data = renderedPNG, let image = NSImage(data: data) {
-                Image(nsImage: image)
+            if let data = renderedPNG, let image = AppImage(data: data) {
+                Image(appImage: image)
                     .resizable()
                     .scaledToFit()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .padding(16)
-                    .background(Color(nsColor: .textBackgroundColor))
+                    .background(Color.semantic(.textBackground))
             } else {
                 ContentUnavailableView {
                     Image(systemName: "photo.on.rectangle.angled")
@@ -218,29 +236,58 @@ struct SharePanelView: View {
     // MARK: - 底部控制
 
     private var controls: some View {
-        HStack(spacing: 20) {
-            Picker(L10n.tr("share.size", lang: language), selection: $size) {
-                Text(verbatim: L10n.tr("share.phone", lang: language)).tag(ShareSize.phone)
-                Text(verbatim: L10n.tr("share.desktop", lang: language)).tag(ShareSize.desktop)
+        Group {
+            #if os(macOS)
+            HStack(spacing: 20) {
+                Picker(L10n.tr("share.size", lang: language), selection: $size) {
+                    Text(verbatim: L10n.tr("share.phone", lang: language)).tag(ShareSize.phone)
+                    Text(verbatim: L10n.tr("share.desktop", lang: language)).tag(ShareSize.desktop)
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 260)
+
+                if mode == .groups {
+                    BorderedTextField(text: groupTitleBinding, placeholder: L10n.tr("share.groupTitle", lang: language))
+                        .frame(width: 220)
+                } else if isMulti {
+                    BorderedTextField(text: overviewTitleBinding, placeholder: L10n.tr("share.overviewTitle", lang: language))
+                        .frame(width: 220)
+                }
+
+                Spacer()
+                exportButtons
             }
-            .pickerStyle(.segmented)
-            .frame(width: 260)
+            #else
+            VStack(alignment: .leading, spacing: 12) {
+                Picker(L10n.tr("share.size", lang: language), selection: $size) {
+                    Text(verbatim: L10n.tr("share.phone", lang: language)).tag(ShareSize.phone)
+                    Text(verbatim: L10n.tr("share.desktop", lang: language)).tag(ShareSize.desktop)
+                }
+                .pickerStyle(.segmented)
 
-            if mode == .groups {
-                BorderedTextField(text: groupTitleBinding, placeholder: L10n.tr("share.groupTitle", lang: language))
-                    .frame(width: 220)
-            } else if isMulti {
-                BorderedTextField(text: overviewTitleBinding, placeholder: L10n.tr("share.overviewTitle", lang: language))
-                    .frame(width: 220)
+                if mode == .groups {
+                    BorderedTextField(text: groupTitleBinding, placeholder: L10n.tr("share.groupTitle", lang: language))
+                } else if isMulti {
+                    BorderedTextField(text: overviewTitleBinding, placeholder: L10n.tr("share.overviewTitle", lang: language))
+                }
+
+                HStack {
+                    exportButtons
+                    Spacer()
+                }
             }
+            #endif
+        }
+        .padding()
+    }
 
-            Spacer()
-
-            let canExport = renderedPNG != nil
-
+    /// 导出按钮组：「保存图片」仅 macOS（iOS 分享走 ShareLink，无保存实现）。
+    private var exportButtons: some View {
+        Group {
+            #if os(macOS)
             Button(L10n.tr("share.saveImage", lang: language)) { saveImage() }
-                .disabled(!canExport)
-
+                .disabled(renderedPNG == nil)
+            #endif
             if let url = shareURL {
                 ShareLink(item: url) {
                     Label(L10n.tr("share.openShareSheet", lang: language), systemImage: "square.and.arrow.up")
@@ -250,7 +297,6 @@ struct SharePanelView: View {
                     .disabled(true)
             }
         }
-        .padding()
     }
 
     // MARK: - 逻辑
@@ -327,6 +373,7 @@ struct SharePanelView: View {
 
     private func saveImage() {
         guard let data = renderedPNG else { return }
+        #if os(macOS)
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.png]
         panel.nameFieldStringValue = mode == .groups
@@ -336,5 +383,8 @@ struct SharePanelView: View {
         if panel.runModal() == .OK, let url = panel.url {
             try? data.write(to: url)
         }
+        #else
+        // iOS：分享走 ShareLink（系统分享单）；如需另存文件，阶段 3 用 fileExporter。
+        #endif
     }
 }

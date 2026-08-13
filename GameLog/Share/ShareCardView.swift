@@ -1,5 +1,4 @@
 import SwiftUI
-import AppKit
 
 // MARK: - 尺寸与内容
 
@@ -162,7 +161,7 @@ private struct BrandWatermark: View {
                 .font(.system(size: fontSize))
                 .foregroundStyle(color)
             if !avatarFile.isEmpty, let avatar = UserCustomization.avatarImage() {
-                Image(nsImage: avatar)
+                Image(appImage: avatar)
                     .resizable()
                     .frame(width: 48, height: 48)
                     .clipShape(Circle())
@@ -199,7 +198,7 @@ private struct CoverImage: View {
     var body: some View {
         Group {
             if let image = game.coverImage {
-                Image(nsImage: image)
+                Image(appImage: image)
                     .resizable()
                     .aspectRatio(contentMode: mode)
             } else {
@@ -715,7 +714,7 @@ private struct GroupGameTile: View {
         VStack(spacing: 8) {
             Group {
                 if let image = game.coverImage {
-                    Image(nsImage: image)
+                    Image(appImage: image)
                         .resizable()
                         .scaledToFit()
                 } else {
@@ -842,7 +841,7 @@ private struct OverviewCard: View {
         .background(theme.background)
         .overlay(alignment: .topLeading) {
             if !avatarFile.isEmpty, let avatar = UserCustomization.avatarImage() {
-                Image(nsImage: avatar)
+                Image(appImage: avatar)
                     .resizable()
                     .frame(width: 72, height: 72)
                     .clipShape(Circle())
@@ -877,7 +876,7 @@ private struct OverviewCell: View {
         VStack(alignment: .leading, spacing: 10) {
             Group {
                 if let image = game.coverImage {
-                    Image(nsImage: image)
+                    Image(appImage: image)
                         .resizable()
                         .scaledToFit()
                 } else {

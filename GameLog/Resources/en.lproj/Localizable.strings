@@ -169,3 +169,17 @@
 "date.year" = "";
 "date.day" = "";
 "date.earlierYears" = "Earlier Years…";
+
+// iOS 专属
+"tab.library" = "Library";
+"tab.settings" = "Settings";
+"library.filterGroup" = "Group";
+"library.allGroups" = "All Groups";
+"group.manage" = "Manage Groups";
+
+"image.pickSource" = "Add Image";
+"image.fromPhotos" = "Choose from Photos";
+"image.fromFiles" = "Choose from Files";
+"image.takePhoto" = "Take Photo";
+"image.cameraUnavailable" = "Camera is not available on this device";
+"library.filter" = "Filter";

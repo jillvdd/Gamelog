@@ -1,4 +1,28 @@
 import SwiftUI
+
+/// 日期选择器：macOS 用自绘滚轮（DateMenuPickerMac），iOS 用系统 DatePicker。
+/// 滚轮的手感与三语显示细节只在 macOS 侧；iOS 交给原生控件（跟随系统 locale 与深浅色）。
+struct DateMenuPicker: View {
+    let title: String
+    @Binding var selection: Date
+    var lowerBoundYear = 1960
+
+    init(title: String, selection: Binding<Date>, lowerBoundYear: Int = 1960) {
+        self.title = title
+        _selection = selection
+        self.lowerBoundYear = lowerBoundYear
+    }
+
+    var body: some View {
+        #if os(macOS)
+        DateMenuPickerMac(title: title, selection: $selection, lowerBoundYear: lowerBoundYear)
+        #else
+        DatePicker(title, selection: $selection, displayedComponents: [.date])
+        #endif
+    }
+}
+
+#if os(macOS)
 import AppKit
 
 /// 滚轮单行高度与可见行数（三列共用）。
@@ -9,7 +33,7 @@ private let wheelVisibleRows = 5
 /// 三列并排（年 / 月 / 日），每列 5 行高、选中项居中吸附，复刻 iOS 日期滚轮的手感：
 /// 选中行加粗并放大、相邻行轻微缩小并淡出。日列随年月联动（大小月 / 闰年）。
 /// 三语显示（zh「2023年 6月 15日」/ ja 同 / en「2023 Jun 15」）。
-struct DateMenuPicker: View {
+struct DateMenuPickerMac: View {
     let title: String
     @Binding var selection: Date
     /// 年份可选下界（覆盖 FC 时代之前的老游戏发售日）。
@@ -322,3 +346,5 @@ private final class WheelDocumentView: NSView {
         }
     }
 }
+
+#endif

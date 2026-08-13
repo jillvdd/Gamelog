@@ -1,5 +1,8 @@
-import AppKit
 import Foundation
+
+#if os(macOS)
+import AppKit
+#endif
 
 /// 用户个性化项（用户名 / app 图标 / 头像 / 自动匹配封面开关）的持久化与读取。
 ///
@@ -49,19 +52,21 @@ enum UserCustomization {
     static func saveIconPNG(_ data: Data) throws {
         try data.write(to: supportDir.appendingPathComponent(iconFilename), options: .atomic)
         UserDefaults.standard.set(iconFilename, forKey: iconFileKey)
+        #if os(macOS)
         applyDockIcon()
+        #endif
     }
 
     // MARK: - 读取
 
-    static func avatarImage() -> NSImage? {
+    static func avatarImage() -> AppImage? {
         guard UserDefaults.standard.string(forKey: avatarFileKey) != nil else { return nil }
-        return NSImage(contentsOf: supportDir.appendingPathComponent(avatarFilename))
+        return loadAppImage(from: supportDir.appendingPathComponent(avatarFilename))
     }
 
-    static func iconImage() -> NSImage? {
+    static func iconImage() -> AppImage? {
         guard UserDefaults.standard.string(forKey: iconFileKey) != nil else { return nil }
-        return NSImage(contentsOf: supportDir.appendingPathComponent(iconFilename))
+        return loadAppImage(from: supportDir.appendingPathComponent(iconFilename))
     }
 
     static func avatarImageData() -> Data? {
@@ -84,9 +89,12 @@ enum UserCustomization {
     static func removeIcon() {
         try? FileManager.default.removeItem(at: supportDir.appendingPathComponent(iconFilename))
         UserDefaults.standard.removeObject(forKey: iconFileKey)
+        #if os(macOS)
         applyDockIcon()
+        #endif
     }
 
+    #if os(macOS)
     // MARK: - Dock 图标（自定义图标只作用于 Dock；Finder/Launchpad 保持系统图标）
 
     static func applyDockIcon() {
@@ -97,43 +105,22 @@ enum UserCustomization {
             NSApplication.shared.applicationIconImage = NSImage(named: NSImage.applicationIconName)
         }
     }
+    #endif
 
     // MARK: - 工具
-
-    /// NSImage → PNG data（裁切面板与备份导出共用）。
-    static func pngData(from image: NSImage) -> Data? {
-        guard let tiff = image.tiffRepresentation,
-              let rep = NSBitmapImageRep(data: tiff),
-              let data = rep.representation(using: .png, properties: [:]) else { return nil }
-        return data
-    }
 
     // MARK: - 收藏照片处理（收藏家模式）
 
     /// 导入收藏照片：keepOriginal=true 存原文件数据；false 压缩（最长边 ≤ maxEdge、JPEG quality）。
     static func collectionImageData(from url: URL, keepOriginal: Bool) -> Data? {
-        if keepOriginal { return try? Data(contentsOf: url) }
-        guard let image = NSImage(contentsOf: url) else { return nil }
-        return compressedJPEGData(from: image)
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        return collectionImageData(from: data, keepOriginal: keepOriginal)
     }
 
-    /// 压缩为 JPEG：最长边 ≤ maxEdge、quality。尺寸未超限时只转 JPEG 不放大。
-    static func compressedJPEGData(from image: NSImage, maxEdge: CGFloat = 1600, quality: CGFloat = 0.8) -> Data? {
-        let size = image.size
-        let maxDim = max(size.width, size.height)
-        let scale = maxDim > maxEdge ? maxEdge / maxDim : 1.0
-        let target = NSSize(width: max(1, size.width * scale), height: max(1, size.height * scale))
-        guard let rep = NSBitmapImageRep(
-            bitmapDataPlanes: nil, pixelsWide: Int(target.width), pixelsHigh: Int(target.height),
-            bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
-            colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0
-        ) else { return nil }
-        rep.size = target
-        NSGraphicsContext.saveGraphicsState()
-        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
-        image.draw(in: NSRect(origin: .zero, size: target))
-        NSGraphicsContext.current?.flushGraphics()
-        NSGraphicsContext.restoreGraphicsState()
-        return rep.representation(using: .jpeg, properties: [.compressionFactor: quality])
+    /// 收藏照片 Data 版本（iOS PhotosPicker 直接给 Data；macOS 走 URL 版本）。
+    static func collectionImageData(from data: Data, keepOriginal: Bool) -> Data? {
+        if keepOriginal { return data }
+        guard let image = AppImage(data: data) else { return nil }
+        return image.compressedJPEGData()
     }
 }

@@ -78,7 +78,9 @@ struct CompletionEditView: View {
             }
         }
         .formStyle(.grouped)
+        #if os(macOS)
         .frame(minWidth: 520, minHeight: 520)
+        #endif
         .navigationTitle(isEditing ? L10n.tr("title.editCompletion", lang: language) : L10n.tr("title.addCompletion", lang: language))
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
