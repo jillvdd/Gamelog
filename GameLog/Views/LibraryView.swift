@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import AppKit
 
 /// 库排序选项。
 enum LibrarySort: String, CaseIterable, Identifiable {
@@ -10,17 +11,42 @@ enum LibrarySort: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+/// 工具栏毛玻璃控制（设置「隐藏分组毛玻璃」开关）。
+/// macOS 15+ 用 `.toolbarBackgroundVisibility`（能真正隐藏窗口工具栏玻璃）；
+/// macOS 14 无对应 API，开启时尽力用透明背景（实际可能仍显示系统玻璃，但 app 照常可用）。
+private struct ToolbarGlassModifier: ViewModifier {
+    let hidden: Bool
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(macOS 15.0, *) {
+            content.toolbarBackgroundVisibility(hidden ? .hidden : .automatic, for: .windowToolbar)
+        } else if hidden {
+            content.toolbarBackground(Color.clear, for: .windowToolbar)
+        } else {
+            content
+        }
+    }
+}
+
 /// 主界面：网格/列表切换、搜索、平台筛选、排序、分享、新建入口。
 struct LibraryView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.appLanguageCode) private var language
     @Query(sort: \Game.createdAt) private var games: [Game]
     let groupFilter: GameGroup?
+    /// 非分组视图（全部游戏 / 侧边栏某平台）的平台过滤，由侧边栏选择驱动，切换即重置。
+    var platform: String? = nil
 
     @State private var searchText = ""
     @AppStorage("useGridView") private var useGridView = true
-    @AppStorage("libraryPlatformFilter") private var platformFilter = ""
+    /// 分组视图内局部平台过滤（不持久化，切换分组即重置）。
+    @State private var groupPlatformFilter = ""
     @AppStorage("librarySort") private var sortRaw = LibrarySort.completionDate.rawValue
+    /// 隐藏工具栏毛玻璃（设置「个性化」开关）：开启 = 无标题 + 完全无毛玻璃（方案 B）。
+    @AppStorage(UserCustomization.hideToolbarGlassKey) private var hideToolbarGlass = false
+    /// 是否全屏：窗口模式保留毛玻璃+标题；全屏下玻璃比工具栏布局多延伸一行，需把内容往下推。
+    @State private var isFullScreen = false
 
     @State private var path = NavigationPath()
     @State private var pendingDeleteGame: Game?
@@ -31,8 +57,10 @@ struct LibraryView: View {
 
     private var sortOption: LibrarySort { LibrarySort(rawValue: sortRaw) ?? .completionDate }
 
-    private var allPlatforms: [String] {
-        Array(Set(games.flatMap { $0.completions.map(\.platform) })).sorted()
+    /// 分组模式下工具栏平台菜单的候选：本组内出现的平台（预设世代倒序 + 自定义排最后）。
+    private var groupPlatforms: [String] {
+        guard let group = groupFilter else { return [] }
+        return Presets.ordered(group.games.flatMap { $0.completions.map(\.platform) })
     }
 
     private var visibleGames: [Game] {
@@ -40,12 +68,17 @@ struct LibraryView: View {
         if let groupFilter {
             // 分组视图直接以双向关系为准：关系变化（右键移出/加入）立即反映
             result = groupFilter.games
+            if !groupPlatformFilter.isEmpty {
+                result = result.filter { game in
+                    game.completions.contains { $0.platform == groupPlatformFilter }
+                }
+            }
         } else {
             result = games
-        }
-        if !platformFilter.isEmpty {
-            result = result.filter { game in
-                game.completions.contains { $0.platform == platformFilter }
+            if let platform {
+                result = result.filter { game in
+                    game.completions.contains { $0.platform == platform }
+                }
             }
         }
         if !searchText.isEmpty {
@@ -60,6 +93,27 @@ struct LibraryView: View {
             result.sort { ($0.latestCompletionDate ?? .distantPast) > ($1.latestCompletionDate ?? .distantPast) }
         }
         return result
+    }
+
+    private var navigationTitleText: String {
+        if let platform {
+            return Presets.display(platform, category: .platform, language: language)
+        }
+        return groupFilter?.name ?? L10n.tr("library.all", lang: language)
+    }
+
+    /// 当前窗口是否全屏（启动时用于初始化状态）。
+    private var windowIsFullScreen: Bool {
+        let win = NSApp.windows.first(where: { $0.isVisible }) ?? NSApp.mainWindow
+        return win?.styleMask.contains(.fullScreen) ?? false
+    }
+
+    /// 异步更新全屏状态：推迟到下一轮 runloop，避免在视图更新期间同步改 @State（曾导致 UI 挂死）。
+    private func setFullScreen(_ value: Bool) {
+        DispatchQueue.main.async {
+            guard isFullScreen != value else { return }
+            isFullScreen = value
+        }
     }
 
     // MARK: - 分组视图（游戏 + 底部统计/评价）
@@ -182,38 +236,54 @@ struct LibraryView: View {
                     }
                 }
             }
+            .onAppear {
+                setFullScreen(windowIsFullScreen)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSWindow.willEnterFullScreenNotification)) { _ in
+                setFullScreen(true)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSWindow.willExitFullScreenNotification)) { _ in
+                setFullScreen(false)
+            }
             .navigationDestination(for: Game.self) { game in
                 GameDetailView(game: game)
             }
             .searchable(text: $searchText, placement: .toolbar, prompt: L10n.tr("library.search", lang: language))
-            .navigationTitle(groupFilter?.name ?? L10n.tr("library.all", lang: language))
+            .navigationTitle(hideToolbarGlass ? "" : navigationTitleText)
+            // 隐藏毛玻璃开关开启（方案 B）：无标题 + 无毛玻璃，全屏也无需下推内容。
+            // 关闭（默认）：保留玻璃+标题；全屏下玻璃比工具栏布局多延伸一行（系统行为，无法压缩），
+            // 把内容顶部往下推一行避开遮挡。
+            .modifier(ToolbarGlassModifier(hidden: hideToolbarGlass))
+            .safeAreaPadding(.top, (!hideToolbarGlass && isFullScreen) ? 24 : 0)
             .toolbar {
-                ToolbarItem {
-                    Menu {
-                        Button {
-                            platformFilter = ""
-                        } label: {
-                            if platformFilter.isEmpty {
-                                Label(L10n.tr("library.allPlatforms", lang: language), systemImage: "checkmark")
-                            } else {
-                                Text(verbatim: L10n.tr("library.allPlatforms", lang: language))
-                            }
-                        }
-                        ForEach(allPlatforms, id: \.self) { p in
+                if groupFilter != nil {
+                    ToolbarItem {
+                        Menu {
                             Button {
-                                platformFilter = p
+                                groupPlatformFilter = ""
                             } label: {
-                                if platformFilter == p {
-                                    Label(Presets.display(p, category: .platform, language: language), systemImage: "checkmark")
+                                if groupPlatformFilter.isEmpty {
+                                    Label(L10n.tr("library.allPlatforms", lang: language), systemImage: "checkmark")
                                 } else {
-                                    Text(verbatim: Presets.display(p, category: .platform, language: language))
+                                    Text(verbatim: L10n.tr("library.allPlatforms", lang: language))
                                 }
                             }
+                            ForEach(groupPlatforms, id: \.self) { p in
+                                Button {
+                                    groupPlatformFilter = p
+                                } label: {
+                                    if groupPlatformFilter == p {
+                                        Label(Presets.display(p, category: .platform, language: language), systemImage: "checkmark")
+                                    } else {
+                                        Text(verbatim: Presets.display(p, category: .platform, language: language))
+                                    }
+                                }
+                            }
+                        } label: {
+                            Image(systemName: "line.3.horizontal.decrease")
                         }
-                    } label: {
-                        Image(systemName: "line.3.horizontal.decrease")
+                        .help(L10n.tr("library.filterPlatform", lang: language))
                     }
-                    .help(L10n.tr("library.filterPlatform", lang: language))
                 }
 
                 ToolbarItem {
@@ -311,6 +381,10 @@ struct LibraryView: View {
                 if let game = pendingDeleteGame {
                     Text(verbatim: L10n.tr("delete.confirmGame", [game.displayName(for: language)], lang: language))
                 }
+            }
+            .onChange(of: groupFilter?.persistentModelID) { _, _ in
+                // 切换分组即重置组内平台过滤（切换页面重置过滤状态）。
+                groupPlatformFilter = ""
             }
         }
     }

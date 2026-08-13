@@ -1,5 +1,6 @@
 "library.all" = "全部游戏";
 "library.stats" = "统计";
+"library.platforms" = "平台";
 "library.search" = "搜索游戏…";
 "library.filterPlatform" = "平台筛选";
 "library.allPlatforms" = "全部平台";
@@ -99,6 +100,8 @@
 "settings.restoreIcon" = "恢复默认图标";
 "settings.autoMatchCover" = "自动匹配封面";
 "settings.autoMatchCoverHint" = "输入游戏名后，自动搜索 SteamGridDB 并填入第一张封面（需在下方配置 API Key）。";
+"settings.hideToolbarGlass" = "隐藏分组毛玻璃";
+"settings.hideToolbarGlassHint" = "隐藏工具栏的毛玻璃背景与标题文字，顶部更简洁（关闭时保留）。（macOS 15 及以上可启用）";
 "crop.titleAvatar" = "裁切头像";
 "crop.titleIcon" = "裁切图标";
 "crop.zoom" = "缩放";
@@ -132,6 +135,9 @@
 "group.review" = "分组评价";
 "group.reviewEmpty" = "还没有评价";
 "group.reviewEdit" = "编辑分组评价";
+"group.pickGames" = "选择游戏…";
+"group.pickSearch" = "搜索游戏…";
+"group.memberCount" = "%d 款游戏";
 "group.gameCount" = "游戏数";
 "group.completionCount" = "通关数";
 "preset.allPlatforms" = "所有平台…";

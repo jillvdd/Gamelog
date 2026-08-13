@@ -14,6 +14,7 @@ struct SettingsView: View {
     @AppStorage(UserCustomization.avatarFileKey) private var avatarFile = ""
     @AppStorage(UserCustomization.iconFileKey) private var iconFile = ""
     @AppStorage(UserCustomization.autoMatchCoverKey) private var autoMatchCover = false
+    @AppStorage(UserCustomization.hideToolbarGlassKey) private var hideToolbarGlass = false
 
     /// 用户名绑定：写入时截断到上限。用 Binding 替代 `.onChange`——`.onChange` 挂 TextField 在 macOS 会吞尾随空格。
     private var usernameBinding: Binding<String> {
@@ -70,6 +71,11 @@ struct SettingsView: View {
 
                 Toggle(L10n.tr("settings.autoMatchCover", lang: language), isOn: $autoMatchCover)
                 LText("settings.autoMatchCoverHint")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Toggle(L10n.tr("settings.hideToolbarGlass", lang: language), isOn: $hideToolbarGlass)
+                LText("settings.hideToolbarGlassHint")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

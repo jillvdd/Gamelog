@@ -1,5 +1,6 @@
 "library.all" = "すべてのゲーム";
 "library.stats" = "統計";
+"library.platforms" = "プラットフォーム";
 "library.search" = "ゲームを検索…";
 "library.filterPlatform" = "プラットフォーム";
 "library.allPlatforms" = "すべてのプラットフォーム";
@@ -100,6 +101,8 @@
 "settings.restoreIcon" = "デフォルトアイコンに戻す";
 "settings.autoMatchCover" = "カバー自動取得";
 "settings.autoMatchCoverHint" = "ゲーム名を入力すると SteamGridDB を検索し、最初のカバーを自動設定します（下の API Key の設定が必要です）。";
+"settings.hideToolbarGlass" = "グループの毛ガラスを隠す";
+"settings.hideToolbarGlassHint" = "ツールバーの毛ガラス背景とタイトルを隠し、上部をシンプルにします（オフで表示）。（macOS 15 以上で有効）";
 "crop.titleAvatar" = "アバターを切り抜く";
 "crop.titleIcon" = "アイコンを切り抜く";
 "crop.zoom" = "ズーム";
@@ -133,6 +136,9 @@
 "group.review" = "グループ評価";
 "group.reviewEmpty" = "評価はまだありません";
 "group.reviewEdit" = "グループ評価を編集";
+"group.pickGames" = "ゲームを選択…";
+"group.pickSearch" = "ゲームを検索…";
+"group.memberCount" = "%d 個のゲーム";
 "group.gameCount" = "ゲーム数";
 "group.completionCount" = "クリア数";
 "preset.allPlatforms" = "すべてのプラットフォーム…";

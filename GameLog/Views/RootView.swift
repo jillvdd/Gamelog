@@ -1,9 +1,10 @@
 import SwiftUI
 import SwiftData
 
-/// 侧边栏条目：全部游戏 / 某个分组 / 统计。
+/// 侧边栏条目：全部游戏 / 某个平台 / 某个分组 / 统计。
 enum SidebarItem: Hashable {
     case all
+    case platform(String)
     case group(GameGroup)
     case stats
 }
@@ -12,11 +13,37 @@ struct RootView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.appLanguageCode) private var language
     @Query(sort: \GameGroup.name) private var groups: [GameGroup]
+    @Query(sort: \Game.createdAt) private var games: [Game]
     @AppStorage(UserCustomization.avatarFileKey) private var avatarFile = ""
     @State private var selection: SidebarItem? = .all
     @State private var showingNewGroup = false
     @State private var renameGroup: GameGroup?
     @State private var deleteGroup: GameGroup?
+    @State private var pickingGamesGroup: GameGroup?
+
+    /// 平台 → 去重游戏数（同平台多条记录算一次；一款游戏在多个平台各计一次）。
+    private var platformCounts: [String: Int] {
+        var counts: [String: Int] = [:]
+        for game in games {
+            for platform in Set(game.completions.map(\.platform)).filter({ !$0.isEmpty }) {
+                counts[platform, default: 0] += 1
+            }
+        }
+        return counts
+    }
+
+    /// 库里出现过的平台，按预设世代倒序 + 自定义按字母排最后。
+    private var platformsInUse: [String] {
+        Presets.ordered(Array(platformCounts.keys))
+    }
+
+    /// 分组行「选择游戏」的 popover 绑定：只在该行分组被选中时弹出，锚定到该行。
+    private func popoverBinding(for group: GameGroup) -> Binding<GameGroup?> {
+        Binding(
+            get: { pickingGamesGroup?.persistentModelID == group.persistentModelID ? group : nil },
+            set: { if $0 == nil { pickingGamesGroup = nil } }
+        )
+    }
 
     var body: some View {
         NavigationSplitView {
@@ -25,12 +52,26 @@ struct RootView: View {
                     Label(L10n.tr("library.all", lang: language), systemImage: "books.vertical")
                         .tag(SidebarItem.all)
                 }
+                if !platformsInUse.isEmpty {
+                    Section(L10n.tr("library.platforms", lang: language)) {
+                        ForEach(platformsInUse, id: \.self) { platform in
+                            Label(Presets.display(platform, category: .platform, language: language), systemImage: "gamecontroller")
+                                .badge(platformCounts[platform] ?? 0)
+                                .tag(SidebarItem.platform(platform))
+                        }
+                    }
+                }
                 if !groups.isEmpty {
                     Section(L10n.tr("game.groups", lang: language)) {
                         ForEach(groups) { group in
                             Label(group.name, systemImage: "folder")
                                 .tag(SidebarItem.group(group))
                                 .contextMenu {
+                                    Button {
+                                        pickingGamesGroup = group
+                                    } label: {
+                                        Label(L10n.tr("group.pickGames", lang: language), systemImage: "checkmark.square")
+                                    }
                                     Button {
                                         renameGroup = group
                                     } label: {
@@ -41,6 +82,9 @@ struct RootView: View {
                                     } label: {
                                         Label(L10n.tr("common.delete", lang: language), systemImage: "trash")
                                     }
+                                }
+                                .popover(item: popoverBinding(for: group), arrowEdge: .trailing) { _ in
+                                    GroupGamePickerView(group: group)
                                 }
                         }
                     }
@@ -73,6 +117,8 @@ struct RootView: View {
             switch selection {
             case .all, .none:
                 LibraryView(groupFilter: nil)
+            case .platform(let platform):
+                LibraryView(groupFilter: nil, platform: platform)
             case .group(let group):
                 LibraryView(groupFilter: group)
             case .stats:
@@ -95,6 +141,9 @@ struct RootView: View {
                 if let group = deleteGroup {
                     if case .group(let selected) = selection, selected.persistentModelID == group.persistentModelID {
                         selection = .all
+                    }
+                    if pickingGamesGroup?.persistentModelID == group.persistentModelID {
+                        pickingGamesGroup = nil
                     }
                     context.delete(group)
                 }

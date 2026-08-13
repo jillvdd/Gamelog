@@ -2,7 +2,7 @@ import Foundation
 import SwiftData
 
 /// 平台名迁移：Switch → Nintendo Switch、Switch 2 → Nintendo Switch 2（2026-08-13 改名）。
-/// 存储值迁移（启动时调用、幂等）+ 平台筛选持久化值同步。
+/// 存储值迁移（启动时调用、幂等）。
 /// 展示层旧名兜底映射在 `Presets.localized` 里（旧备份导入后旧名仍显示新名）。
 enum PlatformMigration {
     /// 旧名 → 新名。
@@ -11,7 +11,8 @@ enum PlatformMigration {
         "Switch 2": "Nintendo Switch 2",
     ]
 
-    /// 一次性迁移库内已存储的旧平台名与平台筛选持久化值。幂等，重复调用无害。
+    /// 一次性迁移库内已存储的旧平台名。幂等，重复调用无害。
+    /// （平台筛选已改由侧边栏/分组局部状态驱动，不再有需要迁移的持久化筛选值。）
     static func migrate(in context: ModelContext) {
         var changed = false
 
@@ -22,14 +23,6 @@ enum PlatformMigration {
                     changed = true
                 }
             }
-        }
-
-        // 平台筛选的持久化值（AppStorage key）同步迁移，避免迁移后筛选落空。
-        let filterKey = "libraryPlatformFilter"
-        if let filter = UserDefaults.standard.string(forKey: filterKey),
-           let newName = renames[filter] {
-            UserDefaults.standard.set(newName, forKey: filterKey)
-            changed = true
         }
 
         if changed { try? context.save() }

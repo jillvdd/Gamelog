@@ -60,6 +60,23 @@ enum Presets {
         ],
     ]
 
+    /// 平台展示排序唯一源：预设按世代倒序（即 `platforms` 数组顺序），预设外的自定义值按 canonical 字典序排在最后。
+    /// 传入去重后的原始字符串集合即可；空值被过滤。
+    static func ordered(_ platforms: [String]) -> [String] {
+        let order = Dictionary(
+            uniqueKeysWithValues: Self.platforms.enumerated().map { ($0.element, $0.offset) }
+        )
+        let unique = Set(platforms.filter { !$0.isEmpty })
+        return unique.sorted { a, b in
+            switch (order[a], order[b]) {
+            case (nil, nil): return a < b
+            case (nil, _): return false
+            case (_, nil): return true
+            case (let ia?, let ib?): return ia < ib
+            }
+        }
+    }
+
     /// 展示本地化：预设值返回当前语言文案；自定义值原样返回。
     static func display(_ value: String, category: PresetCategory, language: String) -> String {
         guard let entry = localized[category]?[value] else { return value }

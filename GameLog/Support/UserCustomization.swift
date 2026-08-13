@@ -17,6 +17,8 @@ enum UserCustomization {
     static let iconFileKey = "customization.iconFile"
     /// 自动匹配封面开关（默认关闭，设置页读写同一源）。
     static let autoMatchCoverKey = "customization.autoMatchCover"
+    /// 隐藏工具栏毛玻璃开关（默认关闭=保留玻璃+标题；开启=方案 B：无标题、完全无毛玻璃）。
+    static let hideToolbarGlassKey = "customization.hideToolbarGlass"
 
     /// 用户名长度上限（设置页输入与导入时统一截断）。
     static let usernameMaxLength = 20
