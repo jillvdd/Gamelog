@@ -103,6 +103,7 @@ let exportGame = Game(name: "异度神剑3", aliases: ["XB3", "ゼノブレイ�
                       reviewTitle: "RPG 天花板", reviewBody: "系统深度惊人")
 context.insert(exportGame)
 let exportGroup = GameGroup(name: "JRPG")
+exportGroup.review = "系列评价草稿"
 context.insert(exportGroup)
 exportGame.groups = [exportGroup]
 let exportC = Completion(platform: "Switch", date: Date(timeIntervalSince1970: 1_660_000_000),
@@ -139,6 +140,7 @@ check("封面 base64 往返", ig.coverData == "COVER_BASE64_MARKER".data(using: 
 check("评价标题往返", ig.reviewTitle == "RPG 天花板")
 check("评价正文往返", ig.reviewBody == "系统深度惊人")
 check("分组映射往返", ig.groups.map(\.name) == ["JRPG"])
+check("分组评价往返", ig.groups.first?.review == "系列评价草稿")
 
 let ic = importedCompletions[0]
 check("记录平台往返", ic.platform == "Switch")
@@ -149,7 +151,7 @@ check("记录内容往返", ic.notes == "全图鉴")
 check("六维评分往返", ic.scoreGameplay == 9.5 && ic.scoreDesign == 9 && ic.scoreStory == 9.5
     && ic.scoreArt == 8.5 && ic.scoreMusic == 9 && ic.scorePerformance == 9)
 check("记录↔游戏关联恢复", ic.game?.persistentModelID == ig.persistentModelID)
-check("库显示分往返 9.0（9.5+9+9.5+8.5+9+9→54.5/6→9.083→round 9.0）", ig.libraryScore == 9.0)
+check("库显示分往返 9.1（9.5+9+9.5+8.5+9+9→54.5/6→9.083→round 0.1→9.1）", ig.libraryScore == 9.1)
 
 // --- 7. 重复导入幂等 ---
 try BackupManager.decodeAndReplace(backupData, into: context)
@@ -173,9 +175,59 @@ check("platform 手机 → en Mobile", Presets.display("手机", category: .plat
 check("platform 掌机 → ja 携帯機", Presets.display("掌机", category: .platform, language: "ja") == "携帯機")
 check("platform 其他 → ja その他（同 degree 其他也翻译）", Presets.display("其他", category: .degree, language: "ja") == "その他")
 check("中性预设 PC → en 原样 PC", Presets.display("PC", category: .platform, language: "en") == "PC")
-check("中性预设 Switch → ja 原样 Switch", Presets.display("Switch", category: .platform, language: "ja") == "Switch")
+check("旧名 Switch → ja Nintendo Switch（兜底映射）", Presets.display("Switch", category: .platform, language: "ja") == "Nintendo Switch")
+check("新预设 Nintendo Switch → en 原样", Presets.display("Nintendo Switch", category: .platform, language: "en") == "Nintendo Switch")
+check("旧名 Switch 2 → zh Nintendo Switch 2（兜底映射）", Presets.display("Switch 2", category: .platform, language: "zh-Hans") == "Nintendo Switch 2")
+check("新预设 Nintendo Switch 2 → ja 原样", Presets.display("Nintendo Switch 2", category: .platform, language: "ja") == "Nintendo Switch 2")
 check("自定义值 Retro → 任意语言原样", Presets.display("Retro", category: .platform, language: "ja") == "Retro")
 check("自定义值 特殊二周目 → en 原样", Presets.display("特殊二周目", category: .degree, language: "en") == "特殊二周目")
+
+// --- 10. 平台限定评分（整体排名按平台切换用） ---
+let multi = Game(name: "多平台游戏", reviewTitle: "")
+context.insert(multi)
+let multiSwitch = Completion(platform: "Nintendo Switch", date: .now, degree: "通关",
+                             scoreGameplay: 9, scoreDesign: 9, scoreStory: 9, scoreArt: 9, scoreMusic: 9, scorePerformance: 9)
+multiSwitch.game = multi
+context.insert(multiSwitch)
+let multiPS5 = Completion(platform: "PS5", date: .now, degree: "通关",
+                          scoreGameplay: 5, scoreDesign: 5, scoreStory: 5, scoreArt: 5, scoreMusic: 5, scorePerformance: 5)
+multiPS5.game = multi
+context.insert(multiPS5)
+try? context.save()
+check("全平台库显示分 7.0（9 与 5 均值）", multi.libraryScore(platform: nil) == 7.0)
+check("Switch 平台库显示分 9.0", multi.libraryScore(platform: "Nintendo Switch") == 9.0)
+check("PS5 平台玩法均值 5.0", multi.dimensionAverage(for: .gameplay, platform: "PS5") == 5.0)
+check("Switch 平台玩法均值 9.0", multi.dimensionAverage(for: .gameplay, platform: "Nintendo Switch") == 9.0)
+check("无该平台记录 → nil", multi.libraryScore(platform: "Xbox One") == nil)
+
+// --- 11. 无日期/无时长记录（None） + 备份往返 ---
+let noDateGame = Game(name: "长线运营游戏", reviewTitle: "t")
+context.insert(noDateGame)
+let noDateC = Completion(platform: "PC", date: nil, degree: "长线", playtime: nil)
+noDateC.game = noDateGame
+context.insert(noDateC)
+try? context.save()
+check("无日期记录 date 为 nil", noDateC.date == nil)
+check("无日期记录 latestCompletionDate 为 nil", noDateGame.latestCompletionDate == nil)
+let noDateBackup = try BackupManager.encode(games: [noDateGame], groups: [])
+try BackupManager.decodeAndReplace(noDateBackup, into: context)
+try context.save()
+let noDateImported = (try? context.fetch(FetchDescriptor<Completion>()))?.first { $0.platform == "PC" }
+check("无日期记录备份往返保持 nil", noDateImported?.date == nil)
+check("无时长记录备份往返保持 nil", noDateImported?.playtime == nil)
+
+// --- 12. 多语言名字 ---
+let ml = Game(name: "The Legend of Zelda", nameZh: "塞尔达传说", nameJa: "ゼルダの伝説", reviewTitle: "")
+context.insert(ml)
+let mlPlain = Game(name: "Xenoblade", reviewTitle: "")
+context.insert(mlPlain)
+try? context.save()
+check("中文模式显示中文名", ml.displayName(for: "zh-Hans") == "塞尔达传说")
+check("日文模式显示日文名", ml.displayName(for: "ja") == "ゼルダの伝説")
+check("英文模式显示英文名", ml.displayName(for: "en") == "The Legend of Zelda")
+check("中文未设回退英文", mlPlain.displayName(for: "zh-Hans") == "Xenoblade")
+check("搜中文名命中", ml.matches(search: "塞尔达"))
+check("搜日文名命中", ml.matches(search: "ゼルダ"))
 
 print(failures == 0 ? "DATA SMOKE TEST PASSED" : "DATA SMOKE TEST FAILED: \(failures) failures")
 exit(failures == 0 ? 0 : 1)

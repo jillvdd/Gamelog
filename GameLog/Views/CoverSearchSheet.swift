@@ -31,9 +31,7 @@ struct CoverSearchSheet: View {
                     .keyboardShortcut(.cancelAction)
             }
 
-            TextField(L10n.tr("library.search", lang: language), text: $searchText)
-                .textFieldStyle(.roundedBorder)
-                .onSubmit { searchNow() }
+            BorderedTextField(text: $searchText, placeholder: L10n.tr("library.search", lang: language), onSubmit: { searchNow() })
                 .onChange(of: searchText) { _, newValue in
                     scheduleSearch(newValue)
                 }

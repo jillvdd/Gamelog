@@ -3,9 +3,9 @@ import Foundation
 /// 评分相关纯逻辑。不依赖 SwiftData / SwiftUI，可独立编译验证。
 enum ScoreMath {
 
-    /// 四舍五入到最近的 0.5（8.3→8.5，8.2→8.0，8.0→8.0）。
-    static func roundToHalf(_ value: Double) -> Double {
-        (value * 2).rounded() / 2
+    /// 四舍五入到最近的 0.1（8.26→8.3，8.25→8.3，8.0→8.0）。评分展示的最小单位。
+    static func roundScore(_ value: Double) -> Double {
+        (value * 10).rounded() / 10
     }
 
     /// 单条通关记录的平均分：现有维度评分的算术均值（1–6 维都认可）。
@@ -16,13 +16,13 @@ enum ScoreMath {
         return scores.reduce(0, +) / Double(scores.count)
     }
 
-    /// 库显示分：所有已评分记录平均分的均值，再取整到最近的 0.5。
+    /// 库显示分：所有已评分记录平均分的均值，再取整到最近的 0.1。
     /// 没有任何已评分记录时返回 nil（界面显示"未评分"）。
     static func libraryScore(recordAverages: [Double]) -> Double? {
         let valid = recordAverages.filter { $0 >= 1 && $0 <= 10 }
         guard !valid.isEmpty else { return nil }
         let mean = valid.reduce(0, +) / Double(valid.count)
-        return roundToHalf(mean)
+        return roundScore(mean)
     }
 
     // MARK: - 命令行自检
@@ -44,22 +44,22 @@ enum ScoreMath {
             return ok
         }
         let results = [
-            assertEq("round 8.3", roundToHalf(8.3), 8.5),
-            assertEq("round 8.2", roundToHalf(8.2), 8.0),
-            assertEq("round 8.0", roundToHalf(8.0), 8.0),
-            assertEq("round 8.25", roundToHalf(8.25), 8.5),
-            assertEq("round 8.75", roundToHalf(8.75), 9.0),
+            assertEq("round 8.3", roundScore(8.3), 8.3),
+            assertEq("round 8.2", roundScore(8.2), 8.2),
+            assertEq("round 8.0", roundScore(8.0), 8.0),
+            assertEq("round 8.25", roundScore(8.25), 8.3),
+            assertEq("round 8.75", roundScore(8.75), 8.8),
             assertEq("record avg 8,9,8,7,9,7", recordAverage([8, 9, 8, 7, 9, 7]), 8.0),
             assertEq("record avg empty", recordAverage([]), nil),
             assertEq("record avg 2 items", recordAverage([8, 9]), 8.5),
             assertEq("record avg 4 items (部分维度)", recordAverage([8, 9, 7, 8]), 8.0),
             assertEq("record avg out of range", recordAverage([8, 9, 11, 8, 9, 8]), nil),
             assertEq("library 8.0 & 9.0", libraryScore(recordAverages: [8.0, 9.0]), 8.5),
-            assertEq("library 8.2 only", libraryScore(recordAverages: [8.2]), 8.0),
+            assertEq("library 8.2 only", libraryScore(recordAverages: [8.2]), 8.2),
             assertEq("library empty", libraryScore(recordAverages: []), nil),
             assertEq("library invalid ignored", libraryScore(recordAverages: [8.0, 12.0]), 8.0),
             assertEq("library 7.6 & 8.4", libraryScore(recordAverages: [7.6, 8.4]), 8.0),
-            assertEq("library 8.4 only", libraryScore(recordAverages: [8.4]), 8.5),
+            assertEq("library 8.4 only", libraryScore(recordAverages: [8.4]), 8.4),
         ]
         return results.allSatisfy { $0 }
     }

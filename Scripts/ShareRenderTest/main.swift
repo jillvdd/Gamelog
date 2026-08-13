@@ -137,6 +137,48 @@ func run() -> Int {
         check("总览 5 款桌面渲染成功", false)
     }
 
+    // 分组分享卡：一个已评分（Switch）游戏 + 一个未评分游戏
+    let group = GameGroup(name: "JRPG")
+    context.insert(group)
+    group.games = [game, plain]
+    try? context.save()
+
+    if let png = ShareCardRenderer.renderPNG(content: .group(group, title: "JRPG", size: .phone), language: language),
+       let size = pngSize(png) {
+        check("分组卡竖版尺寸 1080x1920（实际 \(size.width)x\(size.height)）", size.width == 1080 && size.height == 1920)
+        try? png.write(to: URL(fileURLWithPath: "/tmp/gamelog_share_group_phone.png"))
+    } else {
+        check("分组卡竖版渲染成功", false)
+    }
+
+    if let png = ShareCardRenderer.renderPNG(content: .group(group, title: "JRPG", size: .desktop), language: language),
+       let size = pngSize(png) {
+        check("分组卡横版尺寸 1920x1080（实际 \(size.width)x\(size.height)）", size.width == 1920 && size.height == 1080)
+        try? png.write(to: URL(fileURLWithPath: "/tmp/gamelog_share_group_desktop.png"))
+    } else {
+        check("分组卡横版渲染成功", false)
+    }
+
+    // 分组卡拉长：10 款游戏 → 竖版画布应高于标准 1920（同总览，按内容拉高）
+    let bigGroup = GameGroup(name: "大合集")
+    context.insert(bigGroup)
+    let extraGames = (0..<10).map { i -> Game in
+        let g = Game(name: "游戏\(i)", reviewTitle: "t")
+        context.insert(g)
+        return g
+    }
+    bigGroup.games = extraGames
+    try? context.save()
+    if let png = ShareCardRenderer.renderPNG(content: .group(bigGroup, title: "大合集", size: .phone), language: language),
+       let size = pngSize(png) {
+        let expected = ShareCardLayout.groupSize(gameCount: 10, platformCount: 0, size: .phone)
+        check("分组卡 10 款拉高至 \(Int(expected.height))（实际 \(size.height)）",
+              abs(Double(size.height) - expected.height) <= 1)
+        try? png.write(to: URL(fileURLWithPath: "/tmp/gamelog_share_group_10.png"))
+    } else {
+        check("分组卡 10 款渲染成功", false)
+    }
+
     return failures == 0 ? 0 : 1
 }
 

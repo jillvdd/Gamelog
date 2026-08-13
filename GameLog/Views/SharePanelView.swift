@@ -2,17 +2,27 @@ import SwiftUI
 import SwiftData
 import AppKit
 
-/// 分享面板：勾选游戏（单选→单卡，多选→总览图），选尺寸，预览，保存/分享。
+/// 分享面板左栏模式：按游戏 / 按分组。
+private enum ShareMode: String, CaseIterable {
+    case games
+    case groups
+}
+
+/// 分享面板：勾选游戏（单选→单卡，多选→总览图）或勾选分组（单选→分组分享卡），选尺寸，预览，保存/分享。
 struct SharePanelView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appLanguageCode) private var language
     @Query(sort: \Game.createdAt) private var games: [Game]
+    @Query(sort: \GameGroup.name) private var groups: [GameGroup]
     var preselected: [Game] = []
 
+    @State private var mode: ShareMode = .games
     @State private var selectedIDs: Set<PersistentIdentifier> = []
+    @State private var selectedGroupID: PersistentIdentifier?
     @State private var searchText = ""
     @State private var size: ShareSize = .phone
     @State private var overviewTitle = ""
+    @State private var groupTitle = ""
     @State private var renderedPNG: Data?
     @State private var shareURL: URL?
     @State private var renderTask: Task<Void, Never>?
@@ -22,11 +32,32 @@ struct SharePanelView: View {
         games.filter { selectedIDs.contains($0.persistentModelID) }
     }
 
+    private var selectedGroup: GameGroup? {
+        guard let selectedGroupID else { return nil }
+        return groups.first { $0.persistentModelID == selectedGroupID }
+    }
+
     private var visibleGames: [Game] {
         searchText.isEmpty ? games : games.filter { $0.matches(search: searchText) }
     }
 
     private var isMulti: Bool { selectedGames.count > 1 }
+
+    /// 分组标题绑定：写入时截断到用户名上限（替代 .onChange）。
+    private var groupTitleBinding: Binding<String> {
+        Binding(
+            get: { groupTitle },
+            set: { groupTitle = String(Array($0).prefix(UserCustomization.usernameMaxLength)) }
+        )
+    }
+
+    /// 总览标题绑定：写入时截断到用户名上限（替代 .onChange）。
+    private var overviewTitleBinding: Binding<String> {
+        Binding(
+            get: { overviewTitle },
+            set: { overviewTitle = String(Array($0).prefix(UserCustomization.usernameMaxLength)) }
+        )
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -43,9 +74,12 @@ struct SharePanelView: View {
         }
         .frame(width: 1040, height: 680)
         .onAppear(perform: setup)
+        .onChange(of: mode) { _, _ in scheduleRerender() }
         .onChange(of: selectedIDs) { _, _ in scheduleRerender() }
+        .onChange(of: selectedGroupID) { _, _ in scheduleRerender() }
         .onChange(of: size) { _, _ in scheduleRerender() }
         .onChange(of: overviewTitle) { _, _ in scheduleRerender() }
+        .onChange(of: groupTitle) { _, _ in scheduleRerender() }
         .onDisappear { renderTask?.cancel() }
     }
 
@@ -71,28 +105,54 @@ struct SharePanelView: View {
 
     private var selectionList: some View {
         VStack(spacing: 0) {
-            TextField(L10n.tr("library.search", lang: language), text: $searchText)
-                .textFieldStyle(.roundedBorder)
-                .padding(10)
+            Picker("", selection: $mode) {
+                Text(verbatim: L10n.tr("share.byGames", lang: language)).tag(ShareMode.games)
+                Text(verbatim: L10n.tr("share.byGroups", lang: language)).tag(ShareMode.groups)
+            }
+            .pickerStyle(.segmented)
+            .padding(10)
+
+            BorderedTextField(text: $searchText, placeholder: L10n.tr("library.search", lang: language))
+                .padding([.horizontal, .bottom], 10)
 
             List {
-                ForEach(visibleGames) { game in
-                    HStack(spacing: 8) {
-                        Image(systemName: selectedIDs.contains(game.persistentModelID) ? "checkmark.square.fill" : "square")
-                            .foregroundStyle(selectedIDs.contains(game.persistentModelID) ? Color.accentColor : Color.secondary)
-                        coverThumb(game)
-                        Text(verbatim: game.name)
-                            .lineLimit(1)
-                        Spacer()
-                        if let score = game.libraryScore {
-                            Text(verbatim: String(format: "%.1f", score))
+                if mode == .games {
+                    ForEach(visibleGames) { game in
+                        HStack(spacing: 8) {
+                            Image(systemName: selectedIDs.contains(game.persistentModelID) ? "checkmark.square.fill" : "square")
+                                .foregroundStyle(selectedIDs.contains(game.persistentModelID) ? Color.accentColor : Color.secondary)
+                            coverThumb(game)
+                            Text(verbatim: game.displayName(for: language))
+                                .lineLimit(1)
+                            Spacer()
+                            if let score = game.libraryScore {
+                                Text(verbatim: String(format: "%.1f", score))
+                                    .font(.caption)
+                                    .monospacedDigit()
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .contentShape(Rectangle())
+                        .onTapGesture { toggle(game) }
+                    }
+                } else {
+                    ForEach(groups) { group in
+                        HStack(spacing: 8) {
+                            Image(systemName: selectedGroupID == group.persistentModelID ? "checkmark.square.fill" : "square")
+                                .foregroundStyle(selectedGroupID == group.persistentModelID ? Color.accentColor : Color.secondary)
+                            Image(systemName: "folder")
+                                .foregroundStyle(.secondary)
+                            Text(verbatim: group.name)
+                                .lineLimit(1)
+                            Spacer()
+                            Text(verbatim: "\(group.games.count)")
                                 .font(.caption)
                                 .monospacedDigit()
                                 .foregroundStyle(.secondary)
                         }
+                        .contentShape(Rectangle())
+                        .onTapGesture { toggleGroup(group) }
                     }
-                    .contentShape(Rectangle())
-                    .onTapGesture { toggle(game) }
                 }
             }
             .listStyle(.plain)
@@ -122,6 +182,16 @@ struct SharePanelView: View {
         }
     }
 
+    /// 分组单选：再勾其他分组会取消当前选择；选中时同步标题默认值为分组名。
+    private func toggleGroup(_ group: GameGroup) {
+        if selectedGroupID == group.persistentModelID {
+            selectedGroupID = nil
+        } else {
+            selectedGroupID = group.persistentModelID
+            groupTitle = group.name
+        }
+    }
+
     // MARK: - 预览列
 
     private var previewColumn: some View {
@@ -138,7 +208,7 @@ struct SharePanelView: View {
                     Image(systemName: "photo.on.rectangle.angled")
                         .font(.system(size: 48))
                 } description: {
-                    LText("share.noneSelected")
+                    LText(mode == .groups ? "share.noneSelectedGroup" : "share.noneSelected")
                 }
             }
         }
@@ -156,16 +226,12 @@ struct SharePanelView: View {
             .pickerStyle(.segmented)
             .frame(width: 260)
 
-            if isMulti {
-                TextField(L10n.tr("share.overviewTitle", lang: language), text: $overviewTitle)
-                    .textFieldStyle(.roundedBorder)
+            if mode == .groups {
+                BorderedTextField(text: groupTitleBinding, placeholder: L10n.tr("share.groupTitle", lang: language))
                     .frame(width: 220)
-                    .onChange(of: overviewTitle) { _, newValue in
-                        let max = UserCustomization.usernameMaxLength
-                        if Array(newValue).count > max {
-                            overviewTitle = String(Array(newValue).prefix(max))
-                        }
-                    }
+            } else if isMulti {
+                BorderedTextField(text: overviewTitleBinding, placeholder: L10n.tr("share.overviewTitle", lang: language))
+                    .frame(width: 220)
             }
 
             Spacer()
@@ -215,24 +281,38 @@ struct SharePanelView: View {
     }
 
     private func rerender() {
-        let games = selectedGames
-        guard !games.isEmpty else {
-            renderedPNG = nil
-            shareURL = nil
-            return
-        }
-        let content: ShareCardContent
-        if games.count == 1 {
-            content = .single(games[0], size: size)
+        if mode == .games {
+            let games = selectedGames
+            guard !games.isEmpty else {
+                clearPreview()
+                return
+            }
+            if games.count == 1 {
+                render(.single(games[0], size: size))
+            } else {
+                let title = overviewTitle.trimmingCharacters(in: .whitespaces).isEmpty
+                    ? defaultOverviewTitle()
+                    : overviewTitle
+                render(.overview(games, title: title, size: size))
+            }
         } else {
-            let title = overviewTitle.trimmingCharacters(in: .whitespaces).isEmpty
-                ? defaultOverviewTitle()
-                : overviewTitle
-            content = .overview(games, title: title, size: size)
+            guard let group = selectedGroup else {
+                clearPreview()
+                return
+            }
+            let title = groupTitle.trimmingCharacters(in: .whitespaces).isEmpty ? group.name : groupTitle
+            render(.group(group, title: title, size: size))
         }
+    }
+
+    private func clearPreview() {
+        renderedPNG = nil
+        shareURL = nil
+    }
+
+    private func render(_ content: ShareCardContent) {
         guard let data = ShareCardRenderer.renderPNG(content: content, language: language) else {
-            renderedPNG = nil
-            shareURL = nil
+            clearPreview()
             return
         }
         renderedPNG = data
@@ -245,7 +325,9 @@ struct SharePanelView: View {
         guard let data = renderedPNG else { return }
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.png]
-        panel.nameFieldStringValue = "GameLog-\(size.rawValue).png"
+        panel.nameFieldStringValue = mode == .groups
+            ? "GameLog-group-\(size.rawValue).png"
+            : "GameLog-\(size.rawValue).png"
         panel.canCreateDirectories = true
         if panel.runModal() == .OK, let url = panel.url {
             try? data.write(to: url)

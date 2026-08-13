@@ -19,6 +19,17 @@ struct PresetOrCustomPicker: View {
     @State private var isCustom = false
     @State private var customText = ""
 
+    /// 自定义输入绑定：同步写回存储值。用 Binding 替代 `.onChange`——`.onChange` 挂 TextField 在 macOS 会吞尾随空格。
+    private var customTextBinding: Binding<String> {
+        Binding(
+            get: { customText },
+            set: { newValue in
+                customText = newValue
+                value = newValue
+            }
+        )
+    }
+
     private var quickPresets: [String] { Array(presets.prefix(Self.quickCount)) }
 
     /// 收起时若当前选中项不在快捷区，补一项保证选中可见（编辑旧记录时菜单里仍能高亮当前平台）。
@@ -37,11 +48,7 @@ struct PresetOrCustomPicker: View {
         Group {
             if isCustom {
             VStack(alignment: .leading, spacing: 4) {
-                TextField(title, text: $customText)
-                    .textFieldStyle(.roundedBorder)
-                    .onChange(of: customText) { _, newValue in
-                        value = newValue
-                    }
+                BorderedTextField(text: customTextBinding, placeholder: title)
                 Button {
                     value = presets.first ?? ""
                     isCustom = false
@@ -153,6 +160,65 @@ struct BorderedTextEditor: View {
                 RoundedRectangle(cornerRadius: 6)
                     .stroke(Color(nsColor: .separatorColor))
             )
+    }
+}
+
+/// 单行输入框（NSTextField 封装）。
+/// 规避 macOS SwiftUI TextField 在父视图重渲染时丢失尾随空格的 bug（空格输入不显示、直到下一字符才出现）：
+/// 只在外部绑定值真正变化时才回写字段文本，用户输入过程中（绑定已同步、值相同）不重置字段。
+struct BorderedTextField: NSViewRepresentable {
+    @Binding var text: String
+    var placeholder: String = ""
+    var isEnabled: Bool = true
+    /// 回车提交回调（NSTextField 的 action，替代可能对 representable 失效的 `.onSubmit`）。
+    var onSubmit: (() -> Void)? = nil
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+
+    func makeNSView(context: Context) -> NSTextField {
+        let field = NSTextField(string: text)
+        field.placeholderString = placeholder
+        field.isBezeled = true
+        field.bezelStyle = .roundedBezel
+        field.usesSingleLineMode = true
+        field.isEnabled = isEnabled
+        if onSubmit != nil {
+            field.target = context.coordinator
+            field.action = #selector(Coordinator.commit(_:))
+        }
+        // 让字段在 Form 行/父级提案下横向撑满（与 SwiftUI TextField 行为一致）。
+        field.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        field.delegate = context.coordinator
+        return field
+    }
+
+    func updateNSView(_ nsView: NSTextField, context: Context) {
+        nsView.isEnabled = isEnabled
+        // 关键：仅外部值变化才回写，避免输入途中被重置。
+        if nsView.stringValue != text {
+            nsView.stringValue = text
+        }
+    }
+
+    final class Coordinator: NSObject, NSTextFieldDelegate {
+        var parent: BorderedTextField
+
+        init(_ parent: BorderedTextField) {
+            self.parent = parent
+        }
+
+        func controlTextDidChange(_ obj: Notification) {
+            guard let field = obj.object as? NSTextField else { return }
+            parent.text = field.stringValue
+        }
+
+        @objc func commit(_ sender: NSTextField) {
+            parent.text = sender.stringValue
+            parent.onSubmit?()
+        }
     }
 }
 
@@ -285,6 +351,8 @@ struct GameEditView: View {
 
     // 游戏信息
     @State private var name = ""
+    @State private var nameZh = ""
+    @State private var nameJa = ""
     @State private var aliases: [String] = []
     @State private var aliasInput = ""
     @State private var hasReleaseDate = false
@@ -297,8 +365,10 @@ struct GameEditView: View {
     // 首条通关记录（仅新建时）
     @State private var platform = Presets.platforms[0]
     @State private var completionDate = Date()
+    @State private var completionDateIsNone = false
     @State private var degree = Presets.degrees[0]
     @State private var playtimeText = ""
+    @State private var playtimeIsNone = false
     @State private var notes = ""
     @State private var sGameplay = 7.0
     @State private var sDesign = 7.0
@@ -314,16 +384,25 @@ struct GameEditView: View {
 
     @State private var isAutoMatching = false
     @State private var didFinishLoading = false
-    @State private var autoMatchTask: Task<Void, Never>?
+    /// 加载时的游戏名：自动匹配只在名字被用户改动后才触发（避免编辑打开时误匹配）。
+    @State private var nameAtLoad = ""
 
     private var isCreating: Bool { game == nil }
 
     var body: some View {
         Form {
             Section(L10n.tr("game.name", lang: language)) {
-                TextField(L10n.tr("game.name", lang: language), text: $name)
-                    .textFieldStyle(.roundedBorder)
-                    .onChange(of: name) { _, newValue in scheduleAutoMatch(newValue) }
+                LabeledContent(L10n.tr("game.nameEn", lang: language)) {
+                    BorderedTextField(text: $name, placeholder: L10n.tr("game.nameEn", lang: language))
+                        // 用 `.task(id:)` 而非 `.onChange`：输入框重渲染会丢尾随空格，NSTextField 封装已规避。
+                        .task(id: name) { await debouncedAutoMatch(name) }
+                }
+                LabeledContent(L10n.tr("game.nameZh", lang: language)) {
+                    BorderedTextField(text: $nameZh, placeholder: L10n.tr("game.nameZh", lang: language))
+                }
+                LabeledContent(L10n.tr("game.nameJa", lang: language)) {
+                    BorderedTextField(text: $nameJa, placeholder: L10n.tr("game.nameJa", lang: language))
+                }
 
                 // 别名
                 VStack(alignment: .leading, spacing: 6) {
@@ -352,8 +431,7 @@ struct GameEditView: View {
                             }
                         }
                     }
-                    TextField(L10n.tr("game.aliasPlaceholder", lang: language), text: $aliasInput)
-                        .textFieldStyle(.roundedBorder)
+                    BorderedTextField(text: $aliasInput, placeholder: L10n.tr("game.aliasPlaceholder", lang: language))
                         .onSubmit {
                             let trimmed = aliasInput.trimmingCharacters(in: .whitespaces)
                             if !trimmed.isEmpty && !aliases.contains(trimmed) {
@@ -426,8 +504,9 @@ struct GameEditView: View {
 
             // 评价
             Section(L10n.tr("game.reviewTitle", lang: language)) {
-                TextField(L10n.tr("game.reviewTitlePlaceholder", lang: language), text: $reviewTitle)
-                    .textFieldStyle(.roundedBorder)
+                LabeledContent(L10n.tr("game.reviewTitlePlaceholder", lang: language)) {
+                    BorderedTextField(text: $reviewTitle, placeholder: L10n.tr("game.reviewTitlePlaceholder", lang: language))
+                }
                 BorderedTextEditor(text: $reviewBody, minHeight: 140)
             }
 
@@ -441,14 +520,22 @@ struct GameEditView: View {
                         value: $platform
                     )
                     DateMenuPicker(title: L10n.tr("completion.date", lang: language), selection: $completionDate)
+                        .disabled(completionDateIsNone)
+                    Toggle(L10n.tr("completion.noDate", lang: language), isOn: $completionDateIsNone)
                     PresetOrCustomPicker(
                         title: L10n.tr("completion.degree", lang: language),
                         presets: Presets.degrees,
                         category: .degree,
                         value: $degree
                     )
-                    TextField(L10n.tr("completion.playtime", lang: language), text: $playtimeText)
-                        .textFieldStyle(.roundedBorder)
+                    LabeledContent(L10n.tr("completion.playtime", lang: language)) {
+                        BorderedTextField(
+                            text: $playtimeText,
+                            placeholder: L10n.tr("completion.playtime", lang: language),
+                            isEnabled: !playtimeIsNone
+                        )
+                    }
+                    Toggle(L10n.tr("completion.noPlaytime", lang: language), isOn: $playtimeIsNone)
                     BorderedTextEditor(text: $notes, minHeight: 80)
                 }
 
@@ -496,11 +583,15 @@ struct GameEditView: View {
     private func load() {
         guard let game else {
             // 新建：字段全部保持默认，直接标记已加载完成，之后输入名字即可触发自动匹配。
+            nameAtLoad = ""
             didFinishLoading = true
             return
         }
         name = game.name
+        nameAtLoad = game.name
         aliases = game.aliases
+        nameZh = game.nameZh ?? ""
+        nameJa = game.nameJa ?? ""
         hasReleaseDate = game.releaseDate != nil
         releaseDate = game.releaseDate ?? Date()
         coverData = game.coverData
@@ -524,21 +615,15 @@ struct GameEditView: View {
     // MARK: - 自动匹配封面
 
     /// 输入游戏名 → 防抖后自动匹配封面（仅当开关开、已配 key、且尚无封面时）。
-    private func scheduleAutoMatch(_ newValue: String) {
-        autoMatchTask?.cancel()
-        guard autoMatchCover, !steamGridDBKey.isEmpty, coverData == nil, didFinishLoading else { return }
+    /// 由 `.task(id: name)` 驱动：名字每次变化时取消重开、600ms 后匹配；名字未变（如编辑打开）不匹配。
+    private func debouncedAutoMatch(_ newValue: String) async {
+        guard newValue != nameAtLoad,
+              autoMatchCover, !steamGridDBKey.isEmpty, coverData == nil, didFinishLoading else { return }
         let term = newValue.trimmingCharacters(in: .whitespaces)
         // 名字过短（不足 2 字）不搜，避免输字过程中频繁命中。
         guard term.count >= 2 else { return }
-        let task = Task {
-            try? await Task.sleep(nanoseconds: 600_000_000)
-            guard !Task.isCancelled else { return }
-            await performAutoMatch(term: term)
-        }
-        autoMatchTask = task
-    }
-
-    private func performAutoMatch(term: String) async {
+        try? await Task.sleep(nanoseconds: 600_000_000)
+        guard !Task.isCancelled else { return }
         isAutoMatching = true
         defer { isAutoMatching = false }
         guard coverData == nil else { return }
@@ -560,12 +645,14 @@ struct GameEditView: View {
 
     private func save() {
         let trimmedName = name.trimmingCharacters(in: .whitespaces)
+        let nameZhTrimmed = nameZh.trimmingCharacters(in: .whitespaces)
+        let nameJaTrimmed = nameJa.trimmingCharacters(in: .whitespaces)
         guard !trimmedName.isEmpty else {
             validationError = L10n.tr("validation.nameRequired", lang: language)
             return
         }
         let playtimeTextTrimmed = playtimeText.trimmingCharacters(in: .whitespaces)
-        if !playtimeTextTrimmed.isEmpty {
+        if !playtimeIsNone && !playtimeTextTrimmed.isEmpty {
             guard let value = Double(playtimeTextTrimmed), value >= 0 else {
                 validationError = L10n.tr("validation.playtimeInvalid", lang: language)
                 return
@@ -580,6 +667,8 @@ struct GameEditView: View {
             }
             let newGame = Game(
                 name: trimmedName,
+                nameZh: nameZhTrimmed.isEmpty ? nil : nameZhTrimmed,
+                nameJa: nameJaTrimmed.isEmpty ? nil : nameJaTrimmed,
                 aliases: aliases,
                 releaseDate: hasReleaseDate ? releaseDate : nil,
                 coverData: coverData,
@@ -591,9 +680,9 @@ struct GameEditView: View {
 
             let completion = Completion(
                 platform: platform,
-                date: completionDate,
+                date: completionDateIsNone ? nil : completionDate,
                 degree: degree,
-                playtime: parsedPlaytime,
+                playtime: playtimeIsNone ? nil : parsedPlaytime,
                 notes: notes,
                 scoreGameplay: sGameplay,
                 scoreDesign: sDesign,
@@ -607,6 +696,8 @@ struct GameEditView: View {
         } else {
             guard let game else { return }
             game.name = trimmedName
+            game.nameZh = nameZhTrimmed.isEmpty ? nil : nameZhTrimmed
+            game.nameJa = nameJaTrimmed.isEmpty ? nil : nameJaTrimmed
             game.aliases = aliases
             game.releaseDate = hasReleaseDate ? releaseDate : nil
             game.coverData = coverData

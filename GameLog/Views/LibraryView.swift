@@ -53,7 +53,7 @@ struct LibraryView: View {
         }
         switch sortOption {
         case .name:
-            result.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+            result.sort { $0.displayName(for: language).localizedCaseInsensitiveCompare($1.displayName(for: language)) == .orderedAscending }
         case .releaseDate:
             result.sort { ($0.releaseDate ?? .distantPast) > ($1.releaseDate ?? .distantPast) }
         case .completionDate:
@@ -62,10 +62,100 @@ struct LibraryView: View {
         return result
     }
 
+    // MARK: - 分组视图（游戏 + 底部统计/评价）
+
+    /// 分组内容：游戏网格/列表在上，统计与评价区块在下；空分组也显示区块。
+    /// 统计始终反映整个分组，不受搜索/平台筛选影响。
+    private func groupContent(group: GameGroup) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 28) {
+                if visibleGames.isEmpty {
+                    ContentUnavailableView {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 48))
+                    } description: {
+                        LText("library.noResult")
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 40)
+                } else if useGridView {
+                    gameGrid(visibleGames)
+                } else {
+                    gameList(visibleGames)
+                }
+
+                Divider()
+                GroupStatsSection(group: group)
+                GroupReviewSection(group: group)
+            }
+            .padding()
+            .frame(maxWidth: 1500)
+            .frame(maxWidth: .infinity, alignment: .top)
+        }
+    }
+
+    /// 网格：自适应列，卡片可点击进详情、右键菜单。
+    @ViewBuilder
+    private func gameGrid(_ games: [Game]) -> some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150, maximum: 200), spacing: 16)], spacing: 16) {
+            ForEach(games) { game in
+                gameCard(game)
+            }
+        }
+    }
+
+    /// 列表（分组模式下用 LazyVStack 包进同一 ScrollView，避免嵌套 List）。
+    @ViewBuilder
+    private func gameList(_ games: [Game]) -> some View {
+        LazyVStack(spacing: 0) {
+            ForEach(games) { game in
+                gameRow(game)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func gameCard(_ game: Game) -> some View {
+        GameCardView(game: game)
+            .contentShape(Rectangle())
+            .onTapGesture { path.append(game) }
+            .contextMenu { cardMenu(for: game) }
+    }
+
+    @ViewBuilder
+    private func gameRow(_ game: Game) -> some View {
+        GameRowView(game: game)
+            .contentShape(Rectangle())
+            .onTapGesture { path.append(game) }
+            .contextMenu { cardMenu(for: game) }
+    }
+
+    @ViewBuilder
+    private func cardMenu(for game: Game) -> some View {
+        Button {
+            editingGame = game
+        } label: {
+            Label(L10n.tr("common.edit", lang: language), systemImage: "pencil")
+        }
+        Button {
+            groupPickerGame = game
+        } label: {
+            Label(L10n.tr("game.groups", lang: language), systemImage: "folder")
+        }
+        Divider()
+        Button(role: .destructive) {
+            pendingDeleteGame = game
+        } label: {
+            Label(L10n.tr("common.delete", lang: language), systemImage: "trash")
+        }
+    }
+
     var body: some View {
         NavigationStack(path: $path) {
             Group {
-                if games.isEmpty && groupFilter == nil {
+                if let group = groupFilter {
+                    groupContent(group: group)
+                } else if games.isEmpty {
                     ContentUnavailableView {
                         Image(systemName: "gamecontroller")
                             .font(.system(size: 48))
@@ -81,57 +171,13 @@ struct LibraryView: View {
                     }
                 } else if useGridView {
                     ScrollView {
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150, maximum: 200), spacing: 16)], spacing: 16) {
-                            ForEach(visibleGames) { game in
-                                GameCardView(game: game)
-                                    .contentShape(Rectangle())
-                                    .onTapGesture { path.append(game) }
-                                    .contextMenu {
-                                        Button {
-                                            editingGame = game
-                                        } label: {
-                                            Label(L10n.tr("common.edit", lang: language), systemImage: "pencil")
-                                        }
-                                        Button {
-                                            groupPickerGame = game
-                                        } label: {
-                                            Label(L10n.tr("game.groups", lang: language), systemImage: "folder")
-                                        }
-                                        Divider()
-                                        Button(role: .destructive) {
-                                            pendingDeleteGame = game
-                                        } label: {
-                                            Label(L10n.tr("common.delete", lang: language), systemImage: "trash")
-                                        }
-                                    }
-                            }
-                        }
-                        .padding()
+                        gameGrid(visibleGames)
+                            .padding()
                     }
                 } else {
                     List {
                         ForEach(visibleGames) { game in
-                            GameRowView(game: game)
-                                .contentShape(Rectangle())
-                                .onTapGesture { path.append(game) }
-                                .contextMenu {
-                                    Button {
-                                        editingGame = game
-                                    } label: {
-                                        Label(L10n.tr("common.edit", lang: language), systemImage: "pencil")
-                                    }
-                                    Button {
-                                        groupPickerGame = game
-                                    } label: {
-                                        Label(L10n.tr("game.groups", lang: language), systemImage: "folder")
-                                    }
-                                    Divider()
-                                    Button(role: .destructive) {
-                                        pendingDeleteGame = game
-                                    } label: {
-                                        Label(L10n.tr("common.delete", lang: language), systemImage: "trash")
-                                    }
-                                }
+                            gameRow(game)
                         }
                     }
                 }
@@ -263,7 +309,7 @@ struct LibraryView: View {
                 }
             } message: {
                 if let game = pendingDeleteGame {
-                    Text(verbatim: L10n.tr("delete.confirmGame", [game.name], lang: language))
+                    Text(verbatim: L10n.tr("delete.confirmGame", [game.displayName(for: language)], lang: language))
                 }
             }
         }

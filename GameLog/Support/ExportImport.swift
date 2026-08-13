@@ -16,10 +16,15 @@ struct BackupDTO: Codable {
 
 struct GroupDTO: Codable {
     var name: String
+    /// 分组评价。旧版备份缺字段 → nil，导入时保持现状。
+    var review: String?
 }
 
 struct GameDTO: Codable {
     var name: String
+    /// 多语言名（旧版备份缺字段 → nil）。
+    var nameZh: String?
+    var nameJa: String?
     var aliases: [String]
     var releaseDate: Date?
     var coverBase64: String?
@@ -31,7 +36,8 @@ struct GameDTO: Codable {
 
 struct CompletionDTO: Codable {
     var platform: String
-    var date: Date
+    /// 通关日期。nil = 无（None）。旧版备份有日期，照常兼容。
+    var date: Date?
     var degree: String
     var playtime: Double?
     var notes: String
@@ -53,10 +59,12 @@ enum BackupManager {
         let dto = BackupDTO(
             version: 1,
             exportedAt: .now,
-            groups: groups.map { GroupDTO(name: $0.name) },
+            groups: groups.map { GroupDTO(name: $0.name, review: $0.review) },
             games: games.map { game in
                 GameDTO(
                     name: game.name,
+                    nameZh: game.nameZh,
+                    nameJa: game.nameJa,
                     aliases: game.aliases,
                     releaseDate: game.releaseDate,
                     coverBase64: game.coverData?.base64EncodedString(),
@@ -107,6 +115,10 @@ enum BackupManager {
         var groupMap: [String: GameGroup] = [:]
         for groupDTO in dto.groups {
             let group = GameGroup(name: groupDTO.name)
+            // 旧版备份缺 review → 保持现状（默认空串）
+            if let review = groupDTO.review {
+                group.review = review
+            }
             context.insert(group)
             groupMap[groupDTO.name] = group
         }
@@ -114,6 +126,8 @@ enum BackupManager {
         for gameDTO in dto.games {
             let game = Game(
                 name: gameDTO.name,
+                nameZh: gameDTO.nameZh,
+                nameJa: gameDTO.nameJa,
                 aliases: gameDTO.aliases,
                 releaseDate: gameDTO.releaseDate,
                 coverData: gameDTO.coverBase64.flatMap { Data(base64Encoded: $0) },

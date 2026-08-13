@@ -136,8 +136,7 @@ struct RenameGroupSheet: View {
         VStack(spacing: 16) {
             LText("group.rename")
                 .font(.headline)
-            TextField(L10n.tr("group.name", lang: language), text: $name)
-                .textFieldStyle(.roundedBorder)
+            BorderedTextField(text: $name, placeholder: L10n.tr("group.name", lang: language))
                 .frame(width: 280)
             // 固定高度占位，避免错误出现时窗口跳动
             Text(verbatim: isDuplicate ? L10n.tr("group.nameExists", lang: language) : " ")

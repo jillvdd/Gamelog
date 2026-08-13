@@ -10,7 +10,10 @@ struct GameLogApp: App {
     private let container: ModelContainer = {
         let schema = Schema([Game.self, Completion.self, GameGroup.self])
         do {
-            return try ModelContainer(for: schema)
+            let container = try ModelContainer(for: schema)
+            // 启动即迁移平台旧名（Switch → Nintendo Switch），UI 展示前完成，幂等。
+            PlatformMigration.migrate(in: ModelContext(container))
+            return container
         } catch {
             fatalError("无法创建数据容器: \(error)")
         }

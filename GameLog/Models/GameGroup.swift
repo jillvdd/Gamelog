@@ -5,13 +5,16 @@ import SwiftData
 @Model
 final class GameGroup {
     var name: String
+    /// 分组评价（自由文字，可空）。
+    var review: String = ""
     var createdAt: Date
 
     /// 多对多（inverse 在 Game.groups 上声明）。
     var games: [Game]
 
-    init(name: String, createdAt: Date = .now) {
+    init(name: String, review: String = "", createdAt: Date = .now) {
         self.name = name
+        self.review = review
         self.createdAt = createdAt
         self.games = []
     }

@@ -6,7 +6,8 @@ import SwiftData
 @Model
 final class Completion {
     var platform: String
-    var date: Date
+    /// 通关日期。nil = 无（不记得/长线运营无固定通关，界面显示 None）。
+    var date: Date?
     var degree: String
     var playtime: Double?
     var notes: String
@@ -19,7 +20,7 @@ final class Completion {
     var createdAt: Date
     var game: Game?
 
-    init(platform: String, date: Date, degree: String, playtime: Double? = nil,
+    init(platform: String, date: Date?, degree: String, playtime: Double? = nil,
          notes: String = "", scoreGameplay: Double? = nil, scoreDesign: Double? = nil,
          scoreStory: Double? = nil, scoreArt: Double? = nil, scoreMusic: Double? = nil,
          scorePerformance: Double? = nil, createdAt: Date = .now) {
@@ -55,9 +56,9 @@ extension Completion {
         hasScores ? ScoreMath.recordAverage(scoreValues) : nil
     }
 
-    /// 界面展示用：均值取整到最近的 0.5。
+    /// 界面展示用：均值取整到最近的 0.1。
     var displayAverage: Double? {
-        recordAverage.map { ScoreMath.roundToHalf($0) }
+        recordAverage.map { ScoreMath.roundScore($0) }
     }
 
     /// 取指定维度的评分。

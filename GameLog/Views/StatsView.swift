@@ -1,10 +1,11 @@
 import SwiftUI
 import SwiftData
 
-/// 统计页：总通关数、库平均分、按平台分布。
+/// 统计页：总通关数、库平均分、按平台分布、榜单（平均分 + 六维排名）、整体排名入口。
 struct StatsView: View {
     @Query private var games: [Game]
     @Environment(\.appLanguageCode) private var language
+    @State private var showingOverall = false
 
     private var totalGames: Int { games.count }
 
@@ -15,7 +16,7 @@ struct StatsView: View {
             .flatMap(\.completions)
             .compactMap(\.recordAverage)
         guard !averages.isEmpty else { return nil }
-        return ScoreMath.roundToHalf(averages.reduce(0, +) / Double(averages.count))
+        return ScoreMath.roundScore(averages.reduce(0, +) / Double(averages.count))
     }
 
     private var platformCounts: [(platform: String, count: Int)] {
@@ -34,54 +35,110 @@ struct StatsView: View {
     }
 
     var body: some View {
-        GeometryReader { geo in
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    if games.isEmpty {
-                        ContentUnavailableView {
-                            Image(systemName: "chart.bar")
-                                .font(.system(size: 48))
-                        } description: {
-                            LText("stats.noData")
-                        }
-                    } else {
-                        HStack(spacing: 16) {
-                            statTile(
-                                value: "\(totalGames)",
-                                label: L10n.tr("stats.totalGames", lang: language),
-                                icon: "gamecontroller"
-                            )
-                            statTile(
-                                value: avgScore.map { String(format: "%.1f", $0) } ?? "—",
-                                label: L10n.tr("stats.avgScore", lang: language),
-                                icon: "star"
-                            )
-                        }
-
-                        if !platformCounts.isEmpty {
-                            VStack(alignment: .leading, spacing: 12) {
-                                LText("stats.byPlatform")
-                                    .font(.title3.bold())
-                                LazyVGrid(columns: platformColumns(for: geo.size.width), spacing: 8) {
-                                    ForEach(platformCounts, id: \.platform) { item in
-                                        platformBar(item)
-                                    }
-                                }
-                                .padding(14)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 10)
-                                        .fill(Color(nsColor: .controlBackgroundColor))
+        NavigationStack {
+            GeometryReader { geo in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 24) {
+                        if games.isEmpty {
+                            ContentUnavailableView {
+                                Image(systemName: "chart.bar")
+                                    .font(.system(size: 48))
+                            } description: {
+                                LText("stats.noData")
+                            }
+                        } else {
+                            HStack(spacing: 16) {
+                                statTile(
+                                    value: "\(totalGames)",
+                                    label: L10n.tr("stats.totalGames", lang: language),
+                                    icon: "gamecontroller"
+                                )
+                                statTile(
+                                    value: avgScore.map { String(format: "%.1f", $0) } ?? "—",
+                                    label: L10n.tr("stats.avgScore", lang: language),
+                                    icon: "star"
                                 )
                             }
+
+                            if !platformCounts.isEmpty {
+                                VStack(alignment: .leading, spacing: 12) {
+                                    LText("stats.byPlatform")
+                                        .font(.title3.bold())
+                                    LazyVGrid(columns: platformColumns(for: geo.size.width), spacing: 8) {
+                                        ForEach(platformCounts, id: \.platform) { item in
+                                            PlatformBarRow(
+                                                platform: item.platform,
+                                                count: item.count,
+                                                maxCount: maxPlatformCount,
+                                                language: language
+                                            )
+                                        }
+                                    }
+                                    .padding(14)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 10)
+                                            .fill(Color(nsColor: .controlBackgroundColor))
+                                    )
+                                }
+                            }
+
+                            rankingsSection(width: geo.size.width)
                         }
                     }
+                    .padding(28)
+                    .frame(maxWidth: 1500)
+                    .frame(maxWidth: .infinity, alignment: .top)
                 }
-                .padding(28)
-                .frame(maxWidth: 1500)
-                .frame(maxWidth: .infinity, alignment: .top)
             }
+            .navigationTitle(L10n.tr("library.stats", lang: language))
+            .navigationDestination(for: Game.self) { GameDetailView(game: $0) }
+            .navigationDestination(isPresented: $showingOverall) { OverallRankingView() }
         }
-        .navigationTitle(L10n.tr("library.stats", lang: language))
+    }
+
+    /// 榜单区：平均分榜（整行前 10）+ 六维榜（2 列 × 3 行，各前 5）+ 整体排名入口。
+    private func rankingsSection(width: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            LText("stats.rankings")
+                .font(.title3.bold())
+
+            RankingBoard(
+                title: L10n.tr("group.avgScore", lang: language),
+                entries: Rankings.byAverage(games: games, platform: nil),
+                limit: 10
+            )
+
+            LazyVGrid(columns: rankingColumns(for: width), spacing: 12) {
+                ForEach(Dimension.allCases) { dimension in
+                    RankingBoard(
+                        title: L10n.tr(dimension.labelKey, lang: language),
+                        entries: Rankings.byDimension(dimension, games: games, platform: nil),
+                        limit: 5
+                    )
+                }
+            }
+
+            Button {
+                showingOverall = true
+            } label: {
+                Label(L10n.tr("stats.overallRanking", lang: language), systemImage: "arrow.up.right")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(14)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(Color(nsColor: .controlBackgroundColor))
+                    )
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    /// 榜单列数：宽窗口两列，窄窗口单列。
+    private func rankingColumns(for width: CGFloat) -> [GridItem] {
+        if width >= 900 {
+            return [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
+        }
+        return [GridItem(.flexible(), spacing: 12)]
     }
 
     /// 平台分布列数：宽窗口两列，窄窗口单列。
@@ -90,28 +147,6 @@ struct StatsView: View {
             return [GridItem(.flexible(), spacing: 24), GridItem(.flexible(), spacing: 24)]
         }
         return [GridItem(.flexible(), spacing: 8)]
-    }
-
-    /// 单行平台条形。
-    private func platformBar(_ item: (platform: String, count: Int)) -> some View {
-        HStack(spacing: 12) {
-            Text(verbatim: Presets.display(item.platform, category: .platform, language: language))
-                .frame(width: 160, alignment: .leading)
-                .lineLimit(1)
-            GeometryReader { proxy in
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(Color.accentColor.opacity(0.15))
-                    Capsule()
-                        .fill(Color.accentColor)
-                        .frame(width: proxy.size.width * CGFloat(item.count) / CGFloat(maxPlatformCount))
-                }
-            }
-            .frame(height: 10)
-            Text(verbatim: "\(item.count)")
-                .monospacedDigit()
-                .frame(width: 32, alignment: .trailing)
-        }
     }
 
     private func statTile(value: String, label: String, icon: String) -> some View {

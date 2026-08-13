@@ -11,8 +11,10 @@ struct CompletionEditView: View {
 
     @State private var platform = Presets.platforms[0]
     @State private var date = Date()
+    @State private var dateIsNone = false
     @State private var degree = Presets.degrees[0]
     @State private var playtimeText = ""
+    @State private var playtimeIsNone = false
     @State private var notes = ""
     @State private var skipScores = false
     @State private var sGameplay = 7.0
@@ -43,14 +45,22 @@ struct CompletionEditView: View {
                     value: $platform
                 )
                 DateMenuPicker(title: L10n.tr("completion.date", lang: language), selection: $date)
+                    .disabled(dateIsNone)
+                Toggle(L10n.tr("completion.noDate", lang: language), isOn: $dateIsNone)
                 PresetOrCustomPicker(
                     title: L10n.tr("completion.degree", lang: language),
                     presets: Presets.degrees,
                     category: .degree,
                     value: $degree
                 )
-                TextField(L10n.tr("completion.playtime", lang: language), text: $playtimeText)
-                    .textFieldStyle(.roundedBorder)
+                LabeledContent(L10n.tr("completion.playtime", lang: language)) {
+                    BorderedTextField(
+                        text: $playtimeText,
+                        placeholder: L10n.tr("completion.playtime", lang: language),
+                        isEnabled: !playtimeIsNone
+                    )
+                }
+                Toggle(L10n.tr("completion.noPlaytime", lang: language), isOn: $playtimeIsNone)
                 BorderedTextEditor(text: $notes, minHeight: 80)
             }
 
@@ -94,9 +104,11 @@ struct CompletionEditView: View {
     private func load() {
         guard let completion else { return }
         platform = completion.platform
-        date = completion.date
+        date = completion.date ?? Date()
+        dateIsNone = completion.date == nil
         degree = completion.degree
         playtimeText = completion.playtime.map { String($0) } ?? ""
+        playtimeIsNone = completion.playtime == nil
         notes = completion.notes
         skipScores = !completion.hasScores
         if let v = completion.scoreGameplay { sGameplay = v }
@@ -115,7 +127,7 @@ struct CompletionEditView: View {
 
     private func save() {
         let t = playtimeText.trimmingCharacters(in: .whitespaces)
-        if !t.isEmpty {
+        if !playtimeIsNone && !t.isEmpty {
             guard let value = Double(t), value >= 0 else {
                 validationError = L10n.tr("validation.playtimeInvalid", lang: language)
                 return
@@ -125,9 +137,9 @@ struct CompletionEditView: View {
 
         if let completion {
             completion.platform = platform
-            completion.date = date
+            completion.date = dateIsNone ? nil : date
             completion.degree = degree
-            completion.playtime = parsedPlaytime
+            completion.playtime = playtimeIsNone ? nil : parsedPlaytime
             completion.notes = notes
             if effectiveSkip {
                 completion.scoreGameplay = nil
@@ -147,9 +159,9 @@ struct CompletionEditView: View {
         } else {
             let newCompletion = Completion(
                 platform: platform,
-                date: date,
+                date: dateIsNone ? nil : date,
                 degree: degree,
-                playtime: parsedPlaytime,
+                playtime: playtimeIsNone ? nil : parsedPlaytime,
                 notes: notes,
                 scoreGameplay: effectiveSkip ? nil : sGameplay,
                 scoreDesign: effectiveSkip ? nil : sDesign,

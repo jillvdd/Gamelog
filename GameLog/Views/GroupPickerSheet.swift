@@ -12,7 +12,7 @@ struct GroupPickerSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text(verbatim: game.name)
+            Text(verbatim: game.displayName(for: language))
                 .font(.headline)
 
             LText("game.groups")

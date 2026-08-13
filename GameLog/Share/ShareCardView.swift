@@ -20,6 +20,7 @@ enum ShareSize: String, CaseIterable, Identifiable {
 enum ShareCardContent {
     case single(Game, size: ShareSize)
     case overview([Game], title: String, size: ShareSize)
+    case group(GameGroup, title: String, size: ShareSize)
 
     var canvasSize: CGSize {
         switch self {
@@ -27,6 +28,12 @@ enum ShareCardContent {
             size.pixels
         case .overview(let games, _, let size):
             ShareCardLayout.overviewSize(gameCount: games.count, size: size)
+        case .group(let group, _, let size):
+            ShareCardLayout.groupSize(
+                gameCount: group.games.count,
+                platformCount: Set(group.games.flatMap { $0.completions.map(\.platform) }.filter { !$0.isEmpty }).count,
+                size: size
+            )
         }
     }
 }
@@ -54,6 +61,44 @@ enum ShareCardLayout {
         let columns = size == .phone ? 2 : 4
         let cellWidth = (size.pixels.width - CGFloat(columns + 1) * gap) / CGFloat(columns)
         return CGSize(width: cellWidth, height: cellWidth * 4 / 3 + cellCaptionHeight)
+    }
+
+    // MARK: 分组分享卡布局（竖版 3 列 / 横版 5 列，超出按内容拉高画布）
+
+    static let groupColumnsPhone: Int = 3
+    static let groupColumnsDesktop: Int = 5
+
+    static func groupTileWidth(size: ShareSize) -> CGFloat {
+        if size == .phone {
+            return (size.pixels.width - 2 * 72 - CGFloat(groupColumnsPhone - 1) * 24) / CGFloat(groupColumnsPhone)
+        }
+        return 160
+    }
+
+    /// 封面格高度：4:3 封面 + 名称行。
+    static func groupCellHeight(size: ShareSize) -> CGFloat {
+        groupTileWidth(size: size) * 4 / 3 + 40
+    }
+
+    static func groupRows(gameCount: Int, size: ShareSize) -> Int {
+        let columns = size == .phone ? groupColumnsPhone : groupColumnsDesktop
+        return Int(ceil(Double(max(gameCount, 1)) / Double(columns)))
+    }
+
+    /// 分组卡画布：宽固定，高 = max(标准高, 内容高)，游戏/平台多时拉长（同总览）。
+    static func groupSize(gameCount: Int, platformCount: Int, size: ShareSize) -> CGSize {
+        let rows = gameCount == 0 ? 0 : groupRows(gameCount: gameCount, size: size)
+        let rowGap: CGFloat = size == .phone ? 24 : 20
+        let gamesHeight: CGFloat = rows == 0
+            ? 0
+            : CGFloat(rows) * groupCellHeight(size: size) + CGFloat(rows - 1) * rowGap
+        let platformHeight: CGFloat = platformCount == 0
+            ? 0
+            : CGFloat(platformCount) * (size == .phone ? 36 : 30) + CGFloat(max(platformCount - 1, 0)) * 20
+        // 固定部分：顶/标题/统计块/平台标签/水印等（游戏区顶部间距并入 gamesHeight）
+        let fixed: CGFloat = size == .phone ? 660 : 420
+        let contentHeight = fixed + platformHeight + gamesHeight
+        return CGSize(width: size.pixels.width, height: max(size.pixels.height, contentHeight))
     }
 }
 
@@ -149,6 +194,7 @@ private struct CoverImage: View {
     let theme: ShareTheme
     /// .fit：完整显示封面（居中、四边可能留白）；.fill：铺满容器（可能裁切）。
     var mode: ContentMode = .fill
+    @Environment(\.appLanguageCode) private var language
 
     var body: some View {
         Group {
@@ -162,7 +208,7 @@ private struct CoverImage: View {
                     VStack(spacing: 12) {
                         Image(systemName: "gamecontroller")
                             .font(.system(size: 60))
-                        Text(verbatim: game.name)
+                        Text(verbatim: game.displayName(for: language))
                             .font(.system(size: 28, weight: .medium))
                             .multilineTextAlignment(.center)
                             .lineLimit(3)
@@ -191,6 +237,8 @@ struct ShareCardView: View {
             }
         case .overview(let games, let title, let size):
             OverviewCard(games: games, title: title, size: size, theme: theme)
+        case .group(let group, let title, let size):
+            GroupShareCard(group: group, title: title, size: size, theme: theme)
         }
     }
 }
@@ -216,14 +264,14 @@ private struct SingleCardVertical: View {
             // 内容条：贴卡底，半透明渐变遮罩铺满整条（标题区也有明显遮罩），封面完整透出。
             ZStack(alignment: .bottom) {
                 LinearGradient(
-                    colors: [.black.opacity(0.45), Color.black.opacity(0.85)],
+                    colors: [.black.opacity(0.45), Color.black.opacity(0.80), Color.black.opacity(0.95)],
                     startPoint: .top,
                     endPoint: .bottom
                 )
-                .frame(height: 800)
+                .frame(height: 812)
 
                 VStack(alignment: .leading, spacing: 0) {
-                    Text(verbatim: game.name)
+                    Text(verbatim: game.displayName(for: language))
                         .font(.system(size: 78, weight: .bold))
                         .foregroundStyle(contentText)
                         .lineLimit(2)
@@ -238,8 +286,8 @@ private struct SingleCardVertical: View {
                             .padding(.top, 20)
                     }
 
-                    if let latest = game.sortedCompletions.last {
-                        Text(verbatim: ShareDateFormat.string(from: latest.date, language: language))
+                    if let latest = game.sortedCompletions.last, let date = latest.date {
+                        Text(verbatim: ShareDateFormat.string(from: date, language: language))
                             .font(.system(size: 30))
                             .foregroundStyle(contentSecondary)
                             .padding(.top, 12)
@@ -294,11 +342,11 @@ private struct SingleCardVertical: View {
                     BrandWatermark(theme: theme, fontSize: 28, tint: contentSecondary)
                 }
                 .padding(.horizontal, 72)
-                .padding(.top, 24)
+                .padding(.top, 36)
                 .padding(.bottom, 56)
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .frame(height: 800)
+            .frame(height: 812)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
 
             // 右上角分数胶囊。
@@ -356,7 +404,7 @@ private struct SingleCardHorizontal: View {
 
             VStack(alignment: .leading, spacing: 0) {
                 Spacer(minLength: 40)
-                Text(verbatim: game.name)
+                Text(verbatim: game.displayName(for: language))
                     .font(.system(size: 76, weight: .bold))
                     .foregroundStyle(theme.text)
                     .lineLimit(2)
@@ -371,8 +419,8 @@ private struct SingleCardHorizontal: View {
                         .padding(.top, 18)
                 }
 
-                if let latest = game.sortedCompletions.last {
-                    Text(verbatim: ShareDateFormat.string(from: latest.date, language: language))
+                if let latest = game.sortedCompletions.last, let date = latest.date {
+                    Text(verbatim: ShareDateFormat.string(from: date, language: language))
                         .font(.system(size: 27))
                         .foregroundStyle(theme.secondary)
                         .padding(.top, 10)
@@ -444,6 +492,313 @@ private struct SingleCardHorizontal: View {
         return Dictionary(uniqueKeysWithValues: Dimension.allCases.compactMap { dimension in
             c.score(for: dimension).map { (dimension, $0) }
         })
+    }
+}
+
+// MARK: - 分组分享卡（分组名 + 统计 + 平台分布，不含评价）
+
+private struct GroupShareCard: View {
+    let group: GameGroup
+    let title: String
+    let size: ShareSize
+    let theme: ShareTheme
+    @Environment(\.appLanguageCode) private var language
+
+    /// 组内游戏按名称排序（展示稳定）。
+    private var games: [Game] {
+        group.games.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    /// 平均分：组内各游戏库显示分的均值（按游戏聚合），无已评分则 nil。
+    private var averageScore: Double? {
+        let scores = games.compactMap(\.libraryScore)
+        guard !scores.isEmpty else { return nil }
+        return ScoreMath.roundScore(scores.reduce(0, +) / Double(scores.count))
+    }
+
+    private var completionCount: Int {
+        games.flatMap(\.completions).count
+    }
+
+    /// 平台分布：组内所有通关记录按平台计数（与统计页同口径）。
+    private var platformCounts: [(platform: String, count: Int)] {
+        var counts: [String: Int] = [:]
+        for game in games {
+            for completion in game.completions where !completion.platform.isEmpty {
+                counts[completion.platform, default: 0] += 1
+            }
+        }
+        return counts.sorted { $0.value > $1.value }
+            .map { (platform: $0.key, count: $0.value) }
+    }
+
+    private var maxPlatformCount: Int { platformCounts.map(\.count).max() ?? 1 }
+
+    var body: some View {
+        let canvas = ShareCardLayout.groupSize(gameCount: games.count, platformCount: platformCounts.count, size: size)
+        return Group {
+            if size == .phone {
+                vertical
+            } else {
+                horizontal
+            }
+        }
+        .frame(width: canvas.width, height: canvas.height)
+        .background(theme.background)
+    }
+
+    // MARK: 竖版 9:16
+
+    private var vertical: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(verbatim: title)
+                .font(.system(size: 84, weight: .bold))
+                .foregroundStyle(theme.text)
+                .lineLimit(2)
+
+            HStack(spacing: 24) {
+                ShareStatTile(label: L10n.tr("group.avgScore", lang: language),
+                              value: averageScore.map { String(format: "%.1f", $0) } ?? "—",
+                              theme: theme)
+                ShareStatTile(label: L10n.tr("group.gameCount", lang: language),
+                              value: "\(games.count)",
+                              theme: theme)
+                ShareStatTile(label: L10n.tr("group.completionCount", lang: language),
+                              value: "\(completionCount)",
+                              theme: theme)
+            }
+            .padding(.top, 40)
+
+            if !platformCounts.isEmpty {
+                Text(verbatim: L10n.tr("stats.byPlatform", lang: language))
+                    .font(.system(size: 40, weight: .medium))
+                    .foregroundStyle(theme.secondary)
+                    .padding(.top, 48)
+
+                VStack(spacing: 20) {
+                    ForEach(platformCounts, id: \.platform) { item in
+                        SharePlatformBarRow(platform: item.platform, count: item.count,
+                                            maxCount: maxPlatformCount, language: language, theme: theme)
+                    }
+                }
+                .padding(.top, 20)
+            }
+
+            if !games.isEmpty {
+                verticalGames
+                    .padding(.top, 48)
+            }
+
+            Spacer(minLength: 20)
+            BrandWatermark(theme: theme, fontSize: 30)
+                .padding(.bottom, 96)
+        }
+        .padding(.top, 56)
+        .padding(.horizontal, 72)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    /// 竖版游戏封面格：一行 3 个，全部显示（画布按内容拉高）。
+    private var verticalGames: some View {
+        let cols = ShareCardLayout.groupColumnsPhone
+        let rows = ShareCardLayout.groupRows(gameCount: games.count, size: .phone)
+        let tile = ShareCardLayout.groupTileWidth(size: .phone)
+        return VStack(spacing: 24) {
+            ForEach(0..<rows, id: \.self) { row in
+                HStack(spacing: 24) {
+                    ForEach(0..<cols, id: \.self) { col in
+                        let index = row * cols + col
+                        if index < games.count {
+                            GroupGameTile(game: games[index], tileSize: tile, theme: theme)
+                        } else {
+                            Color.clear
+                                .frame(width: tile, height: tile * 4 / 3 + 40)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// 横版游戏封面格：一行 5 个，全部显示（画布按内容拉高）。
+    private var horizontalGames: some View {
+        let cols = ShareCardLayout.groupColumnsDesktop
+        let rows = ShareCardLayout.groupRows(gameCount: games.count, size: .desktop)
+        let tile = ShareCardLayout.groupTileWidth(size: .desktop)
+        return VStack(spacing: 20) {
+            ForEach(0..<rows, id: \.self) { row in
+                HStack(spacing: 16) {
+                    ForEach(0..<cols, id: \.self) { col in
+                        let index = row * cols + col
+                        if index < games.count {
+                            GroupGameTile(game: games[index], tileSize: tile, theme: theme, nameSize: 24)
+                        } else {
+                            Color.clear
+                                .frame(width: tile, height: tile * 4 / 3 + 40)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: 横版 16:9
+
+    private var horizontal: some View {
+        HStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 0) {
+                Text(verbatim: title)
+                    .font(.system(size: 68, weight: .bold))
+                    .foregroundStyle(theme.text)
+                    .lineLimit(2)
+
+                HStack(spacing: 20) {
+                    ShareStatTile(label: L10n.tr("group.avgScore", lang: language),
+                                  value: averageScore.map { String(format: "%.1f", $0) } ?? "—",
+                                  theme: theme, labelSize: 22, valueSize: 44, padding: 20)
+                    ShareStatTile(label: L10n.tr("group.gameCount", lang: language),
+                                  value: "\(games.count)",
+                                  theme: theme, labelSize: 22, valueSize: 44, padding: 20)
+                    ShareStatTile(label: L10n.tr("group.completionCount", lang: language),
+                                  value: "\(completionCount)",
+                                  theme: theme, labelSize: 22, valueSize: 44, padding: 20)
+                }
+                .padding(.top, 28)
+
+                if !games.isEmpty {
+                    horizontalGames
+                        .padding(.top, 32)
+                }
+
+                Spacer()
+                BrandWatermark(theme: theme, fontSize: 26)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.leading, 64)
+            .padding(.trailing, 40)
+            .padding(.top, 48)
+            .padding(.bottom, 96)
+
+            if !platformCounts.isEmpty {
+                VStack(alignment: .leading, spacing: 0) {
+                    Spacer()
+                    Text(verbatim: L10n.tr("stats.byPlatform", lang: language))
+                        .font(.system(size: 34, weight: .medium))
+                        .foregroundStyle(theme.secondary)
+                    VStack(spacing: 16) {
+                        ForEach(platformCounts, id: \.platform) { item in
+                            SharePlatformBarRow(platform: item.platform, count: item.count,
+                                                maxCount: maxPlatformCount, language: language, theme: theme,
+                                                labelWidth: 200, fontSize: 26, barHeight: 12)
+                        }
+                    }
+                    .padding(.top, 22)
+                    Spacer()
+                }
+                .frame(width: 780)
+                .padding(.trailing, 64)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+}
+
+/// 分组分享卡里的单个游戏封面格（封面 + 名称）。
+private struct GroupGameTile: View {
+    let game: Game
+    let tileSize: CGFloat
+    let theme: ShareTheme
+    var nameSize: CGFloat = 26
+    @Environment(\.appLanguageCode) private var language
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Group {
+                if let image = game.coverImage {
+                    Image(nsImage: image)
+                        .resizable()
+                        .scaledToFit()
+                } else {
+                    ZStack {
+                        Rectangle().fill(theme.card)
+                        Image(systemName: "gamecontroller")
+                            .foregroundStyle(theme.secondary)
+                    }
+                }
+            }
+            .frame(width: tileSize, height: tileSize * 4 / 3)
+            .background(theme.card)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+
+            Text(verbatim: game.displayName(for: language))
+                .font(.system(size: nameSize, weight: .medium))
+                .foregroundStyle(theme.text)
+                .lineLimit(1)
+        }
+        .frame(width: tileSize)
+    }
+}
+
+/// 分享卡统计小方块（平均分 / 游戏数 / 通关数）。
+private struct ShareStatTile: View {
+    let label: String
+    let value: String
+    let theme: ShareTheme
+    var labelSize: CGFloat = 28
+    var valueSize: CGFloat = 64
+    var padding: CGFloat = 28
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(verbatim: label)
+                .font(.system(size: labelSize, weight: .medium))
+                .foregroundStyle(theme.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            Text(verbatim: value)
+                .font(.system(size: valueSize, weight: .bold))
+                .monospacedDigit()
+                .foregroundStyle(theme.text)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(padding)
+        .background(RoundedRectangle(cornerRadius: 20).fill(theme.card))
+    }
+}
+
+/// 分享卡平台条（主题色，非系统 accent）。
+private struct SharePlatformBarRow: View {
+    let platform: String
+    let count: Int
+    let maxCount: Int
+    let language: String
+    let theme: ShareTheme
+    var labelWidth: CGFloat = 220
+    var fontSize: CGFloat = 30
+    var barHeight: CGFloat = 14
+
+    var body: some View {
+        HStack(spacing: 16) {
+            Text(verbatim: Presets.display(platform, category: .platform, language: language))
+                .font(.system(size: fontSize, weight: .medium))
+                .foregroundStyle(theme.secondary)
+                .frame(width: labelWidth, alignment: .leading)
+                .lineLimit(1)
+            GeometryReader { proxy in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(theme.card)
+                    Capsule()
+                        .fill(theme.accent)
+                        .frame(width: proxy.size.width * CGFloat(count) / CGFloat(maxCount))
+                }
+            }
+            .frame(height: barHeight)
+            Text(verbatim: "\(count)")
+                .font(.system(size: fontSize, weight: .semibold))
+                .monospacedDigit()
+                .foregroundStyle(theme.text)
+                .frame(width: 48, alignment: .trailing)
+        }
     }
 }
 
@@ -537,7 +892,7 @@ private struct OverviewCell: View {
             .background(theme.card)
             .clipShape(RoundedRectangle(cornerRadius: 12))
 
-            Text(verbatim: game.name)
+            Text(verbatim: game.displayName(for: language))
                 .font(.system(size: 24, weight: .semibold))
                 .foregroundStyle(theme.text)
                 .lineLimit(1)
@@ -557,8 +912,8 @@ private struct OverviewCell: View {
                 }
             }
 
-            if let latest = game.sortedCompletions.last {
-                Text(verbatim: ShareDateFormat.string(from: latest.date, language: language))
+            if let latest = game.sortedCompletions.last, let date = latest.date {
+                Text(verbatim: ShareDateFormat.string(from: date, language: language))
                     .font(.system(size: 17))
                     .foregroundStyle(theme.secondary)
                     .lineLimit(1)

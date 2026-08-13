@@ -15,6 +15,14 @@ struct SettingsView: View {
     @AppStorage(UserCustomization.iconFileKey) private var iconFile = ""
     @AppStorage(UserCustomization.autoMatchCoverKey) private var autoMatchCover = false
 
+    /// 用户名绑定：写入时截断到上限。用 Binding 替代 `.onChange`——`.onChange` 挂 TextField 在 macOS 会吞尾随空格。
+    private var usernameBinding: Binding<String> {
+        Binding(
+            get: { username },
+            set: { username = String(Array($0).prefix(UserCustomization.usernameMaxLength)) }
+        )
+    }
+
     @Query(sort: \Game.createdAt) private var games: [Game]
     @Query(sort: \GameGroup.name) private var groups: [GameGroup]
 
@@ -34,14 +42,13 @@ struct SettingsView: View {
             }
 
             Section(L10n.tr("settings.customization", lang: language)) {
-                TextField(L10n.tr("settings.username", lang: language), text: $username)
+                LabeledContent(L10n.tr("settings.username", lang: language)) {
+                    BorderedTextField(
+                        text: usernameBinding,
+                        placeholder: L10n.tr("settings.username", lang: language)
+                    )
+                }
                     .textFieldStyle(.roundedBorder)
-                    .onChange(of: username) { _, newValue in
-                        let max = UserCustomization.usernameMaxLength
-                        if Array(newValue).count > max {
-                            username = String(Array(newValue).prefix(max))
-                        }
-                    }
 
                 LabeledContent(L10n.tr("settings.avatar", lang: language)) {
                     HStack {

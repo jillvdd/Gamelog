@@ -11,8 +11,10 @@ struct CompletionCardView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
-                Text(verbatim: completion.date.formatted(date: .abbreviated, time: .omitted))
-                    .font(.system(size: 12, weight: .semibold))
+                if let date = completion.date {
+                    Text(verbatim: date.formatted(date: .abbreviated, time: .omitted))
+                        .font(.system(size: 12, weight: .semibold))
+                }
                 if !completion.platform.isEmpty {
                     chip(Presets.display(completion.platform, category: .platform, language: language))
                 }
@@ -138,6 +140,35 @@ private extension Dimension {
     }
 }
 
+/// 详情页名字下方的其他语言名小字：不带语言标记、上下并排，只显示设置了的，且去掉与主名重复的。
+private struct LocalizedNamesSubtitle: View {
+    let game: Game
+    let currentLanguage: String
+
+    private var names: [String] {
+        let others: [String]
+        switch currentLanguage {
+        case "zh-Hans": others = [game.name, game.nameJa].compactMap { $0 }
+        case "ja": others = [game.nameZh, game.name].compactMap { $0 }
+        default: others = [game.nameZh, game.nameJa].compactMap { $0 }
+        }
+        let display = game.displayName(for: currentLanguage)
+        return others.filter { $0 != display }
+    }
+
+    var body: some View {
+        if !names.isEmpty {
+            VStack(alignment: .leading, spacing: 2) {
+                ForEach(names, id: \.self) { name in
+                    Text(verbatim: name)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+}
+
 /// 游戏详情页：信息 + 评价 + 通关记录列表。
 struct GameDetailView: View {
     @Environment(\.modelContext) private var context
@@ -182,7 +213,7 @@ struct GameDetailView: View {
                 .frame(maxWidth: .infinity, alignment: .top)
             }
         }
-        .navigationTitle(game.name)
+        .navigationTitle(game.displayName(for: language))
         .toolbar {
             ToolbarItemGroup {
                 Button {
@@ -239,7 +270,7 @@ struct GameDetailView: View {
                 dismiss()
             }
         } message: {
-            Text(verbatim: L10n.tr("delete.confirmGame", [game.name], lang: language))
+            Text(verbatim: L10n.tr("delete.confirmGame", [game.displayName(for: language)], lang: language))
         }
     }
 
@@ -267,8 +298,9 @@ struct GameDetailView: View {
             .shadow(color: .black.opacity(0.15), radius: 6, y: 2)
 
             VStack(alignment: .leading, spacing: 10) {
-                Text(verbatim: game.name)
+                Text(verbatim: game.displayName(for: language))
                     .font(.system(size: 26, weight: .bold))
+                LocalizedNamesSubtitle(game: game, currentLanguage: language)
 
                 if let date = game.releaseDate {
                     Text(verbatim: date.formatted(date: .long, time: .omitted))

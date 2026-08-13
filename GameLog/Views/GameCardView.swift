@@ -45,10 +45,10 @@ struct GameCardView: View {
         return shown
     }
 
-    /// 最近一次通关日期，单独一行。
+    /// 最近一次通关日期，单独一行；无日期返回空串（不显示）。
     private var dateText: String {
-        guard let latest = game.sortedCompletions.last else { return "" }
-        return latest.date.formatted(date: .abbreviated, time: .omitted)
+        guard let latest = game.sortedCompletions.last, let date = latest.date else { return "" }
+        return date.formatted(date: .abbreviated, time: .omitted)
     }
 
     var body: some View {
@@ -65,7 +65,7 @@ struct GameCardView: View {
                         .padding(6)
                 }
             }
-            Text(verbatim: game.name)
+            Text(verbatim: game.displayName(for: language))
                 .font(.system(size: 12, weight: .medium))
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)
@@ -118,7 +118,7 @@ struct GameRowView: View {
             .clipShape(RoundedRectangle(cornerRadius: 6))
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(verbatim: game.name)
+                Text(verbatim: game.displayName(for: language))
                     .font(.system(size: 13, weight: .medium))
                 if !subtitle.isEmpty {
                     Text(verbatim: subtitle)
@@ -160,8 +160,7 @@ struct NewGroupSheet: View {
         VStack(spacing: 16) {
             LText("group.newGroup")
                 .font(.headline)
-            TextField(L10n.tr("group.name", lang: language), text: $name)
-                .textFieldStyle(.roundedBorder)
+            BorderedTextField(text: $name, placeholder: L10n.tr("group.name", lang: language))
                 .frame(width: 280)
             // 固定高度占位，避免错误出现时窗口跳动
             Text(verbatim: isDuplicate ? L10n.tr("group.nameExists", lang: language) : " ")

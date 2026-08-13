@@ -11,11 +11,11 @@ enum PresetCategory {
 /// 自定义值原样返回。这样筛选/统计按 canonical 分组，切换语言不会产生混杂数据。
 enum Presets {
     /// 主机预设，按游戏机世代倒序（Gen9 → FC/NES → 其他）。
-    /// 存储即 canonical，展示层按语言翻译；语言中性的条目（PC、Switch、FC/NES 等）三语原样显示。
+    /// 存储即 canonical，展示层按语言翻译；语言中性的条目（PC、Nintendo Switch、FC/NES 等）三语原样显示。
     static let platforms = [
-        "Xbox Series X|S", "Switch 2", "PS5",
+        "Xbox Series X|S", "Nintendo Switch 2", "PS5",
         "PC", "iOS",
-        "Xbox One", "Wii U", "Switch", "PS4",
+        "Xbox One", "Wii U", "Nintendo Switch", "PS4",
         "3DS", "PS Vita",
         "Xbox 360", "Wii", "PS3",
         "NDS", "PSP",
@@ -38,13 +38,16 @@ enum Presets {
         let en: String
     }
 
-    /// 仅收录需要翻译的词条；语言中性的预设（PC、Switch、FC/NES 等）不在表里，直接原样显示。
+    /// 仅收录需要翻译的词条；语言中性的预设（PC、Nintendo Switch、FC/NES 等）不在表里，直接原样显示。
     /// 「手机」「掌机」已从预设选项移除，但保留词条用于翻译历史数据，且自动化测试断言依赖它们。
+    /// Switch 旧名兜底：2026-08-13 平台改名（Switch → Nintendo Switch）后，历史数据/旧备份存的是旧名，仍映射成新名显示。
     private static let localized: [PresetCategory: [String: LocalizedPreset]] = [
         .platform: [
             "手机": .init(zh: "手机", ja: "スマホ", en: "Mobile"),
             "掌机": .init(zh: "掌机", ja: "携帯機", en: "Handheld"),
             "其他": .init(zh: "其他", ja: "その他", en: "Other"),
+            "Switch": .init(zh: "Nintendo Switch", ja: "Nintendo Switch", en: "Nintendo Switch"),
+            "Switch 2": .init(zh: "Nintendo Switch 2", ja: "Nintendo Switch 2", en: "Nintendo Switch 2"),
         ],
         .degree: [
             "主线通关": .init(zh: "主线通关", ja: "メインクリア", en: "Main Story"),
