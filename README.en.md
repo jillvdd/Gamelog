@@ -1,0 +1,93 @@
+# My Gamelog (我的游戏簿)
+
+> **English** · [日本語](README.ja.md) · [简体中文](README.md)
+
+A **macOS + iOS** personal app for recording video games you've finished: cover art, six-dimension scores, per-playthrough platform / date / degree / playtime / notes, physical collections (edition / quantity / photos), and shareable images. Fully local storage (SwiftData) — your data belongs entirely to you.
+
+Interface languages: **简体中文 / 日本語 / English** (switch instantly in Settings). macOS and iOS each store data locally and independently; you can move data between them via JSON backup (including AirDrop).
+
+## Features
+
+- **Game Library**: grid / list view toggle; search by name + aliases + localized names; filter by platform; group management (macOS sidebar / iOS filter menu), a game can belong to several groups; sort by name / release date / completion date. The library score is the mean of the record averages of all scored completions, rounded to 0.1; unscored games show "Unrated".
+- **Game Detail**: review (one-line verdict + body), all completions (edit / append / delete), six-dimension colored bar chart; an extra "Holdings" tab when Collector Mode is on.
+- **Six-Dimension Scoring**: Gameplay / Design / Story / Art / Music / Performance, 1–10 sliders with 0.1 steps. Overall = mean of the six; the first completion requires scores, later ones may be skipped.
+- **Completions**: platform, completion date (can be "None"), completion degree (main story / all side quests / all endings / platinum / multiple playthroughs / speedrun / custom), playtime (can be "None"), and notes.
+- **Date Picker**: macOS three-column wheel (year / month / day, handles Feb 29 and month-end clamping); iOS uses the system date picker.
+- **Groups**: create / rename / delete; pick games to join via context menu (macOS) or menu (iOS); per-group stats and review.
+- **Collector Mode** (Settings toggle): "Details / Holdings" segmented switch on the detail page; each game can have multiple physical editions (edition name + quantity + up to 6 photos); photos open in the system viewer; included in backups.
+- **Cover Art**: import from your device, or search & download via the [SteamGridDB](https://www.steamgriddb.com) API (requires an API Key in Settings, searches as you type); optional **auto-match cover** (about 0.6s after you stop typing, picks the first portrait hit — never overwrites an existing cover, silent on failure). On iOS, adding an image pops a "Photos / Files / Camera" menu.
+- **Personalization**: username (20 chars), avatar (circular crop), macOS app icon (rounded-square crop), auto-match cover toggle, hide group toolbar glass (macOS), keep-original-images toggle. A custom icon reflects on the Dock immediately and persists across restarts.
+- **Share Images**: single game → single card (portrait 1080×1920 or landscape 1920×1080); multi-select → one overview image; by group → a group share card (in-group cover grid + platform distribution). Branded watermark, localized per language, saveable as PNG or via the system share sheet.
+- **Stats & Rankings**: total completions, library average, platform distribution; average-score leaderboard + six-dimension boards (top 5 / 10 per dimension); the "Overall Ranking" page switches between 7 boards, pages up to 100 entries per page, filters by platform.
+- **Backup**: export the whole library to a single JSON (covers embedded as base64), including username / avatar / icon, restorable as a whole, compatible with older backups; import asks for confirmation. On iOS, transfer via AirDrop / Files.
+
+## Platforms
+
+| Platform | Deployment target | Notes |
+|---|---|---|
+| macOS | 14.0+ | Full features: sidebar, context menus, window toolbar, custom Dock icon, etc. |
+| iOS | 18.0+ (iPhone / iPad) | Bottom TabBar (Library / Stats / Settings); filter menu, add-image menu, confirmation sheets follow iOS design conventions |
+
+## Requirements
+
+- macOS 14.0+; iOS 18.0+ (iPhone / iPad)
+- Xcode 16+ (SwiftData / Swift macros support; project verified with Xcode 27 beta)
+
+## Build & Run
+
+```bash
+cd /Users/abc/Documents/gamelog_program
+
+# macOS build + launch
+xcodebuild -project GameLog.xcodeproj -scheme GameLog -configuration Debug \
+  -destination 'platform=macOS' -derivedDataPath /tmp/GameLogDD build
+open /tmp/GameLogDD/Build/Products/Debug/GameLog.app
+
+# iOS simulator build + install + launch
+export DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer
+xcodebuild -project GameLog.xcodeproj -scheme GameLog-iOS -configuration Debug \
+  -destination 'platform=iOS Simulator,name=iPhone 16 Pro' -derivedDataPath /tmp/GameLogDD build
+xcrun simctl install booted /tmp/GameLogDD/Build/Products/Debug-iphonesimulator/GameLog.app
+xcrun simctl launch booted com.abcleg.GameLog
+```
+
+Or open `GameLog.xcodeproj` in Xcode and Run the `GameLog` (macOS) or `GameLog-iOS` (iOS) scheme.
+
+## SteamGridDB Cover Search
+
+1. Register for free at [steamgriddb.com](https://www.steamgriddb.com) and get an API Key from your profile page.
+2. Open Settings → SteamGridDB → enter the Key.
+3. When creating / editing a game, tap "Search Cover…".
+
+## Project Structure
+
+```
+GameLog/
+├── GameLogApp.swift       # macOS entry: WindowGroup + Settings scenes share one ModelContainer
+├── iOSRootView.swift      # iOS entry: bottom TabBar (Library / Stats / Settings) + AirDrop backup import
+├── Models/                # SwiftData models (Game / Completion / GameGroup / PhysicalCopy / Presets)
+├── Support/               # PlatformImage abstraction, score math, backup, personalization, L10n,
+│                          #   SteamGridDB, PlatformConfirmDialog (bottom action sheet), ImageSourcePicker
+├── Share/                 # Share card views + ImageRenderer output pipeline
+├── Views/                 # Platform views (shared + #if os adaptations)
+└── Resources/             # Tri-lingual Localizable.strings + Assets.xcassets (macOS/iOS AppIcon) + Info-iOS.plist
+Scripts/                   # Standalone regression tests (not compiled into the app, see below)
+```
+
+## Development Verification
+
+`Scripts/` holds repeatable standalone regression tests (compiled with `xcrun swiftc`; the macro-plugin path is in each file's header comment):
+
+- `Scripts/ScoreMathSelftest/` — score logic self-test (rounding / means / library score)
+- `Scripts/DataSmokeTest/` — data-layer smoke tests: many-to-many, cascade delete, scoring integration, backup round-trip, import idempotence & replace, holdings backup, date fidelity, preset localization
+- `Scripts/ShareRenderTest/` — share card render pipeline: actually calls ImageRenderer to produce a PNG and validates pixel dimensions
+
+When adding UI copy, the key must go into all three `Localizable.strings` and use `L10n.tr` / `LText` (not `String(localized:)`). After changes, run the key-coverage check — all three languages must have 0 missing (the command is in HANDOVER.md §2).
+
+## Terminology
+
+Domain terms (Game / Completion / Group / Review / Dimension Scores…) follow the glossary in `CONTEXT.md`.
+
+## License
+
+Released under the [MIT](LICENSE) license. See `LICENSE` in the repository root.
