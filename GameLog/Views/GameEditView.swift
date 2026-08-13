@@ -431,14 +431,17 @@ struct GameEditView: View {
                             }
                         }
                     }
-                    BorderedTextField(text: $aliasInput, placeholder: L10n.tr("game.aliasPlaceholder", lang: language))
-                        .onSubmit {
+                    BorderedTextField(
+                        text: $aliasInput,
+                        placeholder: L10n.tr("game.aliasPlaceholder", lang: language),
+                        onSubmit: {
                             let trimmed = aliasInput.trimmingCharacters(in: .whitespaces)
                             if !trimmed.isEmpty && !aliases.contains(trimmed) {
                                 aliases.append(trimmed)
                             }
                             aliasInput = ""
                         }
+                    )
                 }
 
                 Toggle(L10n.tr("game.releaseDate", lang: language), isOn: $hasReleaseDate)

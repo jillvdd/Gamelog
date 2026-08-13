@@ -92,7 +92,7 @@ extension Game {
         Presets.ordered(completions.map(\.platform))
     }
 
-    /// 库显示分：已评分记录平均分的均值，取整到 0.5。无已评分记录则 nil。
+    /// 库显示分：已评分记录平均分的均值，取整到 0.1。无已评分记录则 nil。
     var libraryScore: Double? {
         libraryScore(platform: nil)
     }

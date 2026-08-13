@@ -120,7 +120,26 @@ enum BackupManager {
         decoder.dateDecodingStrategy = .iso8601
         let dto = try decoder.decode(BackupDTO.self, from: data)
 
-        // 清空现有（删除游戏会级联删除通关记录）
+        // 自定义三项先恢复：若这里抛错（头像/图标写盘失败），尚未触碰 store 数据，原库保持完好。
+        // 旧版备份缺字段 → 保持现状不覆盖。
+        if let name = dto.username {
+            if name.isEmpty {
+                UserDefaults.standard.removeObject(forKey: UserCustomization.usernameKey)
+            } else {
+                UserDefaults.standard.set(
+                    String(Array(name).prefix(UserCustomization.usernameMaxLength)),
+                    forKey: UserCustomization.usernameKey
+                )
+            }
+        }
+        if let avatar = dto.avatarBase64.flatMap({ Data(base64Encoded: $0) }) {
+            try UserCustomization.saveAvatarPNG(avatar)
+        }
+        if let icon = dto.iconBase64.flatMap({ Data(base64Encoded: $0) }) {
+            try UserCustomization.saveIconPNG(icon)
+        }
+
+        // 再清空现有（删除游戏会级联删除通关记录与持有记录；以下重建均不抛错，不会中途失败）
         if let existingGames = try? context.fetch(FetchDescriptor<Game>()) {
             existingGames.forEach { context.delete($0) }
         }
@@ -177,30 +196,12 @@ enum BackupManager {
                     let copy = PhysicalCopy(
                         version: copyDTO.version,
                         count: max(1, copyDTO.count),
-                        images: copyDTO.images.compactMap { Data(base64Encoded: $0) }
+                        images: copyDTO.images.prefix(6).compactMap { Data(base64Encoded: $0) }
                     )
                     copy.game = game
                     context.insert(copy)
                 }
             }
-        }
-
-        // 自定义三项：旧版备份缺字段 → 保持现状不覆盖
-        if let name = dto.username {
-            if name.isEmpty {
-                UserDefaults.standard.removeObject(forKey: UserCustomization.usernameKey)
-            } else {
-                UserDefaults.standard.set(
-                    String(Array(name).prefix(UserCustomization.usernameMaxLength)),
-                    forKey: UserCustomization.usernameKey
-                )
-            }
-        }
-        if let avatar = dto.avatarBase64.flatMap({ Data(base64Encoded: $0) }) {
-            try UserCustomization.saveAvatarPNG(avatar)
-        }
-        if let icon = dto.iconBase64.flatMap({ Data(base64Encoded: $0) }) {
-            try UserCustomization.saveIconPNG(icon)
         }
     }
 }

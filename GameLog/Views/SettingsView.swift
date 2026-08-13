@@ -211,7 +211,7 @@ struct SettingsView: View {
             try data.write(to: url)
             statusMessage = L10n.tr("backup.exportDone", lang: language)
         } catch {
-            statusMessage = L10n.tr("backup.importFailed", lang: language)
+            statusMessage = L10n.tr("backup.exportFailed", lang: language)
         }
     }
 

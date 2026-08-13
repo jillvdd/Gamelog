@@ -130,6 +130,7 @@
 "backup.export" = "Export Backup…";
 "backup.import" = "Import Backup…";
 "backup.exportDone" = "Backup exported";
+"backup.exportFailed" = "Export failed";
 "backup.importDone" = "Backup imported";
 "backup.importFailed" = "Import failed. Check that the file is a valid backup.";
 "backup.importConfirm" = "Importing will replace all current data. Continue?";

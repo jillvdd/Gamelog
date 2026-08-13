@@ -286,7 +286,7 @@ private struct SingleCardVertical: View {
                             .padding(.top, 20)
                     }
 
-                    if let latest = game.sortedCompletions.last, let date = latest.date {
+                    if let date = game.latestCompletionDate {
                         Text(verbatim: ShareDateFormat.string(from: date, language: language))
                             .font(.system(size: 30))
                             .foregroundStyle(contentSecondary)
@@ -419,7 +419,7 @@ private struct SingleCardHorizontal: View {
                         .padding(.top, 18)
                 }
 
-                if let latest = game.sortedCompletions.last, let date = latest.date {
+                if let date = game.latestCompletionDate {
                     Text(verbatim: ShareDateFormat.string(from: date, language: language))
                         .font(.system(size: 27))
                         .foregroundStyle(theme.secondary)
@@ -912,7 +912,7 @@ private struct OverviewCell: View {
                 }
             }
 
-            if let latest = game.sortedCompletions.last, let date = latest.date {
+            if let date = game.latestCompletionDate {
                 Text(verbatim: ShareDateFormat.string(from: date, language: language))
                     .font(.system(size: 17))
                     .foregroundStyle(theme.secondary)

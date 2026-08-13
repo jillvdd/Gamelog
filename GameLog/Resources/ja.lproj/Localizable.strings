@@ -130,6 +130,7 @@
 "backup.export" = "バックアップを書き出し…";
 "backup.import" = "バックアップを読み込み…";
 "backup.exportDone" = "バックアップを書き出しました";
+"backup.exportFailed" = "書き出しに失敗しました";
 "backup.importDone" = "バックアップを読み込みました";
 "backup.importFailed" = "読み込みに失敗しました。有効なバックアップか確認してください";
 "backup.importConfirm" = "読み込むと現在の全データが置き換えられます。続行しますか？";

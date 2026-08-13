@@ -250,5 +250,18 @@ check("持有：备份往返版本名", holdImported?.copies.first?.version == "
 check("持有：备份往返数量", holdImported?.copies.first?.count == 2)
 check("持有：备份往返图片", holdImported?.copies.first?.images == [Data([1, 2, 3]), Data([4, 5, 6])])
 
+// 持有：导入时照片数上限 6（防手工构造备份 JSON 塞 >6 张破坏「最多 6 张」不变量）
+let bigGame = Game(name: "Big Photo Test", reviewTitle: "")
+let bigCopy = PhysicalCopy(version: "限定版", count: 1, images: (0..<7).map { Data([UInt8($0)]) })
+bigCopy.game = bigGame
+context.insert(bigGame)
+context.insert(bigCopy)
+try? context.save()
+let bigBackup = try BackupManager.encode(games: [bigGame], groups: [])
+try BackupManager.decodeAndReplace(bigBackup, into: context)
+try context.save()
+let bigImported = (try? context.fetch(FetchDescriptor<Game>()))?.first { $0.name == "Big Photo Test" }
+check("持有：导入照片上限 6 张", bigImported?.copies.first?.images.count == 6)
+
 print(failures == 0 ? "DATA SMOKE TEST PASSED" : "DATA SMOKE TEST FAILED: \(failures) failures")
 exit(failures == 0 ? 0 : 1)

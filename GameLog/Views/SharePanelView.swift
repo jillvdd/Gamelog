@@ -317,8 +317,12 @@ struct SharePanelView: View {
         }
         renderedPNG = data
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("GameLog-share.png")
-        try? data.write(to: url)
-        shareURL = url
+        // 临时文件写失败时保持 shareURL=nil（分享按钮禁用），避免指向缺失或陈旧的旧文件。
+        if (try? data.write(to: url)) != nil {
+            shareURL = url
+        } else {
+            shareURL = nil
+        }
     }
 
     private func saveImage() {

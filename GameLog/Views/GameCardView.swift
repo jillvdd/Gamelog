@@ -46,8 +46,9 @@ struct GameCardView: View {
     }
 
     /// 最近一次通关日期，单独一行；无日期返回空串（不显示）。
+    /// 与库排序同口径：取全部记录中最大的通关日期（latestCompletionDate），而非最后创建的那条。
     private var dateText: String {
-        guard let latest = game.sortedCompletions.last, let date = latest.date else { return "" }
+        guard let date = game.latestCompletionDate else { return "" }
         return date.formatted(date: .abbreviated, time: .omitted)
     }
 

@@ -18,6 +18,8 @@ struct CoverSearchSheet: View {
     @State private var hasSearched = false
     @State private var searchGeneration = 0
     @State private var searchTask: Task<Void, Never>?
+    /// 封面下载代际：返回/关闭/换游戏时 +1，使在途下载结果失效（防下载完成后仍应用封面或关面板）。
+    @State private var downloadGeneration = 0
 
     private var client: SteamGridDBClient { SteamGridDBClient(apiKey: apiKey) }
 
@@ -27,7 +29,7 @@ struct CoverSearchSheet: View {
                 LText("cover.title")
                     .font(.headline)
                 Spacer()
-                Button(L10n.tr("cover.close", lang: language)) { dismiss() }
+                Button(L10n.tr("cover.close", lang: language)) { downloadGeneration += 1; dismiss() }
                     .keyboardShortcut(.cancelAction)
             }
 
@@ -93,6 +95,8 @@ struct CoverSearchSheet: View {
                     .font(.callout)
                     .foregroundStyle(Color.accentColor)
                     .onTapGesture {
+                        downloadGeneration += 1
+                        downloadingGrid = nil
                         selectedGame = nil
                         grids = []
                     }
@@ -201,6 +205,7 @@ struct CoverSearchSheet: View {
     }
 
     private func loadGrids(for game: SteamGridDBGameHit) {
+        downloadGeneration += 1
         selectedGame = game
         grids = []
         errorMessage = nil
@@ -219,12 +224,17 @@ struct CoverSearchSheet: View {
 
     private func download(_ grid: SteamGridDBGrid) {
         downloadingGrid = grid.id
+        downloadGeneration += 1
+        let gen = downloadGeneration
         Task {
             do {
                 let data = try await client.fetchImage(urlString: grid.url)
+                guard gen == downloadGeneration else { return }
+                downloadingGrid = nil
                 coverData = data
                 dismiss()
             } catch {
+                guard gen == downloadGeneration else { return }
                 downloadingGrid = nil
                 errorMessage = L10n.tr("cover.searchFailed", lang: language)
             }
