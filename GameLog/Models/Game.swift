@@ -120,10 +120,12 @@ extension Game {
     }
 
     /// 某维度均值（可限定某平台：只统计该平台下的通关记录）。
+    /// 与 `recordAverage`/`libraryScore` 同一口径：越界分（<1 或 >10）不参与计算。
     func dimensionAverage(for dimension: Dimension, platform: String?) -> Double? {
         let values = completions
             .filter { (platform == nil || $0.platform == platform) && $0.hasScores }
             .compactMap { $0.score(for: dimension) }
+            .filter { (1...10).contains($0) }
         guard !values.isEmpty else { return nil }
         return values.reduce(0, +) / Double(values.count)
     }

@@ -134,9 +134,9 @@ struct OverallRankingView: View {
 
     private static let pageSize = 100
 
-    /// 库里出现过的平台（升序）。
+    /// 库里出现过的平台（按平台预设世代倒序 + 自定义字母排后，与全 app 排序唯一源一致）。
     private var platforms: [String] {
-        Array(Set(games.flatMap { $0.completions.map(\.platform) }.filter { !$0.isEmpty })).sorted()
+        Presets.ordered(games.flatMap { $0.completions.map(\.platform) })
     }
 
     /// 榜单标题（平均分 + 六维，顺序即切换顺序）。
@@ -201,6 +201,10 @@ struct OverallRankingView: View {
             .padding(16)
             .onChange(of: selectedBoard) { _, _ in page = 0 }
             .onChange(of: selectedPlatform) { _, _ in page = 0 }
+            // 数据收缩（删除/改分）导致合格条目数减少时，把越界页码收回来，避免空白榜 + 错页码。
+            .onChange(of: pageCount) { _, newCount in
+                if page >= newCount { page = max(0, newCount - 1) }
+            }
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {

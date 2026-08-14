@@ -205,7 +205,7 @@ private struct LocalizedNamesSubtitle: View {
     var body: some View {
         if !names.isEmpty {
             VStack(alignment: .leading, spacing: 2) {
-                ForEach(names, id: \.self) { name in
+                ForEach(Array(names.enumerated()), id: \.offset) { _, name in
                     Text(verbatim: name)
                         .font(.callout)
                         .foregroundStyle(.secondary)

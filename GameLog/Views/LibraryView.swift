@@ -138,6 +138,26 @@ struct LibraryView: View {
         }
     }
 
+    /// 切换分组/平台筛选时重置导航上下文：退出已打开的详情页、清空搜索词。
+    /// 否则同 case 分支内切换（如平台 A → 平台 B）视图身份不变，path/selectedGame/searchText 会残留。
+    private func resetNavigationContext() {
+        #if os(macOS)
+        path = NavigationPath()
+        #else
+        selectedGame = nil
+        #endif
+        searchText = ""
+    }
+
+    /// 内容顶部安全区下推量：仅 macOS 全屏且未隐藏毛玻璃时推 24pt；iOS 无此玻璃延伸问题，恒 0。
+    private var topSafeAreaPadding: CGFloat {
+        #if os(macOS)
+        return (!hideToolbarGlass && isFullScreen) ? 24 : 0
+        #else
+        return 0
+        #endif
+    }
+
     // MARK: - 分组视图（游戏 + 底部统计/评价）
 
     /// 分组内容：游戏网格/列表在上，统计与评价区块在下；空分组也显示区块。
@@ -252,6 +272,12 @@ struct LibraryView: View {
         .onChange(of: groupFilter?.persistentModelID) { _, _ in
             // 切换分组即重置组内平台过滤（切换页面重置过滤状态）。
             groupPlatformFilter = ""
+            resetNavigationContext()
+        }
+        .onChange(of: platform) { _, _ in
+            // 切换平台同样重置筛选上下文：退出已打开的详情页、清空搜索词，
+            // 避免同一 case 分支内切换时视图身份不变导致状态残留。
+            resetNavigationContext()
         }
         .sheet(isPresented: $showingNewGame) {
             #if os(macOS)
@@ -359,7 +385,7 @@ struct LibraryView: View {
         #if os(macOS)
         .modifier(ToolbarGlassModifier(hidden: hideToolbarGlass))
         #endif
-        .safeAreaPadding(.top, (!hideToolbarGlass && isFullScreen) ? 24 : 0)
+        .safeAreaPadding(.top, topSafeAreaPadding)
         .toolbar {
             #if os(macOS)
             if groupFilter != nil {

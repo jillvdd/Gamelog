@@ -295,6 +295,14 @@ struct SharePanelView: View {
             #if os(macOS)
             Button(L10n.tr("share.saveImage", lang: language)) { saveImage() }
                 .disabled(renderedPNG == nil)
+            if let url = shareURL {
+                ShareLink(item: url) {
+                    Label(L10n.tr("share.openShareSheet", lang: language), systemImage: "square.and.arrow.up")
+                }
+            } else {
+                Button(L10n.tr("share.openShareSheet", lang: language)) {}
+                    .disabled(true)
+            }
             #else
             Button {
                 saveImageToAlbum()
@@ -303,9 +311,11 @@ struct SharePanelView: View {
             }
             .appStandardButton()
             .disabled(renderedPNG == nil)
-            #endif
             if let url = shareURL {
-                ShareLink(item: url) {
+                // iOS 26 sheet 内嵌 ShareLink 静默失败，改用 UIKit 直接 present 系统分享单。
+                Button {
+                    presentShareSheet(url: url)
+                } label: {
                     Label(L10n.tr("share.openShareSheet", lang: language), systemImage: "square.and.arrow.up")
                 }
                 .appStandardButton()
@@ -314,6 +324,7 @@ struct SharePanelView: View {
                     .appStandardButton()
                     .disabled(true)
             }
+            #endif
         }
     }
 

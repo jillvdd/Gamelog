@@ -44,9 +44,9 @@ xcodebuild -project GameLog.xcodeproj -scheme GameLog -configuration Debug \
 open /tmp/GameLogDD/Build/Products/Debug/GameLog.app
 
 # iOS 模拟器构建 + 安装 + 启动
-export DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer
+export DEVELOPER_DIR=/Users/abc/Downloads/Xcode-beta.app/Contents/Developer
 xcodebuild -project GameLog.xcodeproj -scheme GameLog-iOS -configuration Debug \
-  -destination 'platform=iOS Simulator,name=iPhone 16 Pro' -derivedDataPath /tmp/GameLogDD build
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -derivedDataPath /tmp/GameLogDD build
 xcrun simctl install booted /tmp/GameLogDD/Build/Products/Debug-iphonesimulator/GameLog.app
 xcrun simctl launch booted com.abcleg.GameLog
 ```
@@ -55,7 +55,7 @@ xcrun simctl launch booted com.abcleg.GameLog
 
 ## 在 iPhone 上安装（IPA）
 
-本仓库提供 Release 版 IPA（`dist/GameLog-beta-1.8.ipa`），未签名，需自行签名后安装。
+本仓库提供 Release 版 IPA（`dist/GameLog-beta-1.8.1.ipa`），未签名，需自行签名后安装。
 
 > 提示：模拟器或日常开发调试直接用 Xcode Run 即可，不需要 IPA。
 
@@ -85,7 +85,8 @@ GameLog/
 ├── Models/                # SwiftData 模型（Game / Completion / GameGroup / PhysicalCopy / Presets）
 ├── Support/               # 平台抽象 PlatformImage、评分逻辑、备份、个性化、L10n、SteamGridDB、
 │                          #   PlatformIcon（平台图标）、PlatformButton（跨平台按钮样式）、
-│                          #   PlatformConfirmDialog（底部 action sheet）、ImageSourcePicker（加图菜单）
+│                          #   PlatformConfirmDialog（底部 action sheet）、ImageSourcePicker（加图菜单）、
+│                          #   ShareSheetPresenter（iOS 系统分享单）
 ├── Share/                 # 分享卡视图 + ImageRenderer 出图管线
 ├── Views/                 # 各平台视图（共享 + #if os 适配）
 └── Resources/             # 三语 Localizable.strings + Assets.xcassets（macOS/iOS AppIcon）

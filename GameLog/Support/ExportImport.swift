@@ -120,8 +120,16 @@ enum BackupManager {
         decoder.dateDecodingStrategy = .iso8601
         let dto = try decoder.decode(BackupDTO.self, from: data)
 
-        // 自定义三项先恢复：若这里抛错（头像/图标写盘失败），尚未触碰 store 数据，原库保持完好。
+        // 自定义三项：先写可能抛错的文件（头像/图标），最后写 UserDefaults（用户名）。
+        // 用户名写盘不可回滚，若先写用户名、后写文件失败，会出现「提示导入失败但用户名已变更」；
+        // 文件写盘失败时（磁盘满等）用户名保持原值，与「失败时原库保持完好」口径一致。
         // 旧版备份缺字段 → 保持现状不覆盖。
+        if let avatar = dto.avatarBase64.flatMap({ Data(base64Encoded: $0) }) {
+            try UserCustomization.saveAvatarPNG(avatar)
+        }
+        if let icon = dto.iconBase64.flatMap({ Data(base64Encoded: $0) }) {
+            try UserCustomization.saveIconPNG(icon)
+        }
         if let name = dto.username {
             if name.isEmpty {
                 UserDefaults.standard.removeObject(forKey: UserCustomization.usernameKey)
@@ -131,12 +139,6 @@ enum BackupManager {
                     forKey: UserCustomization.usernameKey
                 )
             }
-        }
-        if let avatar = dto.avatarBase64.flatMap({ Data(base64Encoded: $0) }) {
-            try UserCustomization.saveAvatarPNG(avatar)
-        }
-        if let icon = dto.iconBase64.flatMap({ Data(base64Encoded: $0) }) {
-            try UserCustomization.saveIconPNG(icon)
         }
 
         // 再清空现有（删除游戏会级联删除通关记录与持有记录；以下重建均不抛错，不会中途失败）
@@ -149,13 +151,17 @@ enum BackupManager {
 
         var groupMap: [String: GameGroup] = [:]
         for groupDTO in dto.groups {
-            let group = GameGroup(name: groupDTO.name)
+            // 分组名 trim：与新建/改名弹窗的存储口径一致，避免备份里带空格的分组名造成视觉重名
+            // 或与游戏 groupNames 引用错位（如导出 "ABC "、游戏引用 "ABC"）。
+            let groupName = groupDTO.name.trimmingCharacters(in: .whitespaces)
+            guard !groupName.isEmpty else { continue }
+            let group = GameGroup(name: groupName)
             // 旧版备份缺 review → 保持现状（默认空串）
             if let review = groupDTO.review {
                 group.review = review
             }
             context.insert(group)
-            groupMap[groupDTO.name] = group
+            groupMap[groupName] = group
         }
 
         for gameDTO in dto.games {
@@ -169,7 +175,7 @@ enum BackupManager {
                 reviewTitle: gameDTO.reviewTitle,
                 reviewBody: gameDTO.reviewBody
             )
-            game.groups = gameDTO.groupNames.compactMap { groupMap[$0] }
+            game.groups = gameDTO.groupNames.compactMap { groupMap[$0.trimmingCharacters(in: .whitespaces)] }
             context.insert(game)
 
             for completionDTO in gameDTO.completions {

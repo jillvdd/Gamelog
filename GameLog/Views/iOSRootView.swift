@@ -55,6 +55,9 @@ struct iOSRootView: View {
     private func importIncomingBackup() {
         guard let url = incomingBackupURL else { return }
         incomingBackupURL = nil
+        // 「文件」App 打开方式发来的 URL 是 security-scoped，直接读会无权限；AirDrop 路径系统已拷入沙盒可读。
+        let didStart = url.startAccessingSecurityScopedResource()
+        defer { if didStart { url.stopAccessingSecurityScopedResource() } }
         do {
             let data = try Data(contentsOf: url)
             try BackupManager.decodeAndReplace(data, into: context)
@@ -98,6 +101,14 @@ struct iOSLibraryTab: View {
                 }
         }
         .sheet(isPresented: $showingGroupManager) { iOSGroupManagerSheet() }
+        // 分组被删除（分组管理页）后，若当前筛选正指向该分组，先清掉引用，
+        // 避免 LibraryView 继续访问已删除的模型对象而崩溃（macOS 侧删除前先清选中态，iOS 靠这里兜底）。
+        .onChange(of: groups) { _, newGroups in
+            if let current = groupFilter,
+               !newGroups.contains(where: { $0.persistentModelID == current.persistentModelID }) {
+                groupFilter = nil
+            }
+        }
     }
 
     /// 整合的筛选菜单：分组 / 平台 / 全部游戏互斥单选（与 macOS 侧边栏的导航一致）。

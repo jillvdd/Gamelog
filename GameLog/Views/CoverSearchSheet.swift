@@ -268,6 +268,7 @@ struct CoverSearchSheet: View {
 
     private func loadGrids(for game: SteamGridDBGameHit) {
         downloadGeneration += 1
+        let gen = downloadGeneration
         selectedGame = game
         grids = []
         errorMessage = nil
@@ -275,9 +276,11 @@ struct CoverSearchSheet: View {
         Task {
             do {
                 let all = try await client.grids(for: game.id)
+                guard gen == downloadGeneration else { return }
                 grids = SteamGridDBClient.sorted(all)
                 isLoading = false
             } catch {
+                guard gen == downloadGeneration else { return }
                 isLoading = false
                 errorMessage = L10n.tr("cover.searchFailed", lang: language)
             }
@@ -294,6 +297,9 @@ struct CoverSearchSheet: View {
                 guard gen == downloadGeneration else { return }
                 downloadingGrid = nil
                 coverData = data
+                // 停止在途搜索/缩略图请求：面板即将关闭，避免其在后台空跑。
+                searchTask?.cancel()
+                thumbTask?.cancel()
                 dismiss()
             } catch {
                 guard gen == downloadGeneration else { return }

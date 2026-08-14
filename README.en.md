@@ -44,9 +44,9 @@ xcodebuild -project GameLog.xcodeproj -scheme GameLog -configuration Debug \
 open /tmp/GameLogDD/Build/Products/Debug/GameLog.app
 
 # iOS simulator build + install + launch
-export DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer
+export DEVELOPER_DIR=/Users/abc/Downloads/Xcode-beta.app/Contents/Developer
 xcodebuild -project GameLog.xcodeproj -scheme GameLog-iOS -configuration Debug \
-  -destination 'platform=iOS Simulator,name=iPhone 16 Pro' -derivedDataPath /tmp/GameLogDD build
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -derivedDataPath /tmp/GameLogDD build
 xcrun simctl install booted /tmp/GameLogDD/Build/Products/Debug-iphonesimulator/GameLog.app
 xcrun simctl launch booted com.abcleg.GameLog
 ```
@@ -55,7 +55,7 @@ Or open `GameLog.xcodeproj` in Xcode and Run the `GameLog` (macOS) or `GameLog-i
 
 ## Installing on iPhone (IPA)
 
-This repository provides a Release IPA (`dist/GameLog-beta-1.8.ipa`), unsigned — you need to sign it yourself before installing.
+This repository provides a Release IPA (`dist/GameLog-beta-1.8.1.ipa`), unsigned — you need to sign it yourself before installing.
 
 > Tip: for simulator or daily development debugging, just Run from Xcode — no IPA needed.
 
@@ -85,7 +85,8 @@ GameLog/
 ├── Models/                # SwiftData models (Game / Completion / GameGroup / PhysicalCopy / Presets)
 ├── Support/               # PlatformImage abstraction, score math, backup, personalization, L10n,
 │                          #   SteamGridDB, PlatformIcon (platform logos), PlatformButton (cross-platform button style),
-│                          #   PlatformConfirmDialog (bottom action sheet), ImageSourcePicker
+│                          #   PlatformConfirmDialog (bottom action sheet), ImageSourcePicker,
+│                          #   ShareSheetPresenter (iOS system share sheet)
 ├── Share/                 # Share card views + ImageRenderer output pipeline
 ├── Views/                 # Platform views (shared + #if os adaptations)
 └── Resources/             # Tri-lingual Localizable.strings + Assets.xcassets (macOS/iOS AppIcon) + Info-iOS.plist + PlatformIcons (platform logo assets)

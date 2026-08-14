@@ -44,9 +44,9 @@ xcodebuild -project GameLog.xcodeproj -scheme GameLog -configuration Debug \
 open /tmp/GameLogDD/Build/Products/Debug/GameLog.app
 
 # iOS シミュレータ ビルド + インストール + 起動
-export DEVELOPER_DIR=/Applications/Xcode-beta.app/Contents/Developer
+export DEVELOPER_DIR=/Users/abc/Downloads/Xcode-beta.app/Contents/Developer
 xcodebuild -project GameLog.xcodeproj -scheme GameLog-iOS -configuration Debug \
-  -destination 'platform=iOS Simulator,name=iPhone 16 Pro' -derivedDataPath /tmp/GameLogDD build
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' -derivedDataPath /tmp/GameLogDD build
 xcrun simctl install booted /tmp/GameLogDD/Build/Products/Debug-iphonesimulator/GameLog.app
 xcrun simctl launch booted com.abcleg.GameLog
 ```
@@ -55,7 +55,7 @@ xcrun simctl launch booted com.abcleg.GameLog
 
 ## iPhone へのインストール（IPA）
 
-本リポジトリには Release 版 IPA（`dist/GameLog-beta-1.8.ipa`）がありますが、未署名のため、自分で署名してからインストールする必要があります。
+本リポジトリには Release 版 IPA（`dist/GameLog-beta-1.8.1.ipa`）がありますが、未署名のため、自分で署名してからインストールする必要があります。
 
 > ヒント：シミュレータや開発中のデバッグは Xcode で Run するだけで十分で、IPA は不要です。
 
@@ -85,7 +85,8 @@ GameLog/
 ├── Models/                # SwiftData モデル（Game / Completion / GameGroup / PhysicalCopy / Presets）
 ├── Support/               # プラットフォーム抽象 PlatformImage、スコア計算、バックアップ、個人設定、L10n、
 │                          #   SteamGridDB、PlatformIcon（プラットフォームロゴ）、PlatformButton（クロスプラットフォーム
-│                          #   ボタンスタイル）、PlatformConfirmDialog（ボトムアクションシート）、ImageSourcePicker
+│                          #   ボタンスタイル）、PlatformConfirmDialog（ボトムアクションシート）、ImageSourcePicker、
+│                          #   ShareSheetPresenter（iOS システム共有シート）
 ├── Share/                 # 共有カードビュー + ImageRenderer 出力パイプライン
 ├── Views/                 # 各プラットフォームのビュー（共有 + #if os 適応）
 └── Resources/             # 3 言語 Localizable.strings + Assets.xcassets（macOS/iOS AppIcon）、PlatformIcons（プラットフォームロゴアセット）+ Info-iOS.plist

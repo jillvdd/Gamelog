@@ -196,6 +196,7 @@ struct SettingsView: View {
         .formStyle(.grouped)
         .onAppear { validateKey() }
         .onChange(of: steamGridDBKey) { _, _ in validateKey() }
+        .onDisappear { keyValidationTask?.cancel() }
         #if os(macOS)
         .frame(width: 520, height: 720)
         #endif
@@ -403,37 +404,9 @@ struct SettingsView: View {
             statusMessage = L10n.tr("backup.exportFailed", lang: language)
             return
         }
-        presentShareSheet(url: url)
-    }
-
-    /// 以 UIActivityViewController 直接呈现分享单（系统原生路径，可靠）。
-    private func presentShareSheet(url: URL) {
-        let vc = UIActivityViewController(activityItems: [url], applicationActivities: nil)
-        guard let top = topPresentedViewController() else {
+        if !presentShareSheet(url: url) {
             statusMessage = L10n.tr("backup.exportFailed", lang: language)
-            return
         }
-        // iPad 上 activity 控制器需 popover 锚点；iPhone 无需。
-        if let popover = vc.popoverPresentationController {
-            popover.sourceView = top.view
-            popover.sourceRect = CGRect(x: top.view.bounds.midX, y: top.view.bounds.midY, width: 0, height: 0)
-            popover.permittedArrowDirections = []
-        }
-        top.present(vc, animated: true)
-    }
-
-    /// 找当前窗口栈最顶层的 presented view controller，作为 UIKit 呈现锚点。
-    private func topPresentedViewController() -> UIViewController? {
-        guard let windowScene = UIApplication.shared.connectedScenes
-            .compactMap({ $0 as? UIWindowScene })
-            .first(where: { $0.activationState == .foregroundActive }),
-            let root = windowScene.windows.first(where: { $0.isKeyWindow })?.rootViewController
-        else { return nil }
-        var top = root
-        while let presented = top.presentedViewController {
-            top = presented
-        }
-        return top
     }
     #endif
 

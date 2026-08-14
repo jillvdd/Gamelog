@@ -112,7 +112,7 @@ struct CompletionEditView: View {
         playtimeText = completion.playtime.map { String($0) } ?? ""
         playtimeIsNone = completion.playtime == nil
         notes = completion.notes
-        skipScores = !completion.hasScores
+        skipScores = !completion.hasScores && !isFirst
         if let v = completion.scoreGameplay { sGameplay = v }
         if let v = completion.scoreDesign { sDesign = v }
         if let v = completion.scoreStory { sStory = v }
