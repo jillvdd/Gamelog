@@ -7,29 +7,60 @@ struct PlatformBarRow: View {
     let maxCount: Int
     let language: String
 
+    private let nameFontSize: CGFloat = 13
+
+    /// 条形可视部分的最小宽度（窄单元时先压缩它，再触发图标换行）。
+    private let barMinWidth: CGFloat = 30
+
     var body: some View {
-        HStack(spacing: 12) {
-            Text(verbatim: Presets.display(platform, category: .platform, language: language))
-                #if os(macOS)
-                .frame(width: 160, alignment: .leading)
-                #else
-                .frame(width: 110, alignment: .leading)
-                #endif
-                .lineLimit(1)
-            GeometryReader { proxy in
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(Color.accentColor.opacity(0.15))
-                    Capsule()
-                        .fill(Color.accentColor)
-                        .frame(width: proxy.size.width * CGFloat(count) / CGFloat(maxCount))
+        // 用 GeometryReader 拿真实可用宽度，据此计算 label 实际宽度并决定「图标+名字同行」还是「图标换行」。
+        GeometryReader { geo in
+            let cellWidth = geo.size.width
+            // 保留：计数 32 + 三处间距 + 条形最小宽
+            let reserved = 32 + 12 + 12 + barMinWidth
+            let labelW = max(50, cellWidth - reserved)
+            let name = Presets.display(platform, category: .platform, language: language)
+            let iconW = PlatformIcon.displayWidth(platform: platform, size: 14)
+            let nameW = PlatformIcon.textWidth(name, fontSize: nameFontSize)
+            let inline = iconW + 6 + nameW <= labelW
+
+            HStack(spacing: 12) {
+                Group {
+                    if inline {
+                        HStack(spacing: 6) {
+                            PlatformIcon(platform: platform, size: 14)
+                            Text(verbatim: name)
+                                .font(.system(size: nameFontSize))
+                                .lineLimit(1)
+                        }
+                    } else {
+                        VStack(alignment: .leading, spacing: 2) {
+                            PlatformIcon(platform: platform, size: 14)
+                            Text(verbatim: name)
+                                .font(.system(size: nameFontSize))
+                                .lineLimit(1)
+                        }
+                    }
                 }
+                .frame(maxWidth: labelW, alignment: .leading)
+
+                GeometryReader { proxy in
+                    ZStack(alignment: .leading) {
+                        Capsule()
+                            .fill(Color.accentColor.opacity(0.15))
+                        Capsule()
+                            .fill(Color.accentColor)
+                            .frame(width: proxy.size.width * CGFloat(count) / CGFloat(maxCount))
+                    }
+                }
+                .frame(height: 10)
+
+                Text(verbatim: "\(count)")
+                    .monospacedDigit()
+                    .frame(width: 32, alignment: .trailing)
             }
-            .frame(height: 10)
-            Text(verbatim: "\(count)")
-                .monospacedDigit()
-                .frame(width: 32, alignment: .trailing)
         }
+        .fixedSize(horizontal: false, vertical: true)
     }
 }
 

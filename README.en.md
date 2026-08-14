@@ -8,18 +8,18 @@ Interface languages: **简体中文 / 日本語 / English** (switch instantly in
 
 ## Features
 
-- **Game Library**: grid / list view toggle; search by name + aliases + localized names; filter by platform; group management (macOS sidebar / iOS filter menu), a game can belong to several groups; sort by name / release date / completion date. The library score is the mean of the record averages of all scored completions, rounded to 0.1; unscored games show "Unrated".
+- **Game Library**: grid / list view toggle; search by name + aliases + localized names; filter by platform; group management (macOS sidebar / iOS filter menu), a game can belong to several groups; sort by name / release date / completion date / average score (low to high or high to low). The library score is the mean of the record averages of all scored completions, rounded to 0.1; unscored games show "Unrated".
 - **Game Detail**: review (one-line verdict + body), all completions (edit / append / delete), six-dimension colored bar chart; an extra "Holdings" tab when Collector Mode is on.
 - **Six-Dimension Scoring**: Gameplay / Design / Story / Art / Music / Performance, 1–10 sliders with 0.1 steps. Overall = mean of the six; the first completion requires scores, later ones may be skipped.
 - **Completions**: platform, completion date (can be "None"), completion degree (main story / all side quests / all endings / platinum / multiple playthroughs / speedrun / custom), playtime (can be "None"), and notes.
 - **Date Picker**: macOS three-column wheel (year / month / day, handles Feb 29 and month-end clamping); iOS uses the system date picker.
 - **Groups**: create / rename / delete; pick games to join via context menu (macOS) or menu (iOS); per-group stats and review.
 - **Collector Mode** (Settings toggle): "Details / Holdings" segmented switch on the detail page; each game can have multiple physical editions (edition name + quantity + up to 6 photos); photos open in the system viewer; included in backups.
-- **Cover Art**: import from your device, or search & download via the [SteamGridDB](https://www.steamgriddb.com) API (requires an API Key in Settings, searches as you type); optional **auto-match cover** (about 0.6s after you stop typing, picks the first portrait hit — never overwrites an existing cover, silent on failure). On iOS, adding an image pops a "Photos / Files / Camera" menu.
-- **Personalization**: username (20 chars), avatar (circular crop), macOS app icon (rounded-square crop), auto-match cover toggle, hide group toolbar glass (macOS), keep-original-images toggle. A custom icon reflects on the Dock immediately and persists across restarts.
-- **Share Images**: single game → single card (portrait 1080×1920 or landscape 1920×1080); multi-select → one overview image; by group → a group share card (in-group cover grid + platform distribution). Branded watermark, localized per language, saveable as PNG or via the system share sheet.
+- **Cover Art**: import from your device, or search & download via the [SteamGridDB](https://www.steamgriddb.com) API (requires an API Key in Settings, searches as you type); optional **auto-match cover** (about 0.6s after you stop typing, picks the first portrait hit — never overwrites an existing cover, silent on failure). Search results show cover thumbnails. On iOS, adding an image pops a "Photos / Files / Camera" menu.
+- **Personalization**: username (20 chars), avatar (circular crop), macOS app icon (rounded-square crop), auto-match cover toggle, hide group toolbar glass (macOS), keep-original-images toggle, platform-logos toggle (on by default; turning it off hides brand logos in platform pickers / grouping views). A custom icon reflects on the Dock immediately and persists across restarts.
+- **Share Images**: single game → single card (portrait 1080×1920 or landscape 1920×1080); multi-select → one overview image; by group → a group share card (in-group cover grid + platform distribution). Branded watermark, localized per language, saveable as PNG or via the system share sheet; on iOS you can also save the image directly to the Photos album (requires add-photo permission).
 - **Stats & Rankings**: total completions, library average, platform distribution; average-score leaderboard + six-dimension boards (top 5 / 10 per dimension); the "Overall Ranking" page switches between 7 boards, pages up to 100 entries per page, filters by platform.
-- **Backup**: export the whole library to a single JSON (covers embedded as base64), including username / avatar / icon, restorable as a whole, compatible with older backups; import asks for confirmation. On iOS, transfer via AirDrop / Files.
+- **Backup**: export the whole library to a single JSON (covers embedded as base64), including username / avatar / icon, restorable as a whole, compatible with older backups; import asks for confirmation. On iOS, export uses the system share sheet (AirDrop / Save to Files, etc.).
 
 ## Platforms
 
@@ -55,7 +55,7 @@ Or open `GameLog.xcodeproj` in Xcode and Run the `GameLog` (macOS) or `GameLog-i
 
 ## Installing on iPhone (IPA)
 
-This repository provides a Release IPA (`dist/GameLog-beta-1.7.ipa`), unsigned — you need to sign it yourself before installing.
+This repository provides a Release IPA (`dist/GameLog-beta-1.8.ipa`), unsigned — you need to sign it yourself before installing.
 
 > Tip: for simulator or daily development debugging, just Run from Xcode — no IPA needed.
 
@@ -73,7 +73,7 @@ Note: importing replaces the current data.
 ## SteamGridDB Cover Search
 
 1. Register for free at [steamgriddb.com](https://www.steamgriddb.com) and get an API Key from your profile page.
-2. Open Settings → SteamGridDB → enter the Key.
+2. Open Settings → SteamGridDB → enter the Key. The key field supports show/hide, copy, and auto-validation on change (✓ valid / ✗ invalid).
 3. When creating / editing a game, tap "Search Cover…".
 
 ## Project Structure
@@ -84,10 +84,11 @@ GameLog/
 ├── iOSRootView.swift      # iOS entry: bottom TabBar (Library / Stats / Settings) + AirDrop backup import
 ├── Models/                # SwiftData models (Game / Completion / GameGroup / PhysicalCopy / Presets)
 ├── Support/               # PlatformImage abstraction, score math, backup, personalization, L10n,
-│                          #   SteamGridDB, PlatformConfirmDialog (bottom action sheet), ImageSourcePicker
+│                          #   SteamGridDB, PlatformIcon (platform logos), PlatformButton (cross-platform button style),
+│                          #   PlatformConfirmDialog (bottom action sheet), ImageSourcePicker
 ├── Share/                 # Share card views + ImageRenderer output pipeline
 ├── Views/                 # Platform views (shared + #if os adaptations)
-└── Resources/             # Tri-lingual Localizable.strings + Assets.xcassets (macOS/iOS AppIcon) + Info-iOS.plist
+└── Resources/             # Tri-lingual Localizable.strings + Assets.xcassets (macOS/iOS AppIcon) + Info-iOS.plist + PlatformIcons (platform logo assets)
 Scripts/                   # Standalone regression tests (not compiled into the app, see below)
 ```
 

@@ -3,6 +3,8 @@ import SwiftData
 
 #if os(macOS)
 import AppKit
+#else
+import Photos
 #endif
 
 /// 分享面板左栏模式：按游戏 / 按分组。
@@ -29,6 +31,7 @@ struct SharePanelView: View {
     @State private var renderedPNG: Data?
     @State private var shareURL: URL?
     @State private var renderTask: Task<Void, Never>?
+    @State private var saveMessage: String?
     @AppStorage(UserCustomization.usernameKey) private var username = ""
 
     private var selectedGames: [Game] {
@@ -82,10 +85,10 @@ struct SharePanelView: View {
             VStack(spacing: 0) {
                 header
                 Divider()
-                selectionList
-                Divider()
                 previewColumn
-                    .frame(minHeight: 240)
+                    .frame(minHeight: 240, maxHeight: 340)
+                Divider()
+                selectionList
                 Divider()
                 controls
             }
@@ -275,25 +278,40 @@ struct SharePanelView: View {
                     exportButtons
                     Spacer()
                 }
+                if let saveMessage {
+                    Text(verbatim: saveMessage)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
             #endif
         }
         .padding()
     }
 
-    /// 导出按钮组：「保存图片」仅 macOS（iOS 分享走 ShareLink，无保存实现）。
+    /// 导出按钮组：macOS「保存图片」（NSSavePanel）；iOS「保存到相册」（直接写系统相册）+ 系统分享单。
     private var exportButtons: some View {
         Group {
             #if os(macOS)
             Button(L10n.tr("share.saveImage", lang: language)) { saveImage() }
                 .disabled(renderedPNG == nil)
+            #else
+            Button {
+                saveImageToAlbum()
+            } label: {
+                Label(L10n.tr("share.saveToAlbum", lang: language), systemImage: "photo.on.rectangle.angled")
+            }
+            .appStandardButton()
+            .disabled(renderedPNG == nil)
             #endif
             if let url = shareURL {
                 ShareLink(item: url) {
                     Label(L10n.tr("share.openShareSheet", lang: language), systemImage: "square.and.arrow.up")
                 }
+                .appStandardButton()
             } else {
                 Button(L10n.tr("share.openShareSheet", lang: language)) {}
+                    .appStandardButton()
                     .disabled(true)
             }
         }
@@ -387,4 +405,32 @@ struct SharePanelView: View {
         // iOS：分享走 ShareLink（系统分享单）；如需另存文件，阶段 3 用 fileExporter。
         #endif
     }
+
+    #if !os(macOS)
+    /// iOS：把渲染好的 PNG 直接存入系统相册（仅「添加」权限，无需读取相册）。
+    private func saveImageToAlbum() {
+        guard let data = renderedPNG, let image = UIImage(data: data) else {
+            saveMessage = L10n.tr("share.saveFailed", lang: language)
+            return
+        }
+        PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+            DispatchQueue.main.async {
+                switch status {
+                case .authorized, .limited:
+                    PHPhotoLibrary.shared().performChanges {
+                        PHAssetChangeRequest.creationRequestForAsset(from: image)
+                    } completionHandler: { success, _ in
+                        DispatchQueue.main.async {
+                            saveMessage = success
+                                ? L10n.tr("share.savedToAlbum", lang: language)
+                                : L10n.tr("share.saveFailed", lang: language)
+                        }
+                    }
+                default:
+                    saveMessage = L10n.tr("share.photoPermissionDenied", lang: language)
+                }
+            }
+        }
+    }
+    #endif
 }

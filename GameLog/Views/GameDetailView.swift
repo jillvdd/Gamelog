@@ -396,8 +396,19 @@ struct GameDetailView: View {
     /// 信息块：主名/其他语言名/发售日/平台/分组/评分与条形图。
     private var infoBlock: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(verbatim: game.displayName(for: language))
-                .font(.system(size: 26, weight: .bold))
+            // 名字 + 平台图标：一行放得下就并排；放不下（尤其多平台+超宽字标）自动换行成两行，避免撑宽整页布局。
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(verbatim: game.displayName(for: language))
+                        .font(.system(size: 26, weight: .bold))
+                    GamePlatformIcons(platforms: platforms, maxCount: 10, iconSize: 18)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(verbatim: game.displayName(for: language))
+                        .font(.system(size: 26, weight: .bold))
+                    GamePlatformIcons(platforms: platforms, maxCount: 10, iconSize: 18)
+                }
+            }
             LocalizedNamesSubtitle(game: game, currentLanguage: language)
 
             if let date = game.releaseDate {

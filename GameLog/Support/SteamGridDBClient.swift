@@ -26,6 +26,17 @@ struct SteamGridDBResponse<T: Decodable>: Decodable {
 struct SteamGridDBClient {
     let apiKey: String
 
+    init(apiKey: String) {
+        self.apiKey = Self.sanitizedKey(apiKey)
+    }
+
+    /// 从存储值提取有效 key：取第一个空白分隔的 token（key 本身无空格）。
+    /// 兼容从网页复制时把旁边文字（如「Revoke API Key」按钮）一起粘贴进来的情况，
+    /// 也清理首尾空白。为空字符串返回空。
+    static func sanitizedKey(_ raw: String) -> String {
+        raw.split(whereSeparator: { $0.isWhitespace }).first.map(String.init) ?? ""
+    }
+
     private static let base = "https://www.steamgriddb.com/api/v2"
 
     /// 搜索游戏。

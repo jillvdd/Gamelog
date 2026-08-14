@@ -7,6 +7,8 @@
 "library.sortByName" = "名前順";
 "library.sortByRelease" = "発売日順";
 "library.sortByCompletion" = "クリア日順";
+"library.sortByScoreAsc" = "平均点（低い順）";
+"library.sortByScoreDesc" = "平均点（高い順）";
 "library.sort" = "並び替え";
 "library.gridView" = "グリッド表示";
 "library.listView" = "リスト表示";
@@ -22,7 +24,8 @@
 "game.nameZh" = "中国語名";
 "game.nameJa" = "日本語名";
 "game.aliases" = "別名（検索用）";
-"game.aliasPlaceholder" = "別名を入力して Enter";
+"game.aliasPlaceholder" = "別名を入力";
+"game.aliasAdd" = "追加";
 "game.releaseDate" = "発売日";
 "game.cover" = "カバー";
 "game.chooseCover" = "画像を選択…";
@@ -74,6 +77,10 @@
 "share.preview" = "プレビュー";
 "share.saveImage" = "画像を保存…";
 "share.openShareSheet" = "共有…";
+"share.saveToAlbum" = "アルバムに保存";
+"share.savedToAlbum" = "アルバムに保存しました";
+"share.saveFailed" = "保存に失敗しました";
+"share.photoPermissionDenied" = "写真へのアクセスが許可されていません。設定で許可してください";
 "share.noneSelected" = "ゲームを1つ以上選択してください";
 "share.byGames" = "ゲームで共有";
 "share.byGroups" = "グループで共有";
@@ -91,6 +98,11 @@
 "settings.steamgriddb" = "SteamGridDB";
 "settings.steamGridDBKey" = "API Key";
 "settings.steamGridDBHint" = "steamgriddb.com で無料登録後、プロフィールから取得";
+"settings.showKey" = "表示";
+"settings.hideKey" = "隠す";
+"settings.copyKey" = "コピー";
+"settings.keyValid" = "APIキーは有効です";
+"settings.keyInvalid" = "APIキーが無効です。確認してください";
 "settings.backup" = "データバックアップ";
 "settings.customization" = "カスタマイズ";
 "settings.username" = "ユーザー名";
@@ -105,6 +117,8 @@
 "settings.hideToolbarGlassHint" = "ツールバーの毛ガラス背景とタイトルを隠し、上部をシンプルにします（オフで表示）。（macOS 15 以上で有効）";
 "settings.collectorMode" = "コレクターモード";
 "settings.collectorModeHint" = "ゲーム詳細ページに「所持」タブを追加し、実物ゲームの版とコレクション写真を記録します。";
+"settings.platformIcons" = "プラットフォームロゴ";
+"settings.platformIconsHint" = "プラットフォーム選択・グループ表示でブランドロゴを表示します。";
 "settings.keepOriginalImages" = "元画像を保存";
 "settings.keepOriginalImagesHint" = "コレクション写真を圧縮せずそのまま保存します（デフォルトは圧縮して容量を節約。以降に追加する写真にのみ適用）。";
 "detail.details" = "詳細";

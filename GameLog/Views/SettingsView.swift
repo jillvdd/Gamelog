@@ -6,6 +6,7 @@ import AppKit
 import UniformTypeIdentifiers
 #else
 import PhotosUI
+import UIKit
 import UniformTypeIdentifiers
 #endif
 
@@ -27,6 +28,7 @@ struct SettingsView: View {
     #endif
     @AppStorage(UserCustomization.collectorModeKey) private var collectorMode = false
     @AppStorage(UserCustomization.keepOriginalImagesKey) private var keepOriginalImages = false
+    @AppStorage(UserCustomization.platformIconsKey) private var showPlatformIcons = true
 
     /// 用户名绑定：写入时截断到上限。用 Binding 替代 `.onChange`——`.onChange` 挂 TextField 在 macOS 会吞尾随空格。
     private var usernameBinding: Binding<String> {
@@ -42,11 +44,16 @@ struct SettingsView: View {
     @State private var statusMessage: String?
     @State private var showingImportConfirm = false
     @State private var cropSession: CropSession?
+    /// SteamGridDB key 是否明文显示。
+    @State private var showKey = false
+    /// SteamGridDB key 验证状态（改动时自动校验，✓/✗）。
+    @State private var keyStatus: SteamGridDBKeyStatus = .idle
+    /// 最近一次已验证为有效的 key（避免重复请求）。
+    @State private var validatedKey = ""
+    @State private var keyValidationTask: Task<Void, Never>?
     #if !os(macOS)
     @State private var showingAvatarPicker = false
     @State private var showingBackupImporter = false
-    @State private var backupShareURL: URL?
-    @State private var showingShareSheet = false
     #endif
 
     var body: some View {
@@ -74,10 +81,13 @@ struct SettingsView: View {
                         avatarPreview
                         #if os(macOS)
                         Button(L10n.tr("settings.chooseImage", lang: language)) { pickImage(for: .avatar) }
+                            .appStandardButton()
                         #else
                         Button(L10n.tr("settings.chooseImage", lang: language)) { showingAvatarPicker = true }
+                            .appStandardButton()
                         #endif
                         Button(L10n.tr("settings.removeAvatar", lang: language)) { UserCustomization.removeAvatar() }
+                            .appStandardButton()
                             .disabled(avatarFile.isEmpty)
                     }
                 }
@@ -116,11 +126,49 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+
+                Toggle(L10n.tr("settings.platformIcons", lang: language), isOn: $showPlatformIcons)
+                LText("settings.platformIconsHint")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section(L10n.tr("settings.steamgriddb", lang: language)) {
-                SecureField(L10n.tr("settings.steamGridDBKey", lang: language), text: $steamGridDBKey)
+                HStack(spacing: 8) {
+                    Group {
+                        if showKey {
+                            TextField(L10n.tr("settings.steamGridDBKey", lang: language), text: $steamGridDBKey)
+                        } else {
+                            SecureField(L10n.tr("settings.steamGridDBKey", lang: language), text: $steamGridDBKey)
+                        }
+                    }
                     .textFieldStyle(.roundedBorder)
+
+                    Button {
+                        showKey.toggle()
+                    } label: {
+                        Image(systemName: showKey ? "eye.slash" : "eye")
+                    }
+                    #if os(macOS)
+                    .buttonStyle(.borderless)
+                    #endif
+                    .appStandardButton()
+                    .help(L10n.tr(showKey ? "settings.hideKey" : "settings.showKey", lang: language))
+
+                    Button {
+                        copyKey()
+                    } label: {
+                        Image(systemName: "doc.on.doc")
+                    }
+                    #if os(macOS)
+                    .buttonStyle(.borderless)
+                    #endif
+                    .appStandardButton()
+                    .help(L10n.tr("settings.copyKey", lang: language))
+
+                    keyStatusIcon
+                        .frame(width: 20, height: 20)
+                }
                 LText("settings.steamGridDBHint")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -131,8 +179,12 @@ struct SettingsView: View {
                 Button(L10n.tr("backup.export", lang: language)) { export() }
                 Button(L10n.tr("backup.import", lang: language)) { showingImportConfirm = true }
                 #else
+                // iOS：导出分享单由 prepareBackupShare 直接以 UIKit 呈现（不走 SwiftUI sheet，
+                // 规避 sheet 首次弹出为空白、需先弹其他窗「预热」的问题）。
                 Button(L10n.tr("backup.export", lang: language)) { prepareBackupShare() }
+                    .appStandardButton()
                 Button(L10n.tr("backup.import", lang: language)) { showingBackupImporter = true }
+                    .appStandardButton()
                 #endif
                 if let statusMessage {
                     Text(verbatim: statusMessage)
@@ -142,6 +194,8 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .onAppear { validateKey() }
+        .onChange(of: steamGridDBKey) { _, _ in validateKey() }
         #if os(macOS)
         .frame(width: 520, height: 720)
         #endif
@@ -184,15 +238,6 @@ struct SettingsView: View {
                 }
             }
         }
-        .sheet(isPresented: $showingShareSheet) {
-            if let url = backupShareURL {
-                ShareLink(item: url) {
-                    Label(L10n.tr("backup.export", lang: language), systemImage: "square.and.arrow.up")
-                }
-                .presentationDetents([.medium])
-                .presentationDragIndicator(.visible)
-            }
-        }
         #endif
     }
 
@@ -231,6 +276,67 @@ struct SettingsView: View {
         }
     }
     #endif
+
+    // MARK: - SteamGridDB key 验证
+
+    /// key 验证状态图标：空=无、转圈=验证中、✓=有效、✗=无效。
+    @ViewBuilder
+    private var keyStatusIcon: some View {
+        switch keyStatus {
+        case .idle:
+            EmptyView()
+        case .checking:
+            ProgressView()
+                .controlSize(.small)
+        case .valid:
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundStyle(.green)
+                .help(L10n.tr("settings.keyValid", lang: language))
+        case .invalid:
+            Image(systemName: "xmark.circle.fill")
+                .foregroundStyle(.red)
+                .help(L10n.tr("settings.keyInvalid", lang: language))
+        }
+    }
+
+    /// 复制 key（复制净化后的值，不带网页粘贴进来的多余文字）。
+    private func copyKey() {
+        let key = SteamGridDBClient.sanitizedKey(steamGridDBKey)
+        #if os(macOS)
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(key, forType: .string)
+        #else
+        UIPasteboard.general.string = key
+        #endif
+    }
+
+    /// 校验 key 可用性：取净化后的 key，调 SteamGridDB 搜索接口，200=✓、失败=✗。
+    /// 防抖 400ms + 代际守卫，只在停止输入后发一次请求；打开设置页也会校验一次。
+    private func validateKey() {
+        keyValidationTask?.cancel()
+        let key = SteamGridDBClient.sanitizedKey(steamGridDBKey)
+        guard !key.isEmpty else {
+            keyStatus = .idle
+            validatedKey = ""
+            return
+        }
+        if keyStatus == .valid, validatedKey == key { return }
+        validatedKey = key
+        keyStatus = .checking
+        let task = Task {
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            guard !Task.isCancelled else { return }
+            do {
+                _ = try await SteamGridDBClient(apiKey: key).search(term: "zelda")
+                guard !Task.isCancelled else { return }
+                keyStatus = .valid
+            } catch {
+                guard !Task.isCancelled else { return }
+                keyStatus = .invalid
+            }
+        }
+        keyValidationTask = task
+    }
 
     // MARK: - 选图 + 裁切
 
@@ -285,19 +391,49 @@ struct SettingsView: View {
     }
 
     #if !os(macOS)
-    /// iOS 备份导出：编码成 JSON → 写临时文件 → 打开系统分享单（含 AirDrop）。
+    /// iOS 备份导出：编码成 JSON → 写临时文件 → 直接用 UIKit 呈现系统分享单（含 AirDrop / 存储到文件）。
+    /// 不走 SwiftUI sheet：挂 Form 行按钮上的 sheet 首次弹窗会呈现为空白、静默失败（先弹别的窗可「预热」）。
     private func prepareBackupShare() {
         guard let data = try? BackupManager.encode(games: games, groups: groups) else {
             statusMessage = L10n.tr("backup.exportFailed", lang: language)
             return
         }
         let url = FileManager.default.temporaryDirectory.appendingPathComponent("GameLog-backup.json")
-        if (try? data.write(to: url)) != nil {
-            backupShareURL = url
-            showingShareSheet = true
-        } else {
+        guard (try? data.write(to: url)) != nil else {
             statusMessage = L10n.tr("backup.exportFailed", lang: language)
+            return
         }
+        presentShareSheet(url: url)
+    }
+
+    /// 以 UIActivityViewController 直接呈现分享单（系统原生路径，可靠）。
+    private func presentShareSheet(url: URL) {
+        let vc = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+        guard let top = topPresentedViewController() else {
+            statusMessage = L10n.tr("backup.exportFailed", lang: language)
+            return
+        }
+        // iPad 上 activity 控制器需 popover 锚点；iPhone 无需。
+        if let popover = vc.popoverPresentationController {
+            popover.sourceView = top.view
+            popover.sourceRect = CGRect(x: top.view.bounds.midX, y: top.view.bounds.midY, width: 0, height: 0)
+            popover.permittedArrowDirections = []
+        }
+        top.present(vc, animated: true)
+    }
+
+    /// 找当前窗口栈最顶层的 presented view controller，作为 UIKit 呈现锚点。
+    private func topPresentedViewController() -> UIViewController? {
+        guard let windowScene = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .first(where: { $0.activationState == .foregroundActive }),
+            let root = windowScene.windows.first(where: { $0.isKeyWindow })?.rootViewController
+        else { return nil }
+        var top = root
+        while let presented = top.presentedViewController {
+            top = presented
+        }
+        return top
     }
     #endif
 
@@ -327,4 +463,9 @@ private struct CropSession: Identifiable {
     let id = UUID()
     let kind: CropKind
     let image: AppImage
+}
+
+/// SteamGridDB key 校验状态：无输入=idle，校验中=checking，通过=valid，失败=invalid。
+private enum SteamGridDBKeyStatus {
+    case idle, checking, valid, invalid
 }

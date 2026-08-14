@@ -148,15 +148,22 @@ struct GroupGamePickerView: View {
                 Button {
                     platformFilter = p
                 } label: {
-                    if platformFilter == p {
-                        Label(Presets.display(p, category: .platform, language: language), systemImage: "checkmark")
-                    } else {
+                    HStack(spacing: 8) {
+                        PlatformIcon(platform: p, size: 16)
                         Text(verbatim: Presets.display(p, category: .platform, language: language))
+                        Spacer()
+                        if platformFilter == p {
+                            Image(systemName: "checkmark")
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
             }
         } label: {
             HStack(spacing: 4) {
+                if let platformFilter {
+                    PlatformIcon(platform: platformFilter, size: 14)
+                }
                 Image(systemName: "line.3.horizontal.decrease")
                 Text(verbatim: platformMenuLabel)
                     .lineLimit(1)

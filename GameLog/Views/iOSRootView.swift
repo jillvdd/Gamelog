@@ -100,24 +100,28 @@ struct iOSLibraryTab: View {
         .sheet(isPresented: $showingGroupManager) { iOSGroupManagerSheet() }
     }
 
-    /// 整合的筛选菜单：分组筛选（含管理）与平台筛选合到一个按钮，避免两个按钮误触。
+    /// 整合的筛选菜单：分组 / 平台 / 全部游戏互斥单选（与 macOS 侧边栏的导航一致）。
+    /// 选中分组会清掉平台筛选、选中平台会清掉分组筛选，不会同时生效，始终只有一个勾选。
     private var filterMenu: some View {
         Menu {
-            Section(L10n.tr("library.filterGroup", lang: language)) {
-                Button {
-                    groupFilter = nil
-                } label: {
-                    if groupFilter == nil {
-                        Label(L10n.tr("library.allGroups", lang: language), systemImage: "checkmark")
-                    } else {
-                        Text(verbatim: L10n.tr("library.allGroups", lang: language))
-                    }
+            Button {
+                groupFilter = nil
+                platformFilter = nil
+            } label: {
+                if groupFilter == nil && platformFilter == nil {
+                    Label(L10n.tr("library.all", lang: language), systemImage: "checkmark")
+                } else {
+                    Text(verbatim: L10n.tr("library.all", lang: language))
                 }
+            }
+
+            Section(L10n.tr("library.filterGroup", lang: language)) {
                 ForEach(groups) { group in
                     Button {
                         groupFilter = group
+                        platformFilter = nil
                     } label: {
-                        if groupFilter?.persistentModelID == group.persistentModelID {
+                        if groupFilter?.persistentModelID == group.persistentModelID && platformFilter == nil {
                             Label(group.name, systemImage: "checkmark")
                         } else {
                             Text(verbatim: group.name)
@@ -127,23 +131,19 @@ struct iOSLibraryTab: View {
             }
 
             Section(L10n.tr("library.filterPlatform", lang: language)) {
-                Button {
-                    platformFilter = nil
-                } label: {
-                    if platformFilter == nil {
-                        Label(L10n.tr("library.allPlatforms", lang: language), systemImage: "checkmark")
-                    } else {
-                        Text(verbatim: L10n.tr("library.allPlatforms", lang: language))
-                    }
-                }
                 ForEach(platformsInUse, id: \.self) { platform in
                     Button {
                         platformFilter = platform
+                        groupFilter = nil
                     } label: {
-                        if platformFilter == platform {
-                            Label(Presets.display(platform, category: .platform, language: language), systemImage: "checkmark")
-                        } else {
+                        HStack(spacing: 8) {
+                            PlatformIcon(platform: platform, size: 16)
                             Text(verbatim: Presets.display(platform, category: .platform, language: language))
+                            Spacer()
+                            if platformFilter == platform && groupFilter == nil {
+                                Image(systemName: "checkmark")
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
                 }

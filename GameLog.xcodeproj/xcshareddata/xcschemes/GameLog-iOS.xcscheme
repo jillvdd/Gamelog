@@ -15,7 +15,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "100000000000000000000014"
-               BuildableName = "GameLog.app"
+               BuildableName = "GameLog-iOS"
                BlueprintName = "GameLog-iOS"
                ReferencedContainer = "container:GameLog.xcodeproj">
             </BuildableReference>
@@ -44,7 +44,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "100000000000000000000014"
-            BuildableName = "GameLog.app"
+            BuildableName = "GameLog-iOS"
             BlueprintName = "GameLog-iOS"
             ReferencedContainer = "container:GameLog.xcodeproj">
          </BuildableReference>
@@ -61,7 +61,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "100000000000000000000014"
-            BuildableName = "GameLog.app"
+            BuildableName = "GameLog-iOS"
             BlueprintName = "GameLog-iOS"
             ReferencedContainer = "container:GameLog.xcodeproj">
          </BuildableReference>

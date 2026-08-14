@@ -7,6 +7,8 @@
 "library.sortByName" = "按名字";
 "library.sortByRelease" = "按发售日期";
 "library.sortByCompletion" = "按通关日期";
+"library.sortByScoreAsc" = "平均分（从低到高）";
+"library.sortByScoreDesc" = "平均分（从高到低）";
 "library.sort" = "排序";
 "library.gridView" = "网格视图";
 "library.listView" = "列表视图";
@@ -22,7 +24,8 @@
 "game.nameZh" = "中文名";
 "game.nameJa" = "日文名";
 "game.aliases" = "别名（用于搜索）";
-"game.aliasPlaceholder" = "输入别名后回车";
+"game.aliasPlaceholder" = "输入别名";
+"game.aliasAdd" = "添加";
 "game.releaseDate" = "发售日期";
 "game.cover" = "封面";
 "game.chooseCover" = "选择图片…";
@@ -73,6 +76,10 @@
 "share.count" = "共 %d 款";"share.preview" = "预览";
 "share.saveImage" = "保存图片…";
 "share.openShareSheet" = "分享…";
+"share.saveToAlbum" = "保存到相册";
+"share.savedToAlbum" = "已保存到相册";
+"share.saveFailed" = "保存失败";
+"share.photoPermissionDenied" = "未获得照片权限，请在系统设置中允许";
 "share.noneSelected" = "请至少选择一个游戏";
 "share.byGames" = "按游戏分享";
 "share.byGroups" = "按分组分享";
@@ -90,6 +97,11 @@
 "settings.steamgriddb" = "SteamGridDB";
 "settings.steamGridDBKey" = "API Key";
 "settings.steamGridDBHint" = "在 steamgriddb.com 免费注册后，从个人页面获取";
+"settings.showKey" = "显示";
+"settings.hideKey" = "隐藏";
+"settings.copyKey" = "复制";
+"settings.keyValid" = "API Key 有效";
+"settings.keyInvalid" = "API Key 无效，请检查";
 "settings.backup" = "数据备份";
 "settings.customization" = "个性化";
 "settings.username" = "用户名";
@@ -104,6 +116,8 @@
 "settings.hideToolbarGlassHint" = "隐藏工具栏的毛玻璃背景与标题文字，顶部更简洁（关闭时保留）。（macOS 15 及以上可启用）";
 "settings.collectorMode" = "收藏家模式";
 "settings.collectorModeHint" = "在游戏详情页启用「持有」页签，记录实体游戏的版本与收藏照片。";
+"settings.platformIcons" = "平台标志";
+"settings.platformIconsHint" = "在各平台选择与分组中显示品牌标志图标。";
 "settings.keepOriginalImages" = "保存原图";
 "settings.keepOriginalImagesHint" = "收藏照片按原样保存、不压缩（默认压缩以节省空间；只影响之后新增的图）。";
 "detail.details" = "详情";

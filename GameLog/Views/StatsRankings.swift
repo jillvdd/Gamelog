@@ -269,10 +269,14 @@ struct OverallRankingView: View {
                 Button {
                     selectedPlatform = platform
                 } label: {
-                    if selectedPlatform == platform {
-                        Label(Presets.display(platform, category: .platform, language: language), systemImage: "checkmark")
-                    } else {
+                    HStack(spacing: 8) {
+                        PlatformIcon(platform: platform, size: 16)
                         Text(verbatim: Presets.display(platform, category: .platform, language: language))
+                        Spacer()
+                        if selectedPlatform == platform {
+                            Image(systemName: "checkmark")
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
             }

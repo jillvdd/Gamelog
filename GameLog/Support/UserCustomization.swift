@@ -26,6 +26,8 @@ enum UserCustomization {
     static let collectorModeKey = "customization.collectorMode"
     /// 保存原图开关（默认关闭=收藏照片导入时压缩；开启=存原图，只影响之后新增的图）。
     static let keepOriginalImagesKey = "customization.keepOriginalImages"
+    /// 平台标志开关（默认开启；关闭后各平台不显示 logo 图标）。
+    static let platformIconsKey = "customization.platformIcons"
 
     /// 用户名长度上限（设置页输入与导入时统一截断）。
     static let usernameMaxLength = 20

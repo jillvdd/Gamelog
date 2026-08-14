@@ -21,6 +21,8 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>用于拍摄游戏封面、头像与收藏照片。</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>用于把分享图保存到相册。</string>
 	<key>UIFileSharingEnabled</key>
 	<true/>
 </dict>

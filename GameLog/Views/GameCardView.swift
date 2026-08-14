@@ -8,6 +8,28 @@ extension Game {
     }
 }
 
+/// 游戏名右侧的平台图标：最多显示 maxCount 个，超出显示 +N。
+/// 仅作为平台符号提示，下方的平台文字行保持不变。
+struct GamePlatformIcons: View {
+    let platforms: [String]
+    var maxCount: Int = 3
+    var iconSize: CGFloat = 12
+
+    var body: some View {
+        let shown = platforms.prefix(maxCount)
+        HStack(spacing: 3) {
+            ForEach(shown, id: \.self) { p in
+                PlatformIcon(platform: p, size: iconSize)
+            }
+            if platforms.count > maxCount {
+                Text(verbatim: "+\(platforms.count - maxCount)")
+                    .font(.system(size: iconSize * 0.85))
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
 /// 网格视图中的游戏卡片：封面 + 库显示分徽章 + 名称 + 平台/日期。
 struct GameCardView: View {
     @Environment(\.appLanguageCode) private var language
@@ -65,10 +87,23 @@ struct GameCardView: View {
                         .padding(6)
                 }
             }
-            Text(verbatim: game.displayName(for: language))
-                .font(.system(size: 12, weight: .medium))
-                .lineLimit(2)
-                .multilineTextAlignment(.leading)
+            // 名字 + 平台图标：一行放得下就并排；放不下（多平台/超宽字标）图标换到名字下方一行，名字不被挤压省略。
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Text(verbatim: game.displayName(for: language))
+                        .font(.system(size: 12, weight: .medium))
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                    GamePlatformIcons(platforms: game.platformList, maxCount: 3, iconSize: 12)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(verbatim: game.displayName(for: language))
+                        .font(.system(size: 12, weight: .medium))
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                    GamePlatformIcons(platforms: game.platformList, maxCount: 3, iconSize: 12)
+                }
+            }
             if !platformText.isEmpty {
                 Text(verbatim: platformText)
                     .font(.caption2)
@@ -118,8 +153,12 @@ struct GameRowView: View {
             .clipShape(RoundedRectangle(cornerRadius: 6))
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(verbatim: game.displayName(for: language))
-                    .font(.system(size: 13, weight: .medium))
+                HStack(spacing: 4) {
+                    Text(verbatim: game.displayName(for: language))
+                        .font(.system(size: 13, weight: .medium))
+                        .lineLimit(1)
+                    GamePlatformIcons(platforms: game.platformList, maxCount: 4, iconSize: 13)
+                }
                 if !subtitle.isEmpty {
                     Text(verbatim: subtitle)
                         .font(.caption)

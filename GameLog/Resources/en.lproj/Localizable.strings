@@ -7,6 +7,8 @@
 "library.sortByName" = "Name";
 "library.sortByRelease" = "Release date";
 "library.sortByCompletion" = "Completion date";
+"library.sortByScoreAsc" = "Average score (low to high)";
+"library.sortByScoreDesc" = "Average score (high to low)";
 "library.sort" = "Sort";
 "library.gridView" = "Grid view";
 "library.listView" = "List view";
@@ -22,7 +24,8 @@
 "game.nameZh" = "Chinese name";
 "game.nameJa" = "Japanese name";
 "game.aliases" = "Aliases (for search)";
-"game.aliasPlaceholder" = "Type an alias and press Return";
+"game.aliasPlaceholder" = "Enter an alias";
+"game.aliasAdd" = "Add";
 "game.releaseDate" = "Release date";
 "game.cover" = "Cover";
 "game.chooseCover" = "Choose Image…";
@@ -74,6 +77,10 @@
 "share.preview" = "Preview";
 "share.saveImage" = "Save Image…";
 "share.openShareSheet" = "Share…";
+"share.saveToAlbum" = "Save to Album";
+"share.savedToAlbum" = "Saved to Album";
+"share.saveFailed" = "Save failed";
+"share.photoPermissionDenied" = "Photo access is not allowed. Enable it in Settings.";
 "share.noneSelected" = "Select at least one game";
 "share.byGames" = "By Game";
 "share.byGroups" = "By Group";
@@ -91,6 +98,11 @@
 "settings.steamgriddb" = "SteamGridDB";
 "settings.steamGridDBKey" = "API Key";
 "settings.steamGridDBHint" = "Register free at steamgriddb.com, then get the key from your profile";
+"settings.showKey" = "Show";
+"settings.hideKey" = "Hide";
+"settings.copyKey" = "Copy";
+"settings.keyValid" = "API key is valid";
+"settings.keyInvalid" = "Invalid API key. Please check";
 "settings.backup" = "Backup";
 "settings.customization" = "Personalization";
 "settings.username" = "Username";
@@ -105,6 +117,8 @@
 "settings.hideToolbarGlassHint" = "Hides the toolbar frosted-glass background and title for a simpler top bar (kept when off). (macOS 15 and later)";
 "settings.collectorMode" = "Collector Mode";
 "settings.collectorModeHint" = "Adds an \"Owned\" tab to game details for recording physical game editions and photos.";
+"settings.platformIcons" = "Platform Logos";
+"settings.platformIconsHint" = "Show brand logos in platform pickers and grouping views.";
 "settings.keepOriginalImages" = "Keep Original Images";
 "settings.keepOriginalImagesHint" = "Saves collection photos unmodified instead of compressing (applies only to images added afterwards).";
 "detail.details" = "Details";

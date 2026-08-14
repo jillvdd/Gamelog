@@ -86,4 +86,44 @@ enum Presets {
         default: return entry.zh
         }
     }
+
+    /// 平台 → 图标文件名（资源在 Resources/PlatformIcons/，文件名即此表的值）。
+    /// 未列出的预设（PC/其他）与自定义平台没有 PNG 图标，回退 SF Symbol。
+    private static let platformIconFiles: [String: String] = [
+        "Xbox Series X|S": "Xbox-Series-X-S",
+        "Nintendo Switch 2": "Nintendo-Switch-2",
+        "PS5": "PS5",
+        "iOS": "iOS",
+        "Xbox One": "Xbox-One",
+        "Wii U": "Wii-U",
+        "Nintendo Switch": "Nintendo-Switch",
+        "PS4": "PS4",
+        "3DS": "3DS",
+        "PS Vita": "PS-Vita",
+        "Xbox 360": "Xbox-360",
+        "Wii": "Wii",
+        "PS3": "PS3",
+        "NDS": "NDS",
+        "PSP": "PSP",
+        "Xbox": "Xbox",
+        "GameCube": "GameCube",
+        "PS2": "PS2",
+        "GBA": "GBA",
+        "N64": "N64",
+        "PS1": "PS1",
+        "Game Boy Color": "Game-Boy-Color",
+        "SFC/SNES": "SFC-SNES",
+        "Game Boy": "Game-Boy",
+        "FC/NES": "FC-NES",
+    ]
+
+    /// 平台图标文件名（无则 nil）。
+    static func platformIconFile(for platform: String) -> String? {
+        platformIconFiles[platform]
+    }
+
+    /// 无 PNG 图标时的 SF Symbol 兜底（PC / 其他 / 自定义平台）。
+    static func platformIconSymbol(for platform: String) -> String? {
+        platformIconFiles[platform] == nil ? "gamecontroller" : nil
+    }
 }

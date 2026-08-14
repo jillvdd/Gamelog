@@ -98,9 +98,18 @@ struct PresetOrCustomPicker: View {
                         Text(verbatim: L10n.tr("common.custom", lang: language))
                     }
                 } label: {
-                    Text(verbatim: Presets.display(value, category: category, language: language))
+                    HStack(spacing: 6) {
+                        if category == .platform {
+                            PlatformIcon(platform: value, size: 14)
+                        }
+                        Text(verbatim: Presets.display(value, category: category, language: language))
+                    }
                 }
+                #if os(macOS)
                 .menuStyle(.borderlessButton)
+                #else
+                .menuStyle(.button)
+                #endif
             }
         }
         }
@@ -108,16 +117,20 @@ struct PresetOrCustomPicker: View {
         .onChange(of: value) { _, newValue in sync(to: newValue) }
     }
 
-    /// 单个平台选项，当前选中的带对勾。
+    /// 单个平台选项，当前选中的右侧带对勾。
     private func option(_ p: String) -> some View {
         Button {
             value = p
         } label: {
-            Group {
+            HStack(spacing: 8) {
+                if category == .platform {
+                    PlatformIcon(platform: p, size: 16)
+                }
+                Text(verbatim: Presets.display(p, category: category, language: language))
+                Spacer()
                 if value == p {
-                    Label(Presets.display(p, category: category, language: language), systemImage: "checkmark")
-                } else {
-                    Text(verbatim: Presets.display(p, category: category, language: language))
+                    Image(systemName: "checkmark")
+                        .foregroundStyle(.secondary)
                 }
             }
         }
@@ -260,17 +273,15 @@ struct GameEditView: View {
                             }
                         }
                     }
-                    BorderedTextField(
-                        text: $aliasInput,
-                        placeholder: L10n.tr("game.aliasPlaceholder", lang: language),
-                        onSubmit: {
-                            let trimmed = aliasInput.trimmingCharacters(in: .whitespaces)
-                            if !trimmed.isEmpty && !aliases.contains(trimmed) {
-                                aliases.append(trimmed)
-                            }
-                            aliasInput = ""
-                        }
-                    )
+                    HStack(spacing: 8) {
+                        BorderedTextField(
+                            text: $aliasInput,
+                            placeholder: L10n.tr("game.aliasPlaceholder", lang: language),
+                            onSubmit: addAlias
+                        )
+                        Button(L10n.tr("game.aliasAdd", lang: language)) { addAlias() }
+                            .disabled(aliasInput.trimmingCharacters(in: .whitespaces).isEmpty)
+                    }
                 }
 
                 Toggle(L10n.tr("game.releaseDate", lang: language), isOn: $hasReleaseDate)
@@ -323,7 +334,7 @@ struct GameEditView: View {
                         }
                     }
 
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 10) {
                         Button(L10n.tr("game.chooseCover", lang: language)) {
                             #if os(macOS)
                             pickCover()
@@ -331,10 +342,22 @@ struct GameEditView: View {
                             showingCoverPicker = true
                             #endif
                         }
+                        #if os(macOS)
+                        .buttonStyle(.borderless)
+                        #endif
+                        .appStandardButton()
                         Button(L10n.tr("game.searchCover", lang: language)) { showingCoverSearch = true }
+                            #if os(macOS)
+                            .buttonStyle(.borderless)
+                            #endif
+                            .appStandardButton()
                             .disabled(steamGridDBKey.isEmpty)
                         if coverData != nil {
                             Button(L10n.tr("common.delete", lang: language), role: .destructive) { coverData = nil }
+                                #if os(macOS)
+                                .buttonStyle(.borderless)
+                                #endif
+                                .appStandardButton()
                         }
                     }
                 }
@@ -447,6 +470,15 @@ struct GameEditView: View {
         groupIDs = Set(game.groups.map(\.persistentModelID))
         // 放在所有字段写入之后：避免上面给 name 赋值那一次 onChange 触发自动匹配。
         didFinishLoading = true
+    }
+
+    /// 添加别名：去首尾空格、去重，输入框清空。回车（onSubmit）与「添加」按钮共用。
+    private func addAlias() {
+        let trimmed = aliasInput.trimmingCharacters(in: .whitespaces)
+        if !trimmed.isEmpty && !aliases.contains(trimmed) {
+            aliases.append(trimmed)
+        }
+        aliasInput = ""
     }
 
     private func pickCover() {

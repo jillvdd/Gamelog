@@ -17,6 +17,9 @@ struct CoverSearchSheet: View {
     @State private var hasSearched = false
     @State private var searchGeneration = 0
     @State private var searchTask: Task<Void, Never>?
+    /// 搜索结果各命中抓到的第一条封面缩略图 URL（key = 游戏 id）；抓取中为占位。
+    @State private var thumbURLs: [Int: String] = [:]
+    @State private var thumbTask: Task<Void, Never>?
     /// 封面下载代际：返回/关闭/换游戏时 +1，使在途下载结果失效（防下载完成后仍应用封面或关面板）。
     @State private var downloadGeneration = 0
 
@@ -28,7 +31,7 @@ struct CoverSearchSheet: View {
                 LText("cover.title")
                     .font(.headline)
                 Spacer()
-                Button(L10n.tr("cover.close", lang: language)) { downloadGeneration += 1; dismiss() }
+                Button(L10n.tr("cover.close", lang: language)) { downloadGeneration += 1; searchTask?.cancel(); thumbTask?.cancel(); dismiss() }
                     .keyboardShortcut(.cancelAction)
             }
 
@@ -71,7 +74,8 @@ struct CoverSearchSheet: View {
 
     private var resultsList: some View {
         List(results) { hit in
-            HStack {
+            HStack(spacing: 12) {
+                resultThumb(hit)
                 VStack(alignment: .leading) {
                     Text(verbatim: hit.name)
                     if let types = hit.types, !types.isEmpty {
@@ -87,6 +91,34 @@ struct CoverSearchSheet: View {
             .contentShape(Rectangle())
             .onTapGesture { loadGrids(for: hit) }
         }
+    }
+
+    /// 搜索结果行的封面缩略图：已抓到的显示，未抓到的显示占位。
+    private func resultThumb(_ hit: SteamGridDBGameHit) -> some View {
+        Group {
+            if let urlString = thumbURLs[hit.id], let url = URL(string: urlString) {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image.resizable().scaledToFill()
+                    case .failure:
+                        resultThumbPlaceholder
+                    default:
+                        resultThumbPlaceholder
+                    }
+                }
+            } else {
+                resultThumbPlaceholder
+            }
+        }
+        .frame(width: 48, height: 64)
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+    }
+
+    private var resultThumbPlaceholder: some View {
+        Rectangle()
+            .fill(Color.semantic(.quaternarySystemFill))
+            .overlay(Image(systemName: "photo").foregroundStyle(.tertiary))
     }
 
     // MARK: - 封面网格
@@ -159,6 +191,7 @@ struct CoverSearchSheet: View {
     /// 即时搜索（点按钮 / 回车）。
     private func searchNow() {
         searchTask?.cancel()
+        thumbTask?.cancel()
         searchGeneration += 1
         isLoading = false
         let term = searchText.trimmingCharacters(in: .whitespaces)
@@ -170,6 +203,7 @@ struct CoverSearchSheet: View {
     /// 输入防抖：停止输入约 300ms 后才真正搜索；连发请求只保留最后一个生效。
     private func scheduleSearch(_ newValue: String) {
         searchTask?.cancel()
+        thumbTask?.cancel()
         searchGeneration += 1
         isLoading = false
         // 改动搜索词说明要重新搜索，退回结果视图
@@ -179,6 +213,7 @@ struct CoverSearchSheet: View {
         guard !term.isEmpty else {
             hasSearched = false
             results = []
+            thumbURLs = [:]
             errorMessage = nil
             return
         }
@@ -199,11 +234,35 @@ struct CoverSearchSheet: View {
             guard generation == searchGeneration else { return }
             isLoading = false
             hasSearched = true
+            thumbURLs = [:]
             results = hits
+            fetchThumbnails(for: hits)
         } catch {
             guard generation == searchGeneration else { return }
             isLoading = false
             errorMessage = L10n.tr("cover.searchFailed", lang: language)
+        }
+    }
+
+    /// 渐进抓取每个搜索结果的第一条封面 URL 作缩略图：按序（依赖 client 的 ~2 次/秒节流），
+    /// 每抓到一条就更新一次 UI；最多 10 条，避免大批请求拖慢。搜索代际变化时放弃在途结果。
+    private func fetchThumbnails(for hits: [SteamGridDBGameHit]) {
+        thumbTask?.cancel()
+        let gen = searchGeneration
+        thumbTask = Task {
+            for hit in hits.prefix(10) {
+                if Task.isCancelled || gen != searchGeneration { return }
+                if thumbURLs[hit.id] != nil { continue }
+                do {
+                    let all = try await client.grids(for: hit.id)
+                    guard !Task.isCancelled, gen == searchGeneration else { return }
+                    if let first = SteamGridDBClient.sorted(all).first {
+                        thumbURLs[hit.id] = first.url
+                    }
+                } catch {
+                    // 单个失败静默，保持占位。
+                }
+            }
         }
     }
 

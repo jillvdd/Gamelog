@@ -55,9 +55,20 @@ struct RootView: View {
                 if !platformsInUse.isEmpty {
                     Section(L10n.tr("library.platforms", lang: language)) {
                         ForEach(platformsInUse, id: \.self) { platform in
-                            Label(Presets.display(platform, category: .platform, language: language), systemImage: "gamecontroller")
-                                .badge(platformCounts[platform] ?? 0)
-                                .tag(SidebarItem.platform(platform))
+                            // 图标 + 名字：一行放得下就并排；侧边栏窄时图标换到名字上方，名字不被截断。
+                            ViewThatFits(in: .horizontal) {
+                                HStack(spacing: 6) {
+                                    PlatformIcon(platform: platform, size: 16)
+                                    Text(verbatim: Presets.display(platform, category: .platform, language: language))
+                                }
+                                VStack(alignment: .leading, spacing: 2) {
+                                    PlatformIcon(platform: platform, size: 16)
+                                    Text(verbatim: Presets.display(platform, category: .platform, language: language))
+                                        .lineLimit(2)
+                                }
+                            }
+                            .badge(platformCounts[platform] ?? 0)
+                            .tag(SidebarItem.platform(platform))
                         }
                     }
                 }
@@ -97,6 +108,7 @@ struct RootView: View {
             .listStyle(.sidebar)
             .navigationSplitViewColumnWidth(min: 180, ideal: 210)
             .safeAreaInset(edge: .bottom) {
+                // 底部条加毛玻璃背景：内容滚动到下方时被半透明遮罩模糊，避免与头像/按钮重叠突兀。
                 HStack(spacing: 8) {
                     if !avatarFile.isEmpty, let avatar = UserCustomization.avatarImage() {
                         Image(appImage: avatar)
@@ -110,8 +122,13 @@ struct RootView: View {
                         Label(L10n.tr("group.newGroup", lang: language), systemImage: "plus")
                     }
                     .buttonStyle(.plain)
-                    .padding()
+                    Spacer(minLength: 0)
                 }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.ultraThinMaterial)
+                .overlay(alignment: .top) { Divider() }
             }
         } detail: {
             switch selection {

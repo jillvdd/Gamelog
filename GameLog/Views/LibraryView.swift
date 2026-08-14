@@ -10,6 +10,8 @@ enum LibrarySort: String, CaseIterable, Identifiable {
     case name
     case releaseDate
     case completionDate
+    case scoreAscending
+    case scoreDescending
 
     var id: String { rawValue }
 }
@@ -101,6 +103,12 @@ struct LibraryView: View {
             result.sort { ($0.releaseDate ?? .distantPast) > ($1.releaseDate ?? .distantPast) }
         case .completionDate:
             result.sort { ($0.latestCompletionDate ?? .distantPast) > ($1.latestCompletionDate ?? .distantPast) }
+        case .scoreAscending:
+            // 未评分（nil）按无穷大处理，排在已评分之后。
+            result.sort { ($0.rawLibraryScore(platform: nil) ?? .greatestFiniteMagnitude) < ($1.rawLibraryScore(platform: nil) ?? .greatestFiniteMagnitude) }
+        case .scoreDescending:
+            // 未评分（nil）按 -1 处理，排在已评分之后。
+            result.sort { ($0.rawLibraryScore(platform: nil) ?? -1) > ($1.rawLibraryScore(platform: nil) ?? -1) }
         }
         return result
     }
@@ -370,10 +378,14 @@ struct LibraryView: View {
                             Button {
                                 groupPlatformFilter = p
                             } label: {
-                                if groupPlatformFilter == p {
-                                    Label(Presets.display(p, category: .platform, language: language), systemImage: "checkmark")
-                                } else {
+                                HStack(spacing: 8) {
+                                    PlatformIcon(platform: p, size: 16)
                                     Text(verbatim: Presets.display(p, category: .platform, language: language))
+                                    Spacer()
+                                    if groupPlatformFilter == p {
+                                        Image(systemName: "checkmark")
+                                            .foregroundStyle(.secondary)
+                                    }
                                 }
                             }
                         }
@@ -412,6 +424,24 @@ struct LibraryView: View {
                             Label(L10n.tr("library.sortByCompletion", lang: language), systemImage: "checkmark")
                         } else {
                             Text(verbatim: L10n.tr("library.sortByCompletion", lang: language))
+                        }
+                    }
+                    Button {
+                        sortRaw = LibrarySort.scoreAscending.rawValue
+                    } label: {
+                        if sortOption == .scoreAscending {
+                            Label(L10n.tr("library.sortByScoreAsc", lang: language), systemImage: "checkmark")
+                        } else {
+                            Text(verbatim: L10n.tr("library.sortByScoreAsc", lang: language))
+                        }
+                    }
+                    Button {
+                        sortRaw = LibrarySort.scoreDescending.rawValue
+                    } label: {
+                        if sortOption == .scoreDescending {
+                            Label(L10n.tr("library.sortByScoreDesc", lang: language), systemImage: "checkmark")
+                        } else {
+                            Text(verbatim: L10n.tr("library.sortByScoreDesc", lang: language))
                         }
                     }
                 } label: {
@@ -481,6 +511,24 @@ struct LibraryView: View {
                             Label(L10n.tr("library.sortByCompletion", lang: language), systemImage: "checkmark")
                         } else {
                             Text(verbatim: L10n.tr("library.sortByCompletion", lang: language))
+                        }
+                    }
+                    Button {
+                        sortRaw = LibrarySort.scoreAscending.rawValue
+                    } label: {
+                        if sortOption == .scoreAscending {
+                            Label(L10n.tr("library.sortByScoreAsc", lang: language), systemImage: "checkmark")
+                        } else {
+                            Text(verbatim: L10n.tr("library.sortByScoreAsc", lang: language))
+                        }
+                    }
+                    Button {
+                        sortRaw = LibrarySort.scoreDescending.rawValue
+                    } label: {
+                        if sortOption == .scoreDescending {
+                            Label(L10n.tr("library.sortByScoreDesc", lang: language), systemImage: "checkmark")
+                        } else {
+                            Text(verbatim: L10n.tr("library.sortByScoreDesc", lang: language))
                         }
                     }
                     Divider()
