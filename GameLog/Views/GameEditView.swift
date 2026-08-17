@@ -200,6 +200,8 @@ struct GameEditView: View {
     @State private var reviewTitle = ""
     @State private var reviewBody = ""
     @State private var groupIDs: Set<PersistentIdentifier> = []
+    /// 状态机状态（想玩/在玩等轻量状态新建时无需通关记录与评分）。
+    @State private var status = GameStatus.completed
 
     // 首条通关记录（仅新建时）
     @State private var platform = Presets.platforms[0]
@@ -233,6 +235,33 @@ struct GameEditView: View {
 
     var body: some View {
         Form {
+            Section(L10n.tr("game.status", lang: language)) {
+                Picker("", selection: $status) {
+                    ForEach(GameStatus.allCases) { s in
+                        Text(verbatim: L10n.tr(s.labelKey, lang: language)).tag(s)
+                    }
+                }
+                .labelsHidden()
+                #if os(macOS)
+                .pickerStyle(.segmented)
+                #else
+                .pickerStyle(.menu)
+                #endif
+                // 游戏主平台：对所有状态都设置（想玩/在玩等轻量状态没有通关记录，平台挂在游戏上）。
+                PresetOrCustomPicker(
+                    title: L10n.tr("completion.platform", lang: language),
+                    presets: Presets.platforms,
+                    category: .platform,
+                    collapsible: true,
+                    value: $platform
+                )
+                if status != .completed {
+                    LText("game.statusHint")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
             Section(L10n.tr("game.name", lang: language)) {
                 LabeledContent(L10n.tr("game.nameEn", lang: language)) {
                     BorderedTextField(text: $name, placeholder: L10n.tr("game.nameEn", lang: language))
@@ -343,19 +372,19 @@ struct GameEditView: View {
                             #endif
                         }
                         #if os(macOS)
-                        .buttonStyle(.borderless)
+                        .buttonStyle(.bordered)
                         #endif
                         .appStandardButton()
                         Button(L10n.tr("game.searchCover", lang: language)) { showingCoverSearch = true }
                             #if os(macOS)
-                            .buttonStyle(.borderless)
+                            .buttonStyle(.bordered)
                             #endif
                             .appStandardButton()
                             .disabled(steamGridDBKey.isEmpty)
                         if coverData != nil {
                             Button(L10n.tr("common.delete", lang: language), role: .destructive) { coverData = nil }
                                 #if os(macOS)
-                                .buttonStyle(.borderless)
+                                .buttonStyle(.bordered)
                                 #endif
                                 .appStandardButton()
                         }
@@ -371,15 +400,8 @@ struct GameEditView: View {
                 BorderedTextEditor(text: $reviewBody, minHeight: 140)
             }
 
-            if isCreating {
+            if isCreating && (status == .completed || status == .longRunning) {
                 Section(L10n.tr("game.firstCompletion", lang: language)) {
-                    PresetOrCustomPicker(
-                        title: L10n.tr("completion.platform", lang: language),
-                        presets: Presets.platforms,
-                        category: .platform,
-                        collapsible: true,
-                        value: $platform
-                    )
                     DateMenuPicker(title: L10n.tr("completion.date", lang: language), selection: $completionDate)
                         .disabled(completionDateIsNone)
                     Toggle(L10n.tr("completion.noDate", lang: language), isOn: $completionDateIsNone)
@@ -459,6 +481,11 @@ struct GameEditView: View {
         }
         name = game.name
         nameAtLoad = game.name
+        status = game.statusValue
+        // 游戏主平台：旧数据可能为空（已通关游戏），回退到首条记录的平台。
+        platform = game.platform.isEmpty
+            ? (game.sortedCompletions.first?.platform ?? Presets.platforms[0])
+            : game.platform
         aliases = game.aliases
         nameZh = game.nameZh ?? ""
         nameJa = game.nameJa ?? ""
@@ -543,44 +570,53 @@ struct GameEditView: View {
         }
 
         if isCreating {
-            let trimmedTitle = reviewTitle.trimmingCharacters(in: .whitespaces)
-            guard !trimmedTitle.isEmpty else {
-                validationError = L10n.tr("validation.reviewTitleRequired", lang: language)
-                return
+            // 已通关/长线游玩必须写评价标题；想玩等轻量状态不强制（也没有通关记录/评分）。
+            if status == .completed || status == .longRunning {
+                let trimmedTitle = reviewTitle.trimmingCharacters(in: .whitespaces)
+                guard !trimmedTitle.isEmpty else {
+                    validationError = L10n.tr("validation.reviewTitleRequired", lang: language)
+                    return
+                }
             }
             let newGame = Game(
                 name: trimmedName,
                 nameZh: nameZhTrimmed.isEmpty ? nil : nameZhTrimmed,
                 nameJa: nameJaTrimmed.isEmpty ? nil : nameJaTrimmed,
                 aliases: aliases,
+                platform: platform,
                 releaseDate: hasReleaseDate ? releaseDate : nil,
                 coverData: coverData,
-                reviewTitle: trimmedTitle,
-                reviewBody: reviewBody
+                reviewTitle: reviewTitle,
+                reviewBody: reviewBody,
+                status: status
             )
             context.insert(newGame)
             newGame.groups = allGroups.filter { groupIDs.contains($0.persistentModelID) }
 
-            let completion = Completion(
-                platform: platform,
-                date: completionDateIsNone ? nil : completionDate,
-                degree: degree,
-                playtime: playtimeIsNone ? nil : parsedPlaytime,
-                notes: notes,
-                scoreGameplay: sGameplay,
-                scoreDesign: sDesign,
-                scoreStory: sStory,
-                scoreArt: sArt,
-                scoreMusic: sMusic,
-                scorePerformance: sPerformance
-            )
-            completion.game = newGame
-            context.insert(completion)
+            if status == .completed || status == .longRunning {
+                let completion = Completion(
+                    platform: platform,
+                    date: completionDateIsNone ? nil : completionDate,
+                    degree: degree,
+                    playtime: playtimeIsNone ? nil : parsedPlaytime,
+                    notes: notes,
+                    scoreGameplay: sGameplay,
+                    scoreDesign: sDesign,
+                    scoreStory: sStory,
+                    scoreArt: sArt,
+                    scoreMusic: sMusic,
+                    scorePerformance: sPerformance
+                )
+                completion.game = newGame
+                context.insert(completion)
+            }
         } else {
             guard let game else { return }
             game.name = trimmedName
             game.nameZh = nameZhTrimmed.isEmpty ? nil : nameZhTrimmed
             game.nameJa = nameJaTrimmed.isEmpty ? nil : nameJaTrimmed
+            game.statusValue = status
+            game.platform = platform
             game.aliases = aliases
             game.releaseDate = hasReleaseDate ? releaseDate : nil
             game.coverData = coverData

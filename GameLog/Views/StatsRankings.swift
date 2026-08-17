@@ -248,6 +248,7 @@ struct OverallRankingView: View {
             .padding(.vertical, 10)
         }
         .navigationTitle(L10n.tr("stats.overallRanking", lang: language))
+        .appToolbar()
         // 点击榜单游戏名 → 编程式 push 详情（本页由 navigationDestination(isPresented:) 推入，
         // 用 item: 在本地注册，避免父级根视图的 Game 目标对本页不可见）。
         .navigationDestination(item: $selectedGame) { GameDetailView(game: $0) }

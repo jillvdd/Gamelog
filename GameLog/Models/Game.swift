@@ -16,6 +16,22 @@ enum Dimension: String, CaseIterable, Identifiable {
     var labelKey: String { "dimension.\(rawValue)" }
 }
 
+/// 游戏状态机：想玩 / 在玩 / 搁置 / 弃坑 / 长线游玩 / 已通关。
+/// 想玩/在玩/搁置/弃坑是轻量状态：不挂通关记录（详情页隐藏记录区）；流转到 `completed` 或 `longRunning` 才挂记录。
+/// 长线游玩对应已通关：挂通关记录、卡片显示评分（而非状态标签），用于长期运营游戏。
+/// 存储 rawValue，展示走 L10n（status.backlog 等）。
+enum GameStatus: String, CaseIterable, Identifiable {
+    case backlog
+    case playing
+    case paused
+    case dropped
+    case longRunning
+    case completed
+
+    var id: String { rawValue }
+    var labelKey: String { "status.\(rawValue)" }
+}
+
 /// 一个游戏（库条目）。创建时带首条通关记录，之后可追加。
 /// 多语言名字：`name` 为英文名（必须、canonical），`nameZh`/`nameJa` 可选；
 /// 展示时按当前语言用 `displayName(for:)` 回退（中文→nameZh??name，日文→nameJa??name，英文→name）。
@@ -28,11 +44,15 @@ final class Game {
     /// 日文名（可选）。
     var nameJa: String?
     var aliases: [String]
+    /// 游戏主平台（状态机轻量状态无通关记录时用于展示/筛选；已通关时与通关记录平台合并去重）。
+    var platform: String = ""
     var releaseDate: Date?
     var coverData: Data?
     var reviewTitle: String
     var reviewBody: String
     var createdAt: Date
+    /// 状态机状态（GameStatus.rawValue）。默认已通关；想玩/在玩等轻量状态无通关记录。
+    var status: String = GameStatus.completed.rawValue
 
     @Relationship(deleteRule: .cascade, inverse: \Completion.game)
     var completions: [Completion]
@@ -46,18 +66,20 @@ final class Game {
     var groups: [GameGroup]
 
     init(name: String, nameZh: String? = nil, nameJa: String? = nil,
-         aliases: [String] = [], releaseDate: Date? = nil,
+         aliases: [String] = [], platform: String = "", releaseDate: Date? = nil,
          coverData: Data? = nil, reviewTitle: String = "", reviewBody: String = "",
-         createdAt: Date = .now) {
+         createdAt: Date = .now, status: GameStatus = .completed) {
         self.name = name
         self.nameZh = nameZh
         self.nameJa = nameJa
         self.aliases = aliases
+        self.platform = platform
         self.releaseDate = releaseDate
         self.coverData = coverData
         self.reviewTitle = reviewTitle
         self.reviewBody = reviewBody
         self.createdAt = createdAt
+        self.status = status.rawValue
         self.completions = []
         self.copies = []
         self.groups = []
@@ -67,6 +89,17 @@ final class Game {
 // MARK: - 派生计算
 
 extension Game {
+
+    /// 状态机状态（解析存储值，未知值兜底已通关）。
+    var statusValue: GameStatus {
+        get { GameStatus(rawValue: status) ?? .completed }
+        set { status = newValue.rawValue }
+    }
+
+    /// 是否「已通关」或「长线游玩」：两者都挂通关记录、详情页显示记录区、卡片显示评分。
+    var isCompletedOrLongRunning: Bool {
+        statusValue == .completed || statusValue == .longRunning
+    }
 
     /// 按当前语言的显示名：中文→中文名（未设回退英文），日文→日文名（未设回退英文），英文→英文名。
     func displayName(for language: String) -> String {
@@ -87,9 +120,11 @@ extension Game {
         completions.compactMap(\.date).max()
     }
 
-    /// 该游戏出现过的所有平台，去重；按平台预设的世代倒序排列，预设外的自定义值按字典序排在最后。
+    /// 该游戏出现过的所有平台，去重（通关记录平台 + 游戏主平台）；按平台预设的世代倒序排列，预设外的自定义值按字典序排在最后。
     var platformList: [String] {
-        Presets.ordered(completions.map(\.platform))
+        var list = completions.map(\.platform)
+        if !platform.isEmpty { list.append(platform) }
+        return Presets.ordered(list)
     }
 
     /// 库显示分：已评分记录平均分的均值，取整到 0.1。无已评分记录则 nil。

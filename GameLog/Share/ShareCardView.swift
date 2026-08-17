@@ -30,7 +30,7 @@ enum ShareCardContent {
         case .group(let group, _, let size):
             ShareCardLayout.groupSize(
                 gameCount: group.games.count,
-                platformCount: Set(group.games.flatMap { $0.completions.map(\.platform) }.filter { !$0.isEmpty }).count,
+                platformCount: Set(group.games.flatMap(\.platformList)).count,
                 size: size
             )
         }
@@ -275,7 +275,7 @@ private struct SingleCardVertical: View {
                         .foregroundStyle(contentText)
                         .lineLimit(2)
 
-                    let platforms = game.completions.map(\.platform).filter { !$0.isEmpty }
+                    let platforms = game.platformList
                     if !platforms.isEmpty {
                         Text(verbatim: Array(Set(platforms)).sorted()
                             .map { Presets.display($0, category: .platform, language: language) }
@@ -408,7 +408,7 @@ private struct SingleCardHorizontal: View {
                     .foregroundStyle(theme.text)
                     .lineLimit(2)
 
-                let platforms = game.completions.map(\.platform).filter { !$0.isEmpty }
+                let platforms = game.platformList
                 if !platforms.isEmpty {
                     Text(verbatim: Array(Set(platforms)).sorted()
                         .map { Presets.display($0, category: .platform, language: language) }
@@ -519,12 +519,12 @@ private struct GroupShareCard: View {
         games.flatMap(\.completions).count
     }
 
-    /// 平台分布：组内所有通关记录按平台计数（与统计页同口径）。
+    /// 平台分布：组内各游戏按平台计数（含游戏级平台，与统计页同口径）。
     private var platformCounts: [(platform: String, count: Int)] {
         var counts: [String: Int] = [:]
         for game in games {
-            for completion in game.completions where !completion.platform.isEmpty {
-                counts[completion.platform, default: 0] += 1
+            for platform in game.platformList {
+                counts[platform, default: 0] += 1
             }
         }
         return counts.sorted { $0.value > $1.value }

@@ -263,5 +263,64 @@ try context.save()
 let bigImported = (try? context.fetch(FetchDescriptor<Game>()))?.first { $0.name == "Big Photo Test" }
 check("持有：导入照片上限 6 张", bigImported?.copies.first?.images.count == 6)
 
+// --- 14. 状态机（想玩/在玩/搁置/弃坑/已通关） ---
+check("状态机：默认状态已通关", Game(name: "x", reviewTitle: "").statusValue == .completed)
+let backlogGame = Game(name: "想玩游戏", reviewTitle: "", status: .backlog)
+context.insert(backlogGame)
+try? context.save()
+check("状态机：想玩状态存储", backlogGame.statusValue == .backlog)
+check("状态机：想玩游戏无通关记录", backlogGame.sortedCompletions.isEmpty)
+check("状态机：想玩游戏库显示分为 nil", backlogGame.libraryScore == nil)
+
+// 状态备份往返
+let statusBackup = try BackupManager.encode(games: [backlogGame], groups: [])
+try BackupManager.decodeAndReplace(statusBackup, into: context)
+try context.save()
+let statusImported = (try? context.fetch(FetchDescriptor<Game>()))?.first { $0.name == "想玩游戏" }
+check("状态机：想玩状态备份往返", statusImported?.statusValue == .backlog)
+
+// 未通关游戏也有游戏级平台
+let backlogWithPlatform = Game(name: "想玩带平台", platform: "Nintendo Switch", reviewTitle: "", status: .backlog)
+context.insert(backlogWithPlatform)
+try? context.save()
+check("平台：想玩游戏 platformList 含游戏级平台", backlogWithPlatform.platformList == ["Nintendo Switch"])
+
+// 已通关：游戏平台 + 记录平台合并去重（PS5 在预设顺序中排在 Nintendo Switch 前）
+let multiP = Game(name: "多平台", platform: "PS5", reviewTitle: "")
+context.insert(multiP)
+let mpC = Completion(platform: "Nintendo Switch", date: nil, degree: "通关")
+mpC.game = multiP
+context.insert(mpC)
+try? context.save()
+check("平台：已通关合并游戏+记录平台", multiP.platformList == ["PS5", "Nintendo Switch"])
+
+// 想玩 + 平台备份往返
+let plBackup = try BackupManager.encode(games: [backlogWithPlatform], groups: [])
+try BackupManager.decodeAndReplace(plBackup, into: context)
+try context.save()
+let plImported = (try? context.fetch(FetchDescriptor<Game>()))?.first { $0.name == "想玩带平台" }
+check("平台：想玩平台备份往返", plImported?.platform == "Nintendo Switch")
+
+// 长线游玩：对应已通关（挂记录、isCompletedOrLongRunning 为真）
+let longGame = Game(name: "长线游戏", reviewTitle: "", status: .longRunning)
+context.insert(longGame)
+let longC = Completion(platform: "PC", date: nil, degree: "长线")
+longC.game = longGame
+context.insert(longC)
+try? context.save()
+check("状态机：长线游玩状态存储", longGame.statusValue == .longRunning)
+check("状态机：长线游玩视为已通关类", longGame.isCompletedOrLongRunning)
+check("状态机：想玩不是已通关类", Game(name: "t", reviewTitle: "", status: .backlog).isCompletedOrLongRunning == false)
+
+// 旧备份缺 status 字段 → 导入默认已通关
+let legacyJSON = """
+{"version":1,"exportedAt":"2026-01-01T00:00:00Z","groups":[],"games":[{"name":"旧版游戏","aliases":[],"reviewTitle":"","reviewBody":"","groupNames":[],"completions":[]}]}
+"""
+let legacyData = legacyJSON.data(using: .utf8)!
+try BackupManager.decodeAndReplace(legacyData, into: context)
+try context.save()
+let legacyImported = (try? context.fetch(FetchDescriptor<Game>()))?.first { $0.name == "旧版游戏" }
+check("状态机：旧备份缺 status → 默认已通关", legacyImported?.statusValue == .completed)
+
 print(failures == 0 ? "DATA SMOKE TEST PASSED" : "DATA SMOKE TEST FAILED: \(failures) failures")
 exit(failures == 0 ? 0 : 1)

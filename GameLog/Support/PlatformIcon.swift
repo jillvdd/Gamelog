@@ -11,6 +11,8 @@ import UIKit
 struct PlatformIcon: View {
     let platform: String
     var size: CGFloat = 16
+    /// 是否放大显示（非白底图标统一 ×1.5、PS 系 ×1.2）。密集行（统计条）传 false 保持原始尺寸。
+    var enlarge: Bool = true
     @AppStorage(UserCustomization.platformIconsKey) private var showPlatformIcons = true
 
     var body: some View {
@@ -24,35 +26,48 @@ struct PlatformIcon: View {
     private var iconBody: some View {
         let fileName = Presets.platformIconFile(for: platform)
         let image = fileName.flatMap { PlatformIconLoader.image(named: $0) }
+        // 白底宽字标（SFC 等）已按烘焙比例加宽显示，保持原尺寸；
+        // 其余所有图标（方形 logo 与 SF Symbol 兜底）统一放大显示，PS 系 1.2 倍、其余 1.5 倍。
+        // enlarge=false 时（密集行如统计条）不放大，保持传入的原始 size。
+        let isWide = fileName.map(PlatformIconLoader.needsWhiteBackground) ?? false
+        let iconSize = isWide ? size : (enlarge ? size * Self.iconScale(for: fileName) : size)
         return Group {
             if let fileName, let image {
                 PlatformIconImage(
                     image: image,
-                    size: size,
+                    size: iconSize,
                     isTemplate: PlatformIconLoader.isTemplate(named: fileName),
                     whiteBackground: PlatformIconLoader.needsWhiteBackground(named: fileName)
                 )
             } else {
                 Image(systemName: Presets.platformIconSymbol(for: platform) ?? "gamecontroller")
-                    .font(.system(size: size * 0.75))
+                    .font(.system(size: iconSize * 0.75))
                     .foregroundStyle(.secondary)
             }
         }
-        .frame(height: size)
+        .frame(height: iconSize)
+    }
+
+    /// PlayStation 系图标（PS5/PS4/PS3/PS2/PS1/PSP/PS Vita）logo 观感偏大，统一 1.2 倍；其余非白底 1.5 倍。
+    private static let psFileNames: Set<String> = ["PS5", "PS4", "PS3", "PS2", "PS1", "PSP", "PS-Vita"]
+    private static func iconScale(for fileName: String?) -> CGFloat {
+        fileName.map { psFileNames.contains($0) } ?? false ? 1.2 : 1.5
     }
 
     /// 该平台图标在给定高度下的渲染宽度（白底图标含白块；SF Symbol 兜底按约 0.9×高估算）。
     /// 用于「图标 + 名字能否同行放得下」的判断。
-    static func displayWidth(platform: String, size: CGFloat) -> CGFloat {
+    static func displayWidth(platform: String, size: CGFloat, enlarge: Bool = true) -> CGFloat {
         guard let fileName = Presets.platformIconFile(for: platform),
               let aspect = PlatformIconLoader.aspect(named: fileName) else {
-            return size * 0.9
+            // SF Symbol 兜底（PC/其他/自定义平台）：放大时约 1.5×0.9 宽，不放大约 0.9×宽。
+            return size * (enlarge ? 1.5 : 1.0) * 0.9
         }
-        // 白底图标已把白块烘焙进图片，宽度 = 按烘焙后比例；非白底仍封顶 3×。
+        // 白底宽字标已把白块烘焙进图片，宽度 = 按烘焙后比例，保持原尺寸。
         if PlatformIconLoader.needsWhiteBackground(named: fileName) {
             return size * aspect
         }
-        return size * min(max(aspect, 0.5), 3.0)
+        // 其余图标（方形 logo / Xbox 透明）放大时按图标缩放系数（PS 系 1.2 倍、其余 1.5 倍），仍封顶 3×。
+        return size * (enlarge ? Self.iconScale(for: fileName) : 1.0) * min(max(aspect, 0.5), 3.0)
     }
 
     /// 文本在系统默认字体的自然宽度（近似），用于判断文字是否会被省略。
@@ -114,7 +129,7 @@ enum PlatformIconLoader {
     /// 需要白底承托的图标（稀疏深色/彩色字标在深浅主题下都看不清，如 SFC、各代任天堂字标）：
     /// 渲染时垫一块白底圆角块，宽度上限 5× 高（比普通图标更宽，文字不被压扁）。
     private static let whiteBackgroundIcons: Set<String> = [
-        "SFC-SNES", "3DS", "NDS", "N64", "FC-NES", "GBA", "Game-Boy-Color", "Game-Boy"
+        "SFC-SNES", "3DS", "NDS", "N64", "FC-NES", "GBA", "Game-Boy-Color", "Game-Boy",
     ]
 
     /// 图标宽高比（宽/高），仅读文件头不解码整图，按文件名缓存。

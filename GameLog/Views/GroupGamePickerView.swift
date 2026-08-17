@@ -14,16 +14,16 @@ struct GroupGamePickerView: View {
     /// 平台筛选，nil = 全部平台。
     @State private var platformFilter: String?
 
-    /// 整库出现过的平台（预设世代倒序 + 自定义排最后）。
+    /// 整库出现过的平台（预设世代倒序 + 自定义排最后；含游戏级平台，未通关游戏也有平台）。
     private var platforms: [String] {
-        Presets.ordered(games.flatMap { $0.completions.map(\.platform) })
+        Presets.ordered(games.flatMap(\.platformList))
     }
 
     private var visibleGames: [Game] {
         var result = games
         if let platformFilter {
             result = result.filter { game in
-                game.completions.contains { $0.platform == platformFilter }
+                game.platformList.contains(platformFilter)
             }
         }
         if !searchText.isEmpty {

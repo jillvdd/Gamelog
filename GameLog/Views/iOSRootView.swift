@@ -78,22 +78,18 @@ struct iOSLibraryTab: View {
 
     @State private var groupFilter: GameGroup?
     @State private var platformFilter: String?
+    /// 状态筛选（想玩/在玩/…），与分组/平台互斥单选。
+    @State private var statusFilter: GameStatus?
     @State private var showingGroupManager = false
 
-    /// 库里出现过的平台（预设世代倒序 + 自定义排最后）。
+    /// 库里出现过的平台（预设世代倒序 + 自定义排最后；含游戏级平台，未通关游戏也有）。
     private var platformsInUse: [String] {
-        var seen: Set<String> = []
-        for game in games {
-            for completion in game.completions where !completion.platform.isEmpty {
-                seen.insert(completion.platform)
-            }
-        }
-        return Presets.ordered(Array(seen))
+        Presets.ordered(games.flatMap(\.platformList))
     }
 
     var body: some View {
         NavigationStack {
-            LibraryView(groupFilter: groupFilter, platform: platformFilter)
+            LibraryView(groupFilter: groupFilter, platform: platformFilter, statusFilter: statusFilter)
                 .toolbar {
                     // 筛选（分组/平台）整合为一个按钮放 leading，避免两个按钮误触；
                     // 新建游戏与「更多」在 LibraryView 的 trailing，避免触发系统折叠「…」。
@@ -111,18 +107,35 @@ struct iOSLibraryTab: View {
         }
     }
 
-    /// 整合的筛选菜单：分组 / 平台 / 全部游戏互斥单选（与 macOS 侧边栏的导航一致）。
-    /// 选中分组会清掉平台筛选、选中平台会清掉分组筛选，不会同时生效，始终只有一个勾选。
+    /// 整合的筛选菜单：状态 / 分组 / 平台 / 全部游戏互斥单选（与 macOS 侧边栏的导航一致）。
+    /// 选中任一维度会清掉其他维度，不会同时生效，始终只有一个勾选。
     private var filterMenu: some View {
         Menu {
             Button {
+                statusFilter = nil
                 groupFilter = nil
                 platformFilter = nil
             } label: {
-                if groupFilter == nil && platformFilter == nil {
+                if statusFilter == nil && groupFilter == nil && platformFilter == nil {
                     Label(L10n.tr("library.all", lang: language), systemImage: "checkmark")
                 } else {
                     Text(verbatim: L10n.tr("library.all", lang: language))
+                }
+            }
+
+            Section(L10n.tr("game.status", lang: language)) {
+                ForEach(GameStatus.allCases) { s in
+                    Button {
+                        statusFilter = s
+                        groupFilter = nil
+                        platformFilter = nil
+                    } label: {
+                        if statusFilter == s && groupFilter == nil && platformFilter == nil {
+                            Label(L10n.tr(s.labelKey, lang: language), systemImage: "checkmark")
+                        } else {
+                            Text(verbatim: L10n.tr(s.labelKey, lang: language))
+                        }
+                    }
                 }
             }
 
@@ -130,9 +143,10 @@ struct iOSLibraryTab: View {
                 ForEach(groups) { group in
                     Button {
                         groupFilter = group
+                        statusFilter = nil
                         platformFilter = nil
                     } label: {
-                        if groupFilter?.persistentModelID == group.persistentModelID && platformFilter == nil {
+                        if groupFilter?.persistentModelID == group.persistentModelID && statusFilter == nil && platformFilter == nil {
                             Label(group.name, systemImage: "checkmark")
                         } else {
                             Text(verbatim: group.name)
@@ -145,13 +159,14 @@ struct iOSLibraryTab: View {
                 ForEach(platformsInUse, id: \.self) { platform in
                     Button {
                         platformFilter = platform
+                        statusFilter = nil
                         groupFilter = nil
                     } label: {
                         HStack(spacing: 8) {
                             PlatformIcon(platform: platform, size: 16)
                             Text(verbatim: Presets.display(platform, category: .platform, language: language))
                             Spacer()
-                            if platformFilter == platform && groupFilter == nil {
+                            if platformFilter == platform && statusFilter == nil && groupFilter == nil {
                                 Image(systemName: "checkmark")
                                     .foregroundStyle(.secondary)
                             }

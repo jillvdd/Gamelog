@@ -26,6 +26,8 @@ struct GameDTO: Codable {
     var nameZh: String?
     var nameJa: String?
     var aliases: [String]
+    /// 游戏主平台（旧版备份缺字段 → nil，导入默认空）。
+    var platform: String?
     var releaseDate: Date?
     var coverBase64: String?
     var reviewTitle: String
@@ -34,6 +36,8 @@ struct GameDTO: Codable {
     var completions: [CompletionDTO]
     /// 持有记录（收藏家模式；旧版备份缺字段 → nil，导入保持现状）。
     var copies: [CopyDTO]?
+    /// 状态机状态（旧版备份缺字段 → nil，导入默认已通关）。
+    var status: String?
 }
 
 /// 一条持有记录（版本 + 数量 + 最多 6 张照片 base64）。
@@ -75,6 +79,7 @@ enum BackupManager {
                     nameZh: game.nameZh,
                     nameJa: game.nameJa,
                     aliases: game.aliases,
+                    platform: game.platform,
                     releaseDate: game.releaseDate,
                     coverBase64: game.coverData?.base64EncodedString(),
                     reviewTitle: game.reviewTitle,
@@ -101,7 +106,8 @@ enum BackupManager {
                             count: copy.count,
                             images: copy.images.map { $0.base64EncodedString() }
                         )
-                    }
+                    },
+                    status: game.status
                 )
             },
             username: UserDefaults.standard.string(forKey: UserCustomization.usernameKey),
@@ -170,10 +176,13 @@ enum BackupManager {
                 nameZh: gameDTO.nameZh,
                 nameJa: gameDTO.nameJa,
                 aliases: gameDTO.aliases,
+                platform: gameDTO.platform ?? "",
                 releaseDate: gameDTO.releaseDate,
                 coverData: gameDTO.coverBase64.flatMap { Data(base64Encoded: $0) },
                 reviewTitle: gameDTO.reviewTitle,
-                reviewBody: gameDTO.reviewBody
+                reviewBody: gameDTO.reviewBody,
+                // 旧版备份缺 status → 默认已通关。
+                status: gameDTO.status.flatMap(GameStatus.init(rawValue:)) ?? .completed
             )
             game.groups = gameDTO.groupNames.compactMap { groupMap[$0.trimmingCharacters(in: .whitespaces)] }
             context.insert(game)

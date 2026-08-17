@@ -1,12 +1,27 @@
 import SwiftUI
 import SwiftData
 
-/// 侧边栏条目：全部游戏 / 某个平台 / 某个分组 / 统计。
+/// 侧边栏条目：全部游戏 / 某状态 / 某个平台 / 某个分组 / 统计。
 enum SidebarItem: Hashable {
     case all
+    case status(GameStatus)
     case platform(String)
     case group(GameGroup)
     case stats
+}
+
+/// 侧边栏状态行图标。
+private extension GameStatus {
+    var sidebarIcon: String {
+        switch self {
+        case .backlog: "bookmark"
+        case .playing: "play.circle"
+        case .paused: "pause.circle"
+        case .dropped: "xmark.circle"
+        case .longRunning: "infinity"
+        case .completed: "checkmark.circle"
+        }
+    }
 }
 
 struct RootView: View {
@@ -21,11 +36,11 @@ struct RootView: View {
     @State private var deleteGroup: GameGroup?
     @State private var pickingGamesGroup: GameGroup?
 
-    /// 平台 → 去重游戏数（同平台多条记录算一次；一款游戏在多个平台各计一次）。
+    /// 平台 → 去重游戏数（含游戏级平台，未通关游戏计入；一款游戏在多个平台各计一次）。
     private var platformCounts: [String: Int] {
         var counts: [String: Int] = [:]
         for game in games {
-            for platform in Set(game.completions.map(\.platform)).filter({ !$0.isEmpty }) {
+            for platform in game.platformList {
                 counts[platform, default: 0] += 1
             }
         }
@@ -51,6 +66,12 @@ struct RootView: View {
                 Section {
                     Label(L10n.tr("library.all", lang: language), systemImage: "books.vertical")
                         .tag(SidebarItem.all)
+                }
+                Section(L10n.tr("game.status", lang: language)) {
+                    ForEach(GameStatus.allCases) { status in
+                        Label(L10n.tr(status.labelKey, lang: language), systemImage: status.sidebarIcon)
+                            .tag(SidebarItem.status(status))
+                    }
                 }
                 if !platformsInUse.isEmpty {
                     Section(L10n.tr("library.platforms", lang: language)) {
@@ -134,6 +155,8 @@ struct RootView: View {
             switch selection {
             case .all, .none:
                 LibraryView(groupFilter: nil)
+            case .status(let status):
+                LibraryView(groupFilter: nil, statusFilter: status)
             case .platform(let platform):
                 LibraryView(groupFilter: nil, platform: platform)
             case .group(let group):
