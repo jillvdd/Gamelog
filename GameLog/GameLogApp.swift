@@ -23,18 +23,21 @@ struct GameLogApp: App {
 
     var body: some Scene {
         WindowGroup {
-            Group {
+            // AutoBackupContainer：启动时执行自动备份的启动检查（启动备份/版本快照/空库检测恢复）。
+            AutoBackupContainer {
+                Group {
+                    #if os(macOS)
+                    RootView()
+                    #else
+                    iOSRootView()
+                    #endif
+                }
+                .environment(\.appLanguageCode, languageCode)
+                .environment(\.locale, Locale(identifier: languageCode))
                 #if os(macOS)
-                RootView()
-                #else
-                iOSRootView()
+                .onAppear { UserCustomization.applyDockIcon() }
                 #endif
             }
-            .environment(\.appLanguageCode, languageCode)
-            .environment(\.locale, Locale(identifier: languageCode))
-            #if os(macOS)
-            .onAppear { UserCustomization.applyDockIcon() }
-            #endif
         }
         .modelContainer(container)
         #if os(macOS)

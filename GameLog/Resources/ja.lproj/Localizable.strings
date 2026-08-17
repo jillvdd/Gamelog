@@ -207,3 +207,26 @@
 "status.completed" = "クリア済み";
 "stats.backlogCount" = "プレイ予定";
 "status.longRunning" = "長期プレイ";
+
+// 自動バックアップ + キャッシュ
+"settings.autoBackup" = "自動バックアップ";
+"settings.autoBackupHint" = "データが変更されるたびに完全なバックアップを自動保存します。設定からいつでも復元できます。";
+"backup.lastBackup" = "最終バックアップ：%@";
+"backup.backupNow" = "今すぐバックアップ";
+"backup.autobackupRestore" = "自動バックアップから復元…";
+"backup.autobackupRestoreConfirm" = "現在の全データが自動バックアップに置き換えられます。続行しますか？";
+"backup.restoreDone" = "自動バックアップから復元しました";
+"backup.restoreFailed" = "復元に失敗しました。自動バックアップファイルが壊れている可能性があります";
+"backup.snapshotSaved" = "復元前のスナップショットを保存しました";
+"backup.emptyRestoreTitle" = "ライブラリが空です";
+"backup.emptyRestoreMessage" = "現在のライブラリは空ですが、自動バックアップには %lld 件のゲームがあります。自動バックアップから復元しますか？（キャンセルで空のままにします）";
+"backup.restoreNow" = "バックアップから復元";
+"backup.keepEmpty" = "空のままにする";
+"backup.nowDone" = "バックアップを保存しました";
+"backup.noBackupYet" = "バックアップはまだありません";
+"settings.storage" = "ストレージとキャッシュ";
+"settings.cacheSize" = "キャッシュ容量：%@";
+"settings.cacheClear" = "キャッシュを削除";
+"settings.cacheClearConfirm" = "キャッシュを削除しますか？キャッシュは自動で再生成される一時データ（カバー検索のダウンロード、画像デコードキャッシュ、一時ファイル）です。ゲームデータとバックアップには影響しません。";
+"settings.cacheCleared" = "キャッシュを削除しました（%@ 解放）";
+"settings.cacheClearFailed" = "削除に失敗しました";

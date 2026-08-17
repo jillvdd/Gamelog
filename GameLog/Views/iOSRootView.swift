@@ -60,6 +60,7 @@ struct iOSRootView: View {
         defer { if didStart { url.stopAccessingSecurityScopedResource() } }
         do {
             let data = try Data(contentsOf: url)
+            AutoBackup.shared.writeSnapshot(context: context)
             try BackupManager.decodeAndReplace(data, into: context)
             try context.save()
         } catch {

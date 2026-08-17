@@ -5,6 +5,13 @@ import SwiftData
 /// （状态切换、滚动、网格重排时卡顿的根因）。NSCache 自动清理内存。
 private let coverImageCache = NSCache<NSNumber, AppImage>()
 
+extension GameCardView {
+    /// 清空封面解码缓存（「清除缓存」功能调用；NSCache 内存态，正常也会自动清理）。
+    static func clearCoverCache() {
+        coverImageCache.removeAllObjects()
+    }
+}
+
 extension Game {
     var coverImage: AppImage? {
         guard let data = coverData else { return nil }

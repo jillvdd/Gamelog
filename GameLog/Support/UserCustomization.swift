@@ -28,6 +28,8 @@ enum UserCustomization {
     static let keepOriginalImagesKey = "customization.keepOriginalImages"
     /// 平台标志开关（默认开启；关闭后各平台不显示 logo 图标）。
     static let platformIconsKey = "customization.platformIcons"
+    /// 自动备份开关（默认开启=每次数据改动后自动写完整本地备份）。
+    static let autoBackupKey = "customization.autoBackup"
 
     /// 用户名长度上限（设置页输入与导入时统一截断）。
     static let usernameMaxLength = 20
@@ -43,6 +45,9 @@ enum UserCustomization {
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir
     }()
+
+    /// Application Support/GameLog 目录（头像/图标/自动备份共用）。
+    static var supportDirectory: URL { supportDir }
 
     // MARK: - 保存（裁切面板 / 备份导入产出 PNG data → 落盘 + 记引用）
 

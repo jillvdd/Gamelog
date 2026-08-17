@@ -2,13 +2,14 @@
 
 > **English** · [日本語](README.ja.md) · [简体中文](README.md)
 
-A **macOS + iOS** personal app for recording video games you've finished: cover art, six-dimension scores, per-playthrough platform / date / degree / playtime / notes, physical collections (edition / quantity / photos), and shareable images. Fully local storage (SwiftData) — your data belongs entirely to you.
+A **macOS + iOS** personal app for recording your game library and completion history: statuses (backlog / playing / completed…), cover art, six-dimension scores, per-playthrough platform / date / degree / playtime / notes, physical collections (edition / quantity / photos), and shareable images. Fully local storage (SwiftData) — your data belongs entirely to you.
 
 Interface languages: **简体中文 / 日本語 / English** (switch instantly in Settings). macOS and iOS each store data locally and independently; you can move data between them via JSON backup (including AirDrop).
 
 ## Features
 
-- **Game Library**: grid / list view toggle; search by name + aliases + localized names; filter by platform; group management (macOS sidebar / iOS filter menu), a game can belong to several groups; sort by name / release date / completion date / average score (low to high or high to low). The library score is the mean of the record averages of all scored completions, rounded to 0.1; unscored games show "Unrated".
+- **Game Library**: grid / list view toggle; search by name + aliases + localized names; filter by status / platform / group; group management (macOS sidebar / iOS filter menu), a game can belong to several groups; sort by name / release date / completion date / average score (low to high or high to low). The library score is the mean of the record averages of all scored completions, rounded to 0.1; unscored games show "Unrated".
+- **Game Status** (beta 1.9): six statuses — Backlog / Playing / Paused / Dropped / Completed / Long-Running. Lightweight states need no completion records or scores; move to Completed to attach them. Filter the library by status, pick in the detail page; stats exclude non-completed games.
 - **Game Detail**: review (one-line verdict + body), all completions (edit / append / delete), six-dimension colored bar chart; an extra "Holdings" tab when Collector Mode is on.
 - **Six-Dimension Scoring**: Gameplay / Design / Story / Art / Music / Performance, 1–10 sliders with 0.1 steps. Overall = mean of the six; the first completion requires scores, later ones may be skipped.
 - **Completions**: platform, completion date (can be "None"), completion degree (main story / all side quests / all endings / platinum / multiple playthroughs / speedrun / custom), playtime (can be "None"), and notes.
@@ -16,10 +17,12 @@ Interface languages: **简体中文 / 日本語 / English** (switch instantly in
 - **Groups**: create / rename / delete; pick games to join via context menu (macOS) or menu (iOS); per-group stats and review.
 - **Collector Mode** (Settings toggle): "Details / Holdings" segmented switch on the detail page; each game can have multiple physical editions (edition name + quantity + up to 6 photos); photos open in the system viewer; included in backups.
 - **Cover Art**: import from your device, or search & download via the [SteamGridDB](https://www.steamgriddb.com) API (requires an API Key in Settings, searches as you type); optional **auto-match cover** (about 0.6s after you stop typing, picks the first portrait hit — never overwrites an existing cover, silent on failure). Search results show cover thumbnails. On iOS, adding an image pops a "Photos / Files / Camera" menu.
-- **Personalization**: username (20 chars), avatar (circular crop), macOS app icon (rounded-square crop), auto-match cover toggle, hide group toolbar glass (macOS), keep-original-images toggle, platform-logos toggle (on by default; turning it off hides brand logos in platform pickers / grouping views). A custom icon reflects on the Dock immediately and persists across restarts.
+- **Personalization**: username (20 chars), avatar (circular crop), macOS app icon (rounded-square crop), auto-match cover toggle, hide top frosted glass (macOS 15+), keep-original-images toggle, platform-logos toggle (on by default; turning it off hides brand logos in platform pickers / grouping views). A custom icon reflects on the Dock immediately and persists across restarts.
 - **Share Images**: single game → single card (portrait 1080×1920 or landscape 1920×1080); multi-select → one overview image; by group → a group share card (in-group cover grid + platform distribution). Branded watermark, localized per language, saveable as PNG or via the system share sheet; on iOS you can also save the image directly to the Photos album (requires add-photo permission).
 - **Stats & Rankings**: total completions, library average, platform distribution; average-score leaderboard + six-dimension boards (top 5 / 10 per dimension); the "Overall Ranking" page switches between 7 boards, pages up to 100 entries per page, filters by platform.
 - **Backup**: export the whole library to a single JSON (covers embedded as base64), including username / avatar / icon, restorable as a whole, compatible with older backups; import asks for confirmation. On iOS, export uses the system share sheet (AirDrop / Save to Files, etc.).
+- **Auto Backup** (beta 2.0): automatically writes a full local backup (one rolling file) whenever your data changes; keeps a snapshot of the old version before upgrades; if the library is empty but a backup exists, asks on launch whether to restore; snapshots before restore / import so you can undo. On iOS, backups live in Documents/Backups (visible in the Files app), so you can still grab them if the app can't launch (e.g. expired signing cert).
+- **Clear Cache** (beta 2.0): Settings → Storage & Cache shows current cache usage and clears it with one tap (cover/image decode caches, network cache, temp files) — never touches your game data or backups.
 
 ## Platforms
 
@@ -55,7 +58,7 @@ Or open `GameLog.xcodeproj` in Xcode and Run the `GameLog` (macOS) or `GameLog-i
 
 ## Installing on iPhone (IPA)
 
-This repository provides a Release IPA (`dist/GameLog-beta-1.8.1.ipa`), unsigned — you need to sign it yourself before installing.
+This repository provides a Release IPA (`dist/GameLog-beta-2.0.ipa`), unsigned — you need to sign it yourself before installing.
 
 > Tip: for simulator or daily development debugging, just Run from Xcode — no IPA needed.
 
