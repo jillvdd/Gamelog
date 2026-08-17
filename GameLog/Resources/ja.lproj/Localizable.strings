@@ -113,8 +113,8 @@
 "settings.restoreIcon" = "デフォルトアイコンに戻す";
 "settings.autoMatchCover" = "カバー自動取得";
 "settings.autoMatchCoverHint" = "ゲーム名を入力すると SteamGridDB を検索し、最初のカバーを自動設定します（下の API Key の設定が必要です）。";
-"settings.hideToolbarGlass" = "グループの毛ガラスを隠す";
-"settings.hideToolbarGlassHint" = "ツールバーの毛ガラス背景とタイトルを隠し、上部をシンプルにします（オフで表示）。（macOS 15 以上で有効）";
+"settings.hideToolbarGlass" = "上部の毛ガラスを隠す";
+"settings.hideToolbarGlassHint" = "すべてのページ（ライブラリ / 詳細 / 統計）の上部ツールバーの毛ガラス背景を隠し、すっきりさせます。（macOS 15 以上で有効）";
 "settings.collectorMode" = "コレクターモード";
 "settings.collectorModeHint" = "ゲーム詳細ページに「所持」タブを追加し、実物ゲームの版とコレクション写真を記録します。";
 "settings.platformIcons" = "プラットフォームロゴ";
@@ -197,3 +197,13 @@
 "image.takePhoto" = "撮影";
 "image.cameraUnavailable" = "この端末では撮影できません";
 "library.filter" = "フィルター";
+
+"game.status" = "ステータス";
+"game.statusHint" = "プレイ予定/プレイ中などの軽量状態ではクリア記録やスコアは不要です。「クリア済み」にした時に記録します。";
+"status.backlog" = "プレイ予定";
+"status.playing" = "プレイ中";
+"status.paused" = "中断";
+"status.dropped" = "ギブアップ";
+"status.completed" = "クリア済み";
+"stats.backlogCount" = "プレイ予定";
+"status.longRunning" = "長期プレイ";

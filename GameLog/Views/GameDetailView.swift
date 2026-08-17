@@ -1,6 +1,10 @@
 import SwiftUI
 import SwiftData
 
+#if os(macOS)
+import AppKit
+#endif
+
 /// 一条通关记录的卡片（详情页内）。
 struct CompletionCardView: View {
     @Environment(\.appLanguageCode) private var language
@@ -215,6 +219,92 @@ private struct LocalizedNamesSubtitle: View {
     }
 }
 
+/// 详情页状态选择器：自定义滑动条（图标 + 文字），选中滑块用 offset 定位滑动。
+/// 滑块位置由内部独立 @State 驱动——点击立即在本视图内动画，不依赖父视图重算（保证流畅）。
+private struct DetailStatusPicker: View {
+    @Environment(\.appLanguageCode) private var language
+    @Binding var status: GameStatus
+    let onChanged: (GameStatus) -> Void
+    /// 紧凑模式（只图标，窄屏如 iPhone 用）；macOS 显示图标 + 小字。
+    var compact: Bool = false
+
+    /// 滑块当前列（内部状态，点击立即动画，父重算不影响）。
+    @State private var sliderIndex: Int
+
+    init(status: Binding<GameStatus>, compact: Bool = false, onChanged: @escaping (GameStatus) -> Void) {
+        _status = status
+        self.compact = compact
+        self.onChanged = onChanged
+        _sliderIndex = State(initialValue: GameStatus.allCases.firstIndex(of: status.wrappedValue) ?? 0)
+    }
+
+    var body: some View {
+        GeometryReader { geo in
+            let all = GameStatus.allCases
+            let cellWidth = geo.size.width / CGFloat(all.count)
+            ZStack(alignment: .topLeading) {
+                // 选中滑块：内部 sliderIndex 驱动，offset + spring 动画，独立于父视图重算。
+                RoundedRectangle(cornerRadius: 9)
+                    .fill(Color.accentColor.opacity(0.18))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 9)
+                            .strokeBorder(Color.accentColor.opacity(0.45), lineWidth: 1)
+                    )
+                    .frame(width: cellWidth, height: geo.size.height)
+                    .offset(x: CGFloat(sliderIndex) * cellWidth)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.78), value: sliderIndex)
+                // 按钮层：每个状态一列，整格可点。
+                HStack(spacing: 0) {
+                    ForEach(all) { s in
+                        Button {
+                            let idx = all.firstIndex(of: s) ?? 0
+                            guard idx != sliderIndex else { return }
+                            sliderIndex = idx
+                            status = s
+                            onChanged(s)
+                        } label: {
+                            VStack(spacing: 3) {
+                                Image(systemName: s.statusIcon)
+                                    .font(.system(size: compact ? 13 : 14, weight: .semibold))
+                                if !compact {
+                                    Text(verbatim: L10n.tr(s.labelKey, lang: language))
+                                        .font(.system(size: 10))
+                                        .lineLimit(1)
+                                        .minimumScaleFactor(0.6)
+                                }
+                            }
+                            .foregroundStyle(status == s ? Color.accentColor : Color.secondary)
+                            .frame(width: cellWidth, height: geo.size.height)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .help(L10n.tr(s.labelKey, lang: language))
+                    }
+                }
+            }
+        }
+        .frame(height: compact ? 42 : 56)
+        .background {
+            RoundedRectangle(cornerRadius: 12)
+                .fill(.thinMaterial)
+        }
+    }
+}
+
+/// 状态图标（状态条用）。
+private extension GameStatus {
+    var statusIcon: String {
+        switch self {
+        case .backlog: "bookmark"
+        case .playing: "play.circle"
+        case .paused: "pause.circle"
+        case .dropped: "xmark.circle"
+        case .longRunning: "infinity"
+        case .completed: "checkmark.circle"
+        }
+    }
+}
+
 /// 详情页内部页签（收藏家模式开启时显示分段切换）：详情 = 现有内容，持有 = 收藏记录。
 private enum DetailTab: Hashable {
     case details
@@ -236,6 +326,8 @@ struct GameDetailView: View {
     @State private var pendingDeleteCompletion: Completion?
     @State private var showingDeleteGame = false
     @State private var showingShare = false
+    /// 状态机选中值：绑定局部 @State 隔离，避免每次点击时因 game 模型变化导致 Picker 重绘重载。
+    @State private var detailStatus = GameStatus.completed
 
     private var platforms: [String] {
         game.platformList
@@ -270,6 +362,9 @@ struct GameDetailView: View {
             }
         }
         .navigationTitle(game.displayName(for: language))
+        .onAppear { detailStatus = game.statusValue }
+        // 全屏毛玻璃下推 + 「隐藏上方毛玻璃」开关由全局 appToolbar() 统一处理。
+        .appToolbar()
         .toolbar {
             ToolbarItemGroup {
                 Button {
@@ -277,10 +372,12 @@ struct GameDetailView: View {
                 } label: {
                     Label(L10n.tr("library.share", lang: language), systemImage: "square.and.arrow.up")
                 }
-                Button {
-                    showingAddCompletion = true
-                } label: {
-                    Label(L10n.tr("completion.add", lang: language), systemImage: "plus")
+                if game.isCompletedOrLongRunning {
+                    Button {
+                        showingAddCompletion = true
+                    } label: {
+                        Label(L10n.tr("completion.add", lang: language), systemImage: "plus")
+                    }
                 }
                 Button {
                     showingEditGame = true
@@ -411,6 +508,14 @@ struct GameDetailView: View {
             }
             LocalizedNamesSubtitle(game: game, currentLanguage: language)
 
+            // 状态机：自定义滑动条（offset 滑块），点击即切换并保存。
+            // 图标 + 文字同显（含 iOS：只有图标用户会看不懂含义）。
+            DetailStatusPicker(status: $detailStatus) { newValue in
+                guard newValue != game.statusValue else { return }
+                game.statusValue = newValue
+                try? context.save()
+            }
+
             if let date = game.releaseDate {
                 Text(verbatim: date.formatted(date: .long, time: .omitted))
                     .font(.callout)
@@ -538,32 +643,36 @@ struct GameDetailView: View {
         }
     }
 
+    @ViewBuilder
     private var completionsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                LText("game.completions")
-                    .font(.title3.bold())
-                Text(verbatim: "(\(game.completions.count))")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Button {
-                    showingAddCompletion = true
-                } label: {
-                    Label(L10n.tr("completion.add", lang: language), systemImage: "plus.circle")
+        // 已通关/长线游玩显示通关记录区；想玩等在玩轻量状态隐藏（数据保留，切回已通关恢复显示）。
+        if game.isCompletedOrLongRunning {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    LText("game.completions")
+                        .font(.title3.bold())
+                    Text(verbatim: "(\(game.completions.count))")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button {
+                        showingAddCompletion = true
+                    } label: {
+                        Label(L10n.tr("completion.add", lang: language), systemImage: "plus.circle")
+                    }
                 }
-            }
 
-            if game.sortedCompletions.isEmpty {
-                LText("library.noResult")
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(game.sortedCompletions) { completion in
-                    CompletionCardView(
-                        completion: completion,
-                        onEdit: { editingCompletion = completion },
-                        onDelete: { pendingDeleteCompletion = completion }
-                    )
+                if game.sortedCompletions.isEmpty {
+                    LText("library.noResult")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(game.sortedCompletions) { completion in
+                        CompletionCardView(
+                            completion: completion,
+                            onEdit: { editingCompletion = completion },
+                            onDelete: { pendingDeleteCompletion = completion }
+                        )
+                    }
                 }
             }
         }

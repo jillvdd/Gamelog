@@ -113,8 +113,8 @@
 "settings.restoreIcon" = "Restore Default Icon";
 "settings.autoMatchCover" = "Auto-fill Cover";
 "settings.autoMatchCoverHint" = "When you type a game name, automatically searches SteamGridDB and sets the first cover found (requires an API key below).";
-"settings.hideToolbarGlass" = "Hide group frosted glass";
-"settings.hideToolbarGlassHint" = "Hides the toolbar frosted-glass background and title for a simpler top bar (kept when off). (macOS 15 and later)";
+"settings.hideToolbarGlass" = "Hide top frosted glass";
+"settings.hideToolbarGlassHint" = "Hides the top toolbar frosted-glass background on all pages (Library / Detail / Stats) for a cleaner look. (macOS 15 and later)";
 "settings.collectorMode" = "Collector Mode";
 "settings.collectorModeHint" = "Adds an \"Owned\" tab to game details for recording physical game editions and photos.";
 "settings.platformIcons" = "Platform Logos";
@@ -197,3 +197,13 @@
 "image.takePhoto" = "Take Photo";
 "image.cameraUnavailable" = "Camera is not available on this device";
 "library.filter" = "Filter";
+
+"game.status" = "Status";
+"game.statusHint" = "Lightweight states (Backlog, Playing…) need no completion records or scores — add them when you move to Completed.";
+"status.backlog" = "Backlog";
+"status.playing" = "Playing";
+"status.paused" = "Paused";
+"status.dropped" = "Dropped";
+"status.completed" = "Completed";
+"stats.backlogCount" = "Backlog";
+"status.longRunning" = "Long-Running";

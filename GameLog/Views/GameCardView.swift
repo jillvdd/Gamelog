@@ -1,10 +1,34 @@
 import SwiftUI
 import SwiftData
 
+/// 封面解码缓存：按 coverData 哈希缓存 AppImage，避免每次视图 body 重算时重新解码
+/// （状态切换、滚动、网格重排时卡顿的根因）。NSCache 自动清理内存。
+private let coverImageCache = NSCache<NSNumber, AppImage>()
+
 extension Game {
     var coverImage: AppImage? {
         guard let data = coverData else { return nil }
-        return AppImage(data: data)
+        let key = NSNumber(value: data.hashValue)
+        if let cached = coverImageCache.object(forKey: key) {
+            return cached
+        }
+        guard let image = AppImage(data: data) else { return nil }
+        coverImageCache.setObject(image, forKey: key)
+        return image
+    }
+}
+
+/// 状态角标的主题色（仅网格卡片封面用；状态本体定义在 GameStatus）。
+private extension GameStatus {
+    var statusColor: Color {
+        switch self {
+        case .backlog: .blue
+        case .playing: .green
+        case .paused: .orange
+        case .dropped: .gray
+        case .longRunning: .purple
+        case .completed: .primary
+        }
     }
 }
 
@@ -77,13 +101,25 @@ struct GameCardView: View {
         VStack(alignment: .leading, spacing: 6) {
             ZStack(alignment: .topTrailing) {
                 cover
-                if let score = game.libraryScore {
-                    Text(verbatim: Self.formatScore(score))
-                        .font(.system(size: 12, weight: .bold))
+                if game.isCompletedOrLongRunning {
+                    // 已通关/长线游玩：右上角评分徽章（无评分不显示）。
+                    if let score = game.libraryScore {
+                        Text(verbatim: Self.formatScore(score))
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 3)
+                            .background(.black.opacity(0.72), in: Capsule())
+                            .padding(6)
+                    }
+                } else {
+                    // 想玩/在玩/搁置/弃坑：右上角状态标签。
+                    Text(verbatim: L10n.tr(game.statusValue.labelKey, lang: language))
+                        .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 6)
-                        .padding(.vertical, 3)
-                        .background(.black.opacity(0.72), in: Capsule())
+                        .padding(.vertical, 2)
+                        .background(game.statusValue.statusColor.opacity(0.88), in: Capsule())
                         .padding(6)
                 }
             }
@@ -168,14 +204,24 @@ struct GameRowView: View {
 
             Spacer()
 
-            if let score = game.libraryScore {
-                Text(verbatim: GameCardView.formatScore(score))
-                    .font(.system(size: 15, weight: .bold))
-                    .monospacedDigit()
+            if game.isCompletedOrLongRunning {
+                if let score = game.libraryScore {
+                    Text(verbatim: GameCardView.formatScore(score))
+                        .font(.system(size: 15, weight: .bold))
+                        .monospacedDigit()
+                } else {
+                    LText("score.unrated")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
+                }
             } else {
-                LText("score.unrated")
-                    .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
+                // 想玩/在玩/搁置/弃坑：右侧显示状态标签。
+                Text(verbatim: L10n.tr(game.statusValue.labelKey, lang: language))
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(game.statusValue.statusColor.opacity(0.88), in: Capsule())
             }
         }
         .padding(.vertical, 4)

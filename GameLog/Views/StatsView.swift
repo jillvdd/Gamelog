@@ -11,6 +11,11 @@ struct StatsView: View {
 
     private var totalGames: Int { games.count }
 
+    /// 想玩清单数量（状态机：status == backlog 的游戏数）。
+    private var backlogCount: Int {
+        games.filter { $0.statusValue == .backlog }.count
+    }
+
     /// 库平均分：库内每条已评分通关记录的六维平均分之均值，取整到 0.5。
     /// 单条记录按现有六维评分求均值，一条通关记录计一次。
     private var avgScore: Double? {
@@ -24,8 +29,8 @@ struct StatsView: View {
     private var platformCounts: [(platform: String, count: Int)] {
         var counts: [String: Int] = [:]
         for game in games {
-            for completion in game.completions where !completion.platform.isEmpty {
-                counts[completion.platform, default: 0] += 1
+            for platform in game.platformList {
+                counts[platform, default: 0] += 1
             }
         }
         return counts.sorted { $0.value > $1.value }
@@ -62,6 +67,11 @@ struct StatsView: View {
                                         label: L10n.tr("stats.avgScore", lang: language),
                                         icon: "star"
                                     )
+                                    statTile(
+                                        value: "\(backlogCount)",
+                                        label: L10n.tr("stats.backlogCount", lang: language),
+                                        icon: "bookmark"
+                                    )
                                 }
                                 #else
                                 VStack(spacing: 16) {
@@ -74,6 +84,11 @@ struct StatsView: View {
                                         value: avgScore.map { String(format: "%.1f", $0) } ?? "—",
                                         label: L10n.tr("stats.avgScore", lang: language),
                                         icon: "star"
+                                    )
+                                    statTile(
+                                        value: "\(backlogCount)",
+                                        label: L10n.tr("stats.backlogCount", lang: language),
+                                        icon: "bookmark"
                                     )
                                 }
                                 #endif
@@ -114,6 +129,7 @@ struct StatsView: View {
                 }
             }
             .navigationTitle(L10n.tr("library.stats", lang: language))
+            .appToolbar()
             .navigationDestination(item: $selectedGame) { GameDetailView(game: $0) }
             .navigationDestination(isPresented: $showingOverall) { OverallRankingView() }
         }

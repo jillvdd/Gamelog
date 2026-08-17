@@ -16,26 +16,6 @@ enum LibrarySort: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
-#if os(macOS)
-/// 工具栏毛玻璃控制（设置「隐藏分组毛玻璃」开关）。
-/// macOS 15+ 用 `.toolbarBackgroundVisibility`（能真正隐藏窗口工具栏玻璃）；
-/// macOS 14 无对应 API，开启时尽力用透明背景（实际可能仍显示系统玻璃，但 app 照常可用）。
-private struct ToolbarGlassModifier: ViewModifier {
-    let hidden: Bool
-
-    @ViewBuilder
-    func body(content: Content) -> some View {
-        if #available(macOS 15.0, *) {
-            content.toolbarBackgroundVisibility(hidden ? .hidden : .automatic, for: .windowToolbar)
-        } else if hidden {
-            content.toolbarBackground(Color.clear, for: .windowToolbar)
-        } else {
-            content
-        }
-    }
-}
-#endif
-
 /// 主界面：网格/列表切换、搜索、平台筛选、排序、分享、新建入口。
 struct LibraryView: View {
     @Environment(\.modelContext) private var context
@@ -44,16 +24,16 @@ struct LibraryView: View {
     let groupFilter: GameGroup?
     /// 非分组视图（全部游戏 / 侧边栏某平台）的平台过滤，由侧边栏选择驱动，切换即重置。
     var platform: String? = nil
+    /// 状态过滤（想玩/在玩/搁置/弃坑/已通关），由侧边栏/iOS 筛选菜单选择驱动，与 groupFilter/platform 互斥。
+    var statusFilter: GameStatus? = nil
 
     @State private var searchText = ""
     @AppStorage("useGridView") private var useGridView = true
     /// 分组视图内局部平台过滤（不持久化，切换分组即重置）。
     @State private var groupPlatformFilter = ""
     @AppStorage("librarySort") private var sortRaw = LibrarySort.completionDate.rawValue
-    /// 隐藏工具栏毛玻璃（设置「个性化」开关）：开启 = 无标题 + 完全无毛玻璃（方案 B）。
+    /// 隐藏上方毛玻璃（设置「个性化」开关）：开启 = 无标题 + 完全无毛玻璃（全局应用，各页面一致）。
     @AppStorage(UserCustomization.hideToolbarGlassKey) private var hideToolbarGlass = false
-    /// 是否全屏：窗口模式保留毛玻璃+标题；全屏下玻璃比工具栏布局多延伸一行，需把内容往下推。
-    @State private var isFullScreen = false
 
     @State private var path = NavigationPath()
     /// iOS：详情页编程式 push 的目标（复用外层导航栈，避免双层 NavigationStack）。
@@ -80,7 +60,7 @@ struct LibraryView: View {
             #if os(macOS)
             if !groupPlatformFilter.isEmpty {
                 result = result.filter { game in
-                    game.completions.contains { $0.platform == groupPlatformFilter }
+                    game.platformList.contains(groupPlatformFilter)
                 }
             }
             #endif
@@ -90,8 +70,11 @@ struct LibraryView: View {
         // 平台过滤在分组/非分组两种模式下都生效（iOS 由分组/平台两个菜单驱动；macOS 分组模式用 groupPlatformFilter）。
         if let platform {
             result = result.filter { game in
-                game.completions.contains { $0.platform == platform }
+                game.platformList.contains(platform)
             }
+        }
+        if let statusFilter {
+            result = result.filter { $0.statusValue == statusFilter }
         }
         if !searchText.isEmpty {
             result = result.filter { $0.matches(search: searchText) }
@@ -114,28 +97,13 @@ struct LibraryView: View {
     }
 
     private var navigationTitleText: String {
+        if let statusFilter {
+            return L10n.tr(statusFilter.labelKey, lang: language)
+        }
         if let platform {
             return Presets.display(platform, category: .platform, language: language)
         }
         return groupFilter?.name ?? L10n.tr("library.all", lang: language)
-    }
-
-    /// 当前窗口是否全屏（启动时用于初始化状态；iOS 无窗口全屏概念，恒 false）。
-    private var windowIsFullScreen: Bool {
-        #if os(macOS)
-        let win = NSApp.windows.first(where: { $0.isVisible }) ?? NSApp.mainWindow
-        return win?.styleMask.contains(.fullScreen) ?? false
-        #else
-        return false
-        #endif
-    }
-
-    /// 异步更新全屏状态：推迟到下一轮 runloop，避免在视图更新期间同步改 @State（曾导致 UI 挂死）。
-    private func setFullScreen(_ value: Bool) {
-        DispatchQueue.main.async {
-            guard isFullScreen != value else { return }
-            isFullScreen = value
-        }
     }
 
     /// 切换分组/平台筛选时重置导航上下文：退出已打开的详情页、清空搜索词。
@@ -147,15 +115,6 @@ struct LibraryView: View {
         selectedGame = nil
         #endif
         searchText = ""
-    }
-
-    /// 内容顶部安全区下推量：仅 macOS 全屏且未隐藏毛玻璃时推 24pt；iOS 无此玻璃延伸问题，恒 0。
-    private var topSafeAreaPadding: CGFloat {
-        #if os(macOS)
-        return (!hideToolbarGlass && isFullScreen) ? 24 : 0
-        #else
-        return 0
-        #endif
     }
 
     // MARK: - 分组视图（游戏 + 底部统计/评价）
@@ -240,6 +199,22 @@ struct LibraryView: View {
 
     @ViewBuilder
     private func cardMenu(for game: Game) -> some View {
+        Menu {
+            ForEach(GameStatus.allCases) { s in
+                Button {
+                    game.statusValue = s
+                    try? context.save()
+                } label: {
+                    if game.statusValue == s {
+                        Label(L10n.tr(s.labelKey, lang: language), systemImage: "checkmark")
+                    } else {
+                        Text(verbatim: L10n.tr(s.labelKey, lang: language))
+                    }
+                }
+            }
+        } label: {
+            Label(L10n.tr("game.status", lang: language), systemImage: "tag")
+        }
         Button {
             editingGame = game
         } label: {
@@ -277,6 +252,9 @@ struct LibraryView: View {
         .onChange(of: platform) { _, _ in
             // 切换平台同样重置筛选上下文：退出已打开的详情页、清空搜索词，
             // 避免同一 case 分支内切换时视图身份不变导致状态残留。
+            resetNavigationContext()
+        }
+        .onChange(of: statusFilter) { _, _ in
             resetNavigationContext()
         }
         .sheet(isPresented: $showingNewGame) {
@@ -355,16 +333,7 @@ struct LibraryView: View {
                 }
             }
         }
-        .onAppear {
-            setFullScreen(windowIsFullScreen)
-        }
         #if os(macOS)
-        .onReceive(NotificationCenter.default.publisher(for: NSWindow.willEnterFullScreenNotification)) { _ in
-            setFullScreen(true)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NSWindow.willExitFullScreenNotification)) { _ in
-            setFullScreen(false)
-        }
         .navigationDestination(for: Game.self) { game in
             GameDetailView(game: game)
         }
@@ -379,13 +348,8 @@ struct LibraryView: View {
         #else
         .navigationTitle(navigationTitleText)
         #endif
-        // 隐藏毛玻璃开关开启（方案 B）：无标题 + 无毛玻璃，全屏也无需下推内容。
-        // 关闭（默认）：保留玻璃+标题；全屏下玻璃比工具栏布局多延伸一行（系统行为，无法压缩），
-        // 把内容顶部往下推一行避开遮挡。
-        #if os(macOS)
-        .modifier(ToolbarGlassModifier(hidden: hideToolbarGlass))
-        #endif
-        .safeAreaPadding(.top, topSafeAreaPadding)
+        // 全屏毛玻璃下推 + 「隐藏上方毛玻璃」开关由全局 appToolbar() 统一处理（库/详情/统计一致）。
+        .appToolbar()
         .toolbar {
             #if os(macOS)
             if groupFilter != nil {

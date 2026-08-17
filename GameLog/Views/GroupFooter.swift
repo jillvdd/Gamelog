@@ -7,60 +7,44 @@ struct PlatformBarRow: View {
     let maxCount: Int
     let language: String
 
-    private let nameFontSize: CGFloat = 13
+    /// 平台名字号：图标放大后（非白底 ×1.5）文字随之放大，视觉协调。
+    private let nameFontSize: CGFloat = 14
 
-    /// 条形可视部分的最小宽度（窄单元时先压缩它，再触发图标换行）。
+    /// 条形可视部分的最小宽度（窄单元时先压缩它）。
     private let barMinWidth: CGFloat = 30
 
     var body: some View {
-        // 用 GeometryReader 拿真实可用宽度，据此计算 label 实际宽度并决定「图标+名字同行」还是「图标换行」。
-        GeometryReader { geo in
-            let cellWidth = geo.size.width
-            // 保留：计数 32 + 三处间距 + 条形最小宽
-            let reserved = 32 + 12 + 12 + barMinWidth
-            let labelW = max(50, cellWidth - reserved)
-            let name = Presets.display(platform, category: .platform, language: language)
-            let iconW = PlatformIcon.displayWidth(platform: platform, size: 14)
-            let nameW = PlatformIcon.textWidth(name, fontSize: nameFontSize)
-            let inline = iconW + 6 + nameW <= labelW
-
-            HStack(spacing: 12) {
-                Group {
-                    if inline {
-                        HStack(spacing: 6) {
-                            PlatformIcon(platform: platform, size: 14)
-                            Text(verbatim: name)
-                                .font(.system(size: nameFontSize))
-                                .lineLimit(1)
-                        }
-                    } else {
-                        VStack(alignment: .leading, spacing: 2) {
-                            PlatformIcon(platform: platform, size: 14)
-                            Text(verbatim: name)
-                                .font(.system(size: nameFontSize))
-                                .lineLimit(1)
-                        }
-                    }
+        let iconW = PlatformIcon.displayWidth(platform: platform, size: 14)
+        let name = Presets.display(platform, category: .platform, language: language)
+        return HStack(spacing: 12) {
+            // 图标固定宽度区域：放大图标不挤压、不与文字重叠。
+            PlatformIcon(platform: platform, size: 14)
+                .frame(width: iconW, alignment: .leading)
+            // 平台名：占满剩余宽度，过长自动缩放（不省略、不溢出重叠）。
+            Text(verbatim: name)
+                .font(.system(size: nameFontSize))
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            // 条形图（flexible，保底 barMinWidth）。
+            GeometryReader { proxy in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(Color.accentColor.opacity(0.15))
+                    Capsule()
+                        .fill(Color.accentColor)
+                        .frame(width: proxy.size.width * CGFloat(count) / CGFloat(maxCount))
                 }
-                .frame(maxWidth: labelW, alignment: .leading)
-
-                GeometryReader { proxy in
-                    ZStack(alignment: .leading) {
-                        Capsule()
-                            .fill(Color.accentColor.opacity(0.15))
-                        Capsule()
-                            .fill(Color.accentColor)
-                            .frame(width: proxy.size.width * CGFloat(count) / CGFloat(maxCount))
-                    }
-                }
-                .frame(height: 10)
-
-                Text(verbatim: "\(count)")
-                    .monospacedDigit()
-                    .frame(width: 32, alignment: .trailing)
             }
+            .frame(height: 12)
+            .frame(minWidth: barMinWidth)
+            // 计数。
+            Text(verbatim: "\(count)")
+                .font(.system(size: nameFontSize))
+                .monospacedDigit()
+                .frame(width: 32, alignment: .trailing)
         }
-        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
