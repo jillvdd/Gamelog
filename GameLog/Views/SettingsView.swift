@@ -29,6 +29,7 @@ struct SettingsView: View {
     @AppStorage(UserCustomization.collectorModeKey) private var collectorMode = false
     @AppStorage(UserCustomization.keepOriginalImagesKey) private var keepOriginalImages = false
     @AppStorage(UserCustomization.platformIconsKey) private var showPlatformIcons = true
+    @AppStorage(UserCustomization.autoBackupKey) private var autoBackup = true
 
     /// 用户名绑定：写入时截断到上限。用 Binding 替代 `.onChange`——`.onChange` 挂 TextField 在 macOS 会吞尾随空格。
     private var usernameBinding: Binding<String> {
@@ -51,6 +52,14 @@ struct SettingsView: View {
     /// 最近一次已验证为有效的 key（避免重复请求）。
     @State private var validatedKey = ""
     @State private var keyValidationTask: Task<Void, Never>?
+    /// 是否显示「从自动备份恢复」确认。
+    @State private var showingAutoRestoreConfirm = false
+    /// 是否显示「清除缓存」确认。
+    @State private var showingCacheConfirm = false
+    /// 当前缓存占用（字节），onAppear / 清除后刷新。
+    @State private var cacheSizeBytes: Int64 = 0
+    /// 缓存区操作反馈（清除成功）。
+    @State private var cacheMessage: String?
     #if !os(macOS)
     @State private var showingAvatarPicker = false
     @State private var showingBackupImporter = false
@@ -175,6 +184,19 @@ struct SettingsView: View {
             }
 
             Section(L10n.tr("settings.backup", lang: language)) {
+                Toggle(L10n.tr("settings.autoBackup", lang: language), isOn: $autoBackup)
+                LText("settings.autoBackupHint")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                backupInfoRow
+
+                Button(L10n.tr("backup.backupNow", lang: language)) { backupNow() }
+                    .appStandardButton()
+                Button(L10n.tr("backup.autobackupRestore", lang: language)) { showingAutoRestoreConfirm = true }
+                    .appStandardButton()
+
+                Divider()
                 #if os(macOS)
                 Button(L10n.tr("backup.export", lang: language)) { export() }
                 Button(L10n.tr("backup.import", lang: language)) { showingImportConfirm = true }
@@ -192,9 +214,22 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+
+            Section(L10n.tr("settings.storage", lang: language)) {
+                Text(verbatim: L10n.tr("settings.cacheSize", [formatSize(Int(cacheSizeBytes))], lang: language))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                Button(L10n.tr("settings.cacheClear", lang: language)) { showingCacheConfirm = true }
+                    .appStandardButton()
+                if let cacheMessage {
+                    Text(verbatim: cacheMessage)
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                }
+            }
         }
         .formStyle(.grouped)
-        .onAppear { validateKey() }
+        .onAppear { validateKey(); refreshCacheSize() }
         .onChange(of: steamGridDBKey) { _, _ in validateKey() }
         .onDisappear { keyValidationTask?.cancel() }
         #if os(macOS)
@@ -210,6 +245,24 @@ struct SettingsView: View {
         } message: {
             LText("backup.importConfirm")
         }
+        .platformConfirmDialog(
+            L10n.tr("common.confirm", lang: language),
+            isPresented: $showingAutoRestoreConfirm,
+            message: L10n.tr("backup.autobackupRestoreConfirm", lang: language),
+            cancelTitle: L10n.tr("common.cancel", lang: language),
+            actions: [
+                ConfirmAction(title: L10n.tr("common.confirm", lang: language)) { restoreFromAutoBackup() }
+            ]
+        )
+        .platformConfirmDialog(
+            L10n.tr("common.confirm", lang: language),
+            isPresented: $showingCacheConfirm,
+            message: L10n.tr("settings.cacheClearConfirm", lang: language),
+            cancelTitle: L10n.tr("common.cancel", lang: language),
+            actions: [
+                ConfirmAction(title: L10n.tr("settings.cacheClear", lang: language)) { clearCache() }
+            ]
+        )
         .sheet(item: $cropSession) { session in
             ImageCropSheet(
                 kind: session.kind,
@@ -231,6 +284,7 @@ struct SettingsView: View {
             if case .success(let url) = result {
                 do {
                     let data = try Data(contentsOf: url)
+                    AutoBackup.shared.writeSnapshot(context: context)
                     try BackupManager.decodeAndReplace(data, into: context)
                     try context.save()
                     statusMessage = L10n.tr("backup.importDone", lang: language)
@@ -419,6 +473,7 @@ struct SettingsView: View {
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
             let data = try Data(contentsOf: url)
+            AutoBackup.shared.writeSnapshot(context: context)
             try BackupManager.decodeAndReplace(data, into: context)
             try context.save()
             statusMessage = L10n.tr("backup.importDone", lang: language)
@@ -428,6 +483,51 @@ struct SettingsView: View {
         #else
         // iOS：阶段 3 用 fileImporter 实现备份导入。
         #endif
+    }
+
+    // MARK: - 自动备份 + 缓存
+
+    @ViewBuilder
+    private var backupInfoRow: some View {
+        if let date = AutoBackup.lastBackupDate {
+            Text(verbatim: L10n.tr(
+                "backup.lastBackup",
+                ["\(date.formatted(date: .abbreviated, time: .shortened))（\(formatSize(AutoBackup.lastBackupSize))）"],
+                lang: language
+            ))
+            .font(.callout)
+            .foregroundStyle(.secondary)
+        } else {
+            LText("backup.noBackupYet")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func backupNow() {
+        AutoBackup.shared.writeNow()
+        statusMessage = L10n.tr("backup.nowDone", lang: language)
+    }
+
+    private func restoreFromAutoBackup() {
+        let ok = AutoBackup.shared.restoreFromAutoBackup(context: context)
+        statusMessage = ok
+            ? L10n.tr("backup.restoreDone", lang: language)
+            : L10n.tr("backup.restoreFailed", lang: language)
+    }
+
+    private func clearCache() {
+        let freed = CacheCleaner.clear()
+        cacheSizeBytes = CacheCleaner.diskSize()
+        cacheMessage = L10n.tr("settings.cacheCleared", [formatSize(Int(freed))], lang: language)
+    }
+
+    private func refreshCacheSize() {
+        cacheSizeBytes = CacheCleaner.diskSize()
+    }
+
+    private func formatSize(_ bytes: Int) -> String {
+        ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)
     }
 }
 

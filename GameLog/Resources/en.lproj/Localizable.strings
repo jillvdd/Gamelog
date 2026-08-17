@@ -207,3 +207,26 @@
 "status.completed" = "Completed";
 "stats.backlogCount" = "Backlog";
 "status.longRunning" = "Long-Running";
+
+// Auto backup + cache
+"settings.autoBackup" = "Auto Backup";
+"settings.autoBackupHint" = "Automatically saves a full backup locally whenever your data changes. Restore anytime from Settings.";
+"backup.lastBackup" = "Last backup: %@";
+"backup.backupNow" = "Back Up Now";
+"backup.autobackupRestore" = "Restore from Auto Backup…";
+"backup.autobackupRestoreConfirm" = "Restoring will replace all current data with the auto backup. Continue?";
+"backup.restoreDone" = "Restored from auto backup";
+"backup.restoreFailed" = "Restore failed. The auto backup file may be corrupted.";
+"backup.snapshotSaved" = "Pre-restore snapshot saved";
+"backup.emptyRestoreTitle" = "Empty library detected";
+"backup.emptyRestoreMessage" = "Your library is empty, but the local auto backup contains %lld games. Restore from auto backup? (Cancel keeps the empty library)";
+"backup.restoreNow" = "Restore from Backup";
+"backup.keepEmpty" = "Keep Empty";
+"backup.nowDone" = "Backup saved";
+"backup.noBackupYet" = "No backup yet";
+"settings.storage" = "Storage & Cache";
+"settings.cacheSize" = "Cache size: %@";
+"settings.cacheClear" = "Clear Cache";
+"settings.cacheClearConfirm" = "Clear caches? Caches are temporary data that rebuilds automatically (cover search downloads, image decode caches, temporary files). Your game data and backups are not affected.";
+"settings.cacheCleared" = "Cache cleared (%@ freed)";
+"settings.cacheClearFailed" = "Clear failed";

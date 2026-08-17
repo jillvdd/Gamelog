@@ -206,3 +206,26 @@
 "status.completed" = "已通关";
 "stats.backlogCount" = "想玩";
 "status.longRunning" = "长线游玩";
+
+// 自动备份 + 缓存
+"settings.autoBackup" = "自动备份";
+"settings.autoBackupHint" = "每次数据改动后自动在本地保存完整备份，可在设置中随时恢复。";
+"backup.lastBackup" = "上次备份：%@";
+"backup.backupNow" = "立即备份";
+"backup.autobackupRestore" = "从自动备份恢复…";
+"backup.autobackupRestoreConfirm" = "将用自动备份替换当前全部数据，确定继续吗？";
+"backup.restoreDone" = "已从自动备份恢复";
+"backup.restoreFailed" = "恢复失败，自动备份文件可能已损坏";
+"backup.snapshotSaved" = "恢复前快照已保留";
+"backup.emptyRestoreTitle" = "检测到库为空";
+"backup.emptyRestoreMessage" = "当前库为空，但本地自动备份包含 %lld 款游戏。是否从自动备份恢复？（取消将保留空库）";
+"backup.restoreNow" = "从备份恢复";
+"backup.keepEmpty" = "保留空库";
+"backup.nowDone" = "已保存备份";
+"backup.noBackupYet" = "尚未备份";
+"settings.storage" = "存储与缓存";
+"settings.cacheSize" = "当前缓存占用：%@";
+"settings.cacheClear" = "清除缓存";
+"settings.cacheClearConfirm" = "清除缓存？缓存仅为可自动重建的临时数据（封面搜索下载、图片解码缓存、临时文件），不会影响游戏数据与备份。";
+"settings.cacheCleared" = "已清除缓存（释放 %@）";
+"settings.cacheClearFailed" = "清除失败";

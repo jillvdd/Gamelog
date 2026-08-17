@@ -132,6 +132,12 @@ enum PlatformIconLoader {
         "SFC-SNES", "3DS", "NDS", "N64", "FC-NES", "GBA", "Game-Boy-Color", "Game-Boy",
     ]
 
+    /// 清空 aspect/template 缓存（内存态；「清除缓存」功能调用）。
+    static func clearCaches() {
+        aspectCache.removeAll()
+        templateCache.removeAll()
+    }
+
     /// 图标宽高比（宽/高），仅读文件头不解码整图，按文件名缓存。
     static func aspect(named: String) -> CGFloat? {
         if let cached = aspectCache[named] { return cached }
