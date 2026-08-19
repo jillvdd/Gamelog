@@ -196,7 +196,6 @@ struct SettingsView: View {
                 Button(L10n.tr("backup.autobackupRestore", lang: language)) { showingAutoRestoreConfirm = true }
                     .appStandardButton()
 
-                Divider()
                 #if os(macOS)
                 Button(L10n.tr("backup.export", lang: language)) { export() }
                 Button(L10n.tr("backup.import", lang: language)) { showingImportConfirm = true }

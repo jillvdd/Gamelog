@@ -19,7 +19,7 @@
 "group.newGroup" = "新建分组";
 "group.name" = "分组名称";
 "group.nameExists" = "该分组名已存在";
-"game.name" = "名称";
+"game.name" = "游戏名称";
 "game.nameEn" = "英文名";
 "game.nameZh" = "中文名";
 "game.nameJa" = "日文名";
@@ -33,6 +33,18 @@
 "game.reviewTitle" = "评价标题";
 "game.reviewTitlePlaceholder" = "一句话评价（分享图会用到）";
 "game.reviewBody" = "评价正文";
+"review.header" = "评价";
+"review.editor" = "编辑评价";
+"review.edit" = "编辑评价";
+"review.save" = "保存";
+"review.source" = "Markdown 源码";
+"review.bodyHint" = "支持 Markdown：标题用 #，加粗用 **文字**，斜体用 *文字*，列表用 - 项";
+"review.main" = "正文";
+"review.title" = "大标题";
+"review.subtitle" = "副标题";
+"review.bold" = "加粗";
+"review.italic" = "斜体";
+"review.list" = "列表";
 "game.groups" = "所属分组";
 "game.completions" = "通关记录";
 "game.firstCompletion" = "首条通关记录";
@@ -43,7 +55,7 @@
 "completion.playtime" = "游戏时长（小时）";
 "completion.noDate" = "无通关日期";
 "completion.noPlaytime" = "无时长";
-"completion.notes" = "通关内容";
+"completion.notes" = "通关备注";
 "completion.notesPlaceholder" = "这次的游玩感受、趣事…";
 "completion.add" = "追加通关记录";
 "completion.edit" = "编辑";
@@ -73,7 +85,8 @@
 "share.desktop" = "电脑 (16:9)";
 "share.overviewTitle" = "总览标题";
 "share.overviewTitleDefault" = "我的游戏簿";
-"share.count" = "共 %d 款";"share.preview" = "预览";
+"share.count" = "共 %d 款";
+"share.preview" = "预览";
 "share.saveImage" = "保存图片…";
 "share.openShareSheet" = "分享…";
 "share.saveToAlbum" = "保存到相册";
@@ -116,7 +129,7 @@
 "settings.hideToolbarGlassHint" = "隐藏所有页面（库/详情/统计）顶部工具栏的毛玻璃背景，界面更简洁。（macOS 15 及以上可启用）";
 "settings.collectorMode" = "收藏家模式";
 "settings.collectorModeHint" = "在游戏详情页启用「持有」页签，记录实体游戏的版本与收藏照片。";
-"settings.platformIcons" = "平台标志";
+"settings.platformIcons" = "平台图标";
 "settings.platformIconsHint" = "在各平台选择与分组中显示品牌标志图标。";
 "settings.keepOriginalImages" = "保存原图";
 "settings.keepOriginalImagesHint" = "收藏照片按原样保存、不压缩（默认压缩以节省空间；只影响之后新增的图）。";
@@ -186,7 +199,7 @@
 // iOS 专属
 "tab.library" = "库";
 "tab.settings" = "设置";
-"library.filterGroup" = "分组";
+"library.filterGroup" = "按分组筛选";
 "library.allGroups" = "全部分组";
 "group.manage" = "管理分组";
 

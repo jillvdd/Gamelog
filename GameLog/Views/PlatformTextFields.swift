@@ -27,11 +27,15 @@ struct BorderedTextEditor: View {
     @Binding var text: String
     var minHeight: CGFloat
     var maxHeight: CGFloat
+    /// NSTextView 就绪钩子（仅 macOS 有效）。入参需在 macOS 分支 cast 成 NSTextView。
+    var onTextViewReady: ((Any) -> Void)?
 
-    init(text: Binding<String>, minHeight: CGFloat, maxHeight: CGFloat? = nil) {
+    init(text: Binding<String>, minHeight: CGFloat, maxHeight: CGFloat? = nil,
+         onTextViewReady: ((Any) -> Void)? = nil) {
         self._text = text
         self.minHeight = minHeight
         self.maxHeight = maxHeight ?? Self.defaultMaxHeight
+        self.onTextViewReady = onTextViewReady
     }
 
     /// 约 20 行的最大高度：系统正文字号行高 × 20 + 上下内边距。
@@ -46,7 +50,8 @@ struct BorderedTextEditor: View {
 
     var body: some View {
         #if os(macOS)
-        TextEditorNSView(text: $text, minHeight: minHeight, maxHeight: maxHeight)
+        TextEditorNSView(text: $text, minHeight: minHeight, maxHeight: maxHeight,
+                         onTextViewReady: onTextViewReady)
             .background(
                 RoundedRectangle(cornerRadius: 6)
                     .fill(Color.semantic(.textBackground))
@@ -137,6 +142,8 @@ private struct TextEditorNSView: NSViewRepresentable {
     @Binding var text: String
     var minHeight: CGFloat
     var maxHeight: CGFloat
+    /// 通用钩子：NSTextView 就绪后暴露引用，供外部（如格式工具条）执行插入/选区操作。
+    var onTextViewReady: ((NSTextView) -> Void)?
 
     final class Coordinator: NSObject, NSTextViewDelegate {
         var parent: TextEditorNSView
@@ -185,6 +192,7 @@ private struct TextEditorNSView: NSViewRepresentable {
             scrollView?.invalidateIntrinsicContentSize()
         }
         textView.string = text
+        onTextViewReady?(textView)
         return scrollView
     }
 

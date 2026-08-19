@@ -10,8 +10,11 @@ struct PlatformBarRow: View {
     /// 平台名字号：图标放大后（非白底 ×1.5）文字随之放大，视觉协调。
     private let nameFontSize: CGFloat = 14
 
-    /// 条形可视部分的最小宽度（窄单元时先压缩它）。
+    /// 条形可视部分的最小宽度（极窄单元格时）。
     private let barMinWidth: CGFloat = 30
+
+    /// 整行宽度（背景测量填充，不影响行自然高度）。
+    @State private var rowWidth: CGFloat = 0
 
     var body: some View {
         let iconW = PlatformIcon.displayWidth(platform: platform, size: 14)
@@ -26,18 +29,16 @@ struct PlatformBarRow: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            // 条形图（flexible，保底 barMinWidth）。
-            GeometryReader { proxy in
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(Color.accentColor.opacity(0.15))
-                    Capsule()
-                        .fill(Color.accentColor)
-                        .frame(width: proxy.size.width * CGFloat(count) / CGFloat(maxCount))
-                }
+            // 条形图：固定宽度（整行的 38%，不随名字伸缩），保底 barMinWidth。
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color.accentColor.opacity(0.15))
+                Capsule()
+                    .fill(Color.accentColor)
+                    .frame(width: max(barWidth, barMinWidth) * CGFloat(count) / CGFloat(maxCount))
             }
+            .frame(width: max(barWidth, barMinWidth))
             .frame(height: 12)
-            .frame(minWidth: barMinWidth)
             // 计数。
             Text(verbatim: "\(count)")
                 .font(.system(size: nameFontSize))
@@ -45,7 +46,16 @@ struct PlatformBarRow: View {
                 .frame(width: 32, alignment: .trailing)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            GeometryReader { proxy in
+                Color.clear
+                    .onAppear { rowWidth = proxy.size.width }
+            }
+        )
     }
+
+    /// 条形固定宽度：整行可用宽度的 38%，与名字长短无关。
+    private var barWidth: CGFloat { rowWidth * 0.38 }
 }
 
 /// 分组视图底部的统计区块：平均分（按游戏聚合）+ 平台分布（按通关记录计数）。
@@ -73,8 +83,11 @@ struct GroupStatsSection: View {
                 counts[completion.platform, default: 0] += 1
             }
         }
-        return counts.sorted { $0.value > $1.value }
-            .map { (platform: $0.key, count: $0.value) }
+        // 计数降序；数量相同时按平台名升序，保证排序稳定、相同数量不反复横跳。
+        return counts.sorted {
+            $0.value == $1.value ? $0.key < $1.key : $0.value > $1.value
+        }
+        .map { (platform: $0.key, count: $0.value) }
     }
 
     private var maxPlatformCount: Int {

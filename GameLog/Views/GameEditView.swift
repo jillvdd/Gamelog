@@ -398,6 +398,9 @@ struct GameEditView: View {
                     BorderedTextField(text: $reviewTitle, placeholder: L10n.tr("game.reviewTitlePlaceholder", lang: language))
                 }
                 BorderedTextEditor(text: $reviewBody, minHeight: 140)
+                Text(verbatim: L10n.tr("review.bodyHint", lang: language))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             if isCreating && (status == .completed || status == .longRunning) {
