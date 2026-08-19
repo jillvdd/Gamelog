@@ -10,7 +10,8 @@ Interface languages: **简体中文 / 日本語 / English** (switch instantly in
 
 - **Game Library**: grid / list view toggle; search by name + aliases + localized names; filter by status / platform / group; group management (macOS sidebar / iOS filter menu), a game can belong to several groups; sort by name / release date / completion date / average score (low to high or high to low). The library score is the mean of the record averages of all scored completions, rounded to 0.1; unscored games show "Unrated".
 - **Game Status** (beta 1.9): six statuses — Backlog / Playing / Paused / Dropped / Completed / Long-Running. Lightweight states need no completion records or scores; move to Completed to attach them. Filter the library by status, pick in the detail page; stats exclude non-completed games.
-- **Game Detail**: review (one-line verdict + body), all completions (edit / append / delete), six-dimension colored bar chart; an extra "Holdings" tab when Collector Mode is on.
+- **Game Detail**: review area (one-line tagline intro + long-form body), all completions (edit / append / delete), six-dimension colored bar chart; an extra "Holdings" tab when Collector Mode is on.
+- **Review (Markdown long-form, beta 2.1)**: the one-line verdict (tagline) renders as a large lead-in "thesis"; the review body supports a Markdown subset (headings `#` / bold `**` / italic `*` / lists `-`) like a well-set article. **macOS = WYSIWYG rich-text editor** (a dedicated "writing desk" window; the toolbar applies styles directly, saved back to Markdown; CJK italics are synthesized with a shear at draw time); **iOS = editing sheet (TextEditor + preview)**. Per-platform editing share one Markdown renderer, so both platforms look consistent.
 - **Six-Dimension Scoring**: Gameplay / Design / Story / Art / Music / Performance, 1–10 sliders with 0.1 steps. Overall = mean of the six; the first completion requires scores, later ones may be skipped.
 - **Completions**: platform, completion date (can be "None"), completion degree (main story / all side quests / all endings / platinum / multiple playthroughs / speedrun / custom), playtime (can be "None"), and notes.
 - **Date Picker**: macOS three-column wheel (year / month / day, handles Feb 29 and month-end clamping); iOS uses the system date picker.
@@ -58,7 +59,7 @@ Or open `GameLog.xcodeproj` in Xcode and Run the `GameLog` (macOS) or `GameLog-i
 
 ## Installing on iPhone (IPA)
 
-This repository provides a Release IPA (`dist/GameLog-beta-2.0.ipa`), unsigned — you need to sign it yourself before installing.
+This repository provides a Release IPA (`dist/GameLog-beta-2.1.ipa`), unsigned — you need to sign it yourself before installing.
 
 > Tip: for simulator or daily development debugging, just Run from Xcode — no IPA needed.
 

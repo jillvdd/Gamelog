@@ -67,6 +67,18 @@ struct GameLogApp: App {
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 380, height: 300)
+
+        // 评价编辑独立窗口（macOS 专属「写字台」）：详情页点「编辑评价」打开，
+        // 保存才写回 reviewTitle/reviewBody。当前编辑目标经 ReviewEditorSession 共享。
+        Window(L10n.tr("review.editor", lang: languageCode), id: "reviewEditor") {
+            ReviewEditorView()
+                .environment(\.appLanguageCode, languageCode)
+                .environment(\.locale, Locale(identifier: languageCode))
+        }
+        .modelContainer(container)
+        #if os(macOS)
+        .defaultSize(width: 760, height: 520)
+        #endif
         #endif
     }
 }

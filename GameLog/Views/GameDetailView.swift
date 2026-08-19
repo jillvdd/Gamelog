@@ -317,6 +317,8 @@ struct GameDetailView: View {
     @Environment(\.appLanguageCode) private var language
     @Environment(\.dismiss) private var dismiss
     @AppStorage(UserCustomization.collectorModeKey) private var collectorMode = false
+    /// 隐藏上方毛玻璃（全局开关）：开启 = 无标题 + 无毛玻璃，与 Library / 统计一致。
+    @AppStorage(UserCustomization.hideToolbarGlassKey) private var hideToolbarGlass = false
     let game: Game
 
     @State private var detailTab: DetailTab = .details
@@ -328,6 +330,12 @@ struct GameDetailView: View {
     @State private var showingShare = false
     /// 状态机选中值：绑定局部 @State 隔离，避免每次点击时因 game 模型变化导致 Picker 重绘重载。
     @State private var detailStatus = GameStatus.completed
+    #if os(macOS)
+    @Environment(\.openWindow) private var openWindow
+    #else
+    /// iOS 评价编辑 sheet 开关。
+    @State private var showingReviewEditor = false
+    #endif
 
     private var platforms: [String] {
         game.platformList
@@ -361,7 +369,7 @@ struct GameDetailView: View {
                 .frame(maxWidth: .infinity, alignment: .top)
             }
         }
-        .navigationTitle(game.displayName(for: language))
+        .navigationTitle(hideToolbarGlass ? "" : game.displayName(for: language))
         .onAppear { detailStatus = game.statusValue }
         // 全屏毛玻璃下推 + 「隐藏上方毛玻璃」开关由全局 appToolbar() 统一处理。
         .appToolbar()
@@ -413,6 +421,11 @@ struct GameDetailView: View {
             #endif
         }
         .sheet(isPresented: $showingShare) { SharePanelView(preselected: [game]) }
+        #if os(iOS)
+        .sheet(isPresented: $showingReviewEditor) {
+            ReviewEditSheet(game: game)
+        }
+        #endif
         .platformConfirmDialog(
             L10n.tr("common.confirmDelete", lang: language),
             isPresented: Binding(
@@ -567,31 +580,71 @@ struct GameDetailView: View {
 
     // MARK: - 评价
 
-    /// 评价正文卡片（不含标题，标题由调用方按布局需要放置）。
+    /// 一句话评价（tagline）作为长评正文首段前的大号引言（方案②）：
+    /// 与正文同流、更强——比正文大一号、半粗斜体。
     @ViewBuilder
-    private var reviewBodySection: some View {
-        if !game.reviewBody.isEmpty {
-            Text(verbatim: game.reviewBody)
-                .font(.body)
-                .foregroundStyle(.secondary)
+    private var taglineView: some View {
+        if !game.reviewTitle.isEmpty {
+            Text(verbatim: game.reviewTitle)
+                .font(.system(size: 21, weight: .semibold))
+                .italic()
+                .foregroundStyle(.primary)
+                .lineSpacing(3)
                 .textSelection(.enabled)
-                .lineSpacing(4)
-                .padding(16)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(RoundedRectangle(cornerRadius: 10).fill(Color.semantic(.controlBackground)))
         }
     }
 
-    /// 评价区（单栏模式）：标题 + 正文卡片。
+    /// 长评正文：Markdown 渲染（标题 / 加粗 / 斜体 / 列表），像一篇文章。
+    @ViewBuilder
+    private var reviewBodySection: some View {
+        if !game.reviewBody.isEmpty {
+            MarkdownReviewView(markdown: game.reviewBody)
+                .textSelection(.enabled)
+        }
+    }
+
+    /// 「编辑评价」入口：macOS 打开独立编辑窗口（写字台），iOS 弹出编辑 sheet。
+    /// iOS 端只留编辑图标（square.and.pencil），不带文字。
+    private var reviewEditButton: some View {
+        Button {
+            openReviewEditor()
+        } label: {
+            #if os(macOS)
+            Label(L10n.tr("review.edit", lang: language), systemImage: "square.and.pencil")
+            #else
+            Image(systemName: "square.and.pencil")
+            #endif
+        }
+        .buttonStyle(.borderless)
+        .foregroundStyle(.secondary)
+    }
+
+    private func openReviewEditor() {
+        #if os(macOS)
+        ReviewEditorSession.shared.gameID = game.persistentModelID
+        openWindow(id: "reviewEditor")
+        #else
+        showingReviewEditor = true
+        #endif
+    }
+
+    /// 评价区（单栏模式）：顶部工具行（含编辑入口）+ tagline 大号引言 + Markdown 长评正文。
     @ViewBuilder
     private var reviewSection: some View {
         if !game.reviewTitle.isEmpty || !game.reviewBody.isEmpty {
-            VStack(alignment: .leading, spacing: 8) {
-                if !game.reviewTitle.isEmpty {
-                    Text(verbatim: game.reviewTitle)
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text(L10n.tr("review.header", lang: language))
                         .font(.title3.bold())
+                    Spacer()
+                    reviewEditButton
                 }
-                reviewBodySection
+                taglineView
+                if !game.reviewBody.isEmpty && !game.reviewTitle.isEmpty {
+                    reviewBodySection.padding(.top, 14)
+                } else {
+                    reviewBodySection
+                }
             }
         }
     }
@@ -633,9 +686,18 @@ struct GameDetailView: View {
     private func wideContent(contentWidth: CGFloat) -> some View {
         HStack(alignment: .top, spacing: 24) {
             VStack(alignment: .leading, spacing: 12) {
-                Text(verbatim: game.reviewTitle)
-                    .font(.title3.bold())
-                reviewBodySection
+                HStack {
+                    Text(L10n.tr("review.header", lang: language))
+                        .font(.title3.bold())
+                    Spacer()
+                    reviewEditButton
+                }
+                taglineView
+                if !game.reviewBody.isEmpty && !game.reviewTitle.isEmpty {
+                    reviewBodySection.padding(.top, 14)
+                } else {
+                    reviewBodySection
+                }
             }
             .frame(width: max(340, contentWidth * 0.58), alignment: .leading)
             completionsSection

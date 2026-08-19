@@ -5,6 +5,7 @@ import SwiftData
 struct StatsView: View {
     @Query private var games: [Game]
     @Environment(\.appLanguageCode) private var language
+    @AppStorage(UserCustomization.hideToolbarGlassKey) private var hideToolbarGlass = false
     @State private var showingOverall = false
     /// 点击榜单游戏名 → 编程式 push 到详情。
     @State private var selectedGame: Game?
@@ -33,8 +34,11 @@ struct StatsView: View {
                 counts[platform, default: 0] += 1
             }
         }
-        return counts.sorted { $0.value > $1.value }
-            .map { (platform: $0.key, count: $0.value) }
+        // 计数降序；数量相同时按平台名升序，保证排序稳定、相同数量不反复横跳。
+        return counts.sorted {
+            $0.value == $1.value ? $0.key < $1.key : $0.value > $1.value
+        }
+        .map { (platform: $0.key, count: $0.value) }
     }
 
     private var maxPlatformCount: Int {
@@ -128,7 +132,7 @@ struct StatsView: View {
                     .frame(maxWidth: .infinity, alignment: .top)
                 }
             }
-            .navigationTitle(L10n.tr("library.stats", lang: language))
+            .navigationTitle(hideToolbarGlass ? "" : L10n.tr("library.stats", lang: language))
             .appToolbar()
             .navigationDestination(item: $selectedGame) { GameDetailView(game: $0) }
             .navigationDestination(isPresented: $showingOverall) { OverallRankingView() }

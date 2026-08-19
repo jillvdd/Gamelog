@@ -1,14 +1,14 @@
 # GameLog 交接日志（HANDOVER）
 
-> 更新：2026-08-17（beta 2.0 = 自动备份 + 清缓存，本轮提交）
-> 状态：**beta 2.0 = macOS + iOS 双平台**（macOS 14.0 / iOS 18.0）。macOS + iOS Debug/Release 构建、ScoreMath/DataSmoke/ShareRender、L10n 三语全绿。**本轮已提交**；**未打 tag、未推 GitHub**。详见 §26。
+> 更新：2026-08-20（beta 2.1 = 评价区 Markdown 长评 + WYSIWYG 编辑 + 分端编辑，本轮提交）
+> 状态：**beta 2.1 = macOS + iOS 双平台**（macOS 14.0 / iOS 18.0）。macOS + iOS Debug/Release 构建、ScoreMath/DataSmoke/ShareRender/RichReview、L10n 三语全绿。**本轮已提交**；**未打 tag、未推 GitHub**。详见 §27。
 > 环境：macOS 27 beta 只能用 **Xcode beta**（`/Users/abc/Downloads/Xcode-beta.app`），iOS 构建/运行一律用它。
 
 ## 1. 一句话现状
 
-`GameLog.xcodeproj`（macOS + iOS，SwiftUI + SwiftData，纯本地，三语 zh-Hans / ja / en 即时切换）能完整构建并运行。**beta 2.0 已提交**：自动备份（每次数据改动防抖 3 秒写完整本地备份 + 版本升级前快照 + 恢复/导入前快照 + 空库检测恢复弹窗 + iOS 备份存 Documents/Backups）、设置「存储与缓存」一键清缓存（只清内存/网络/临时缓存，不动任何数据与备份）。beta 1.9 的状态机（6 状态 + 游戏级平台）、全屏毛玻璃、平台图标尺寸系统延续。**部署目标 macOS 14.0 / iOS 18.0**。DMG `dist/GameLog-beta-2.0.dmg`、IPA `dist/GameLog-beta-2.0.ipa` 已打包验证。GitHub 未推（tag 未打）。
+`GameLog.xcodeproj`（macOS + iOS，SwiftUI + SwiftData，纯本地，三语 zh-Hans / ja / en 即时切换）能完整构建并运行。**beta 2.1 已提交**：评价区优化——一句话评价（tagline）改作长评正文前的大号引言「题眼」；长评正文升级为 **Markdown 子集**（`#` 标题 / `**` 加粗 / `*` 斜体 / `-` 列表）；**macOS = 富文本所见即所得编辑器**（独立「写字台」窗口 + 工具条，中文斜体合成倾斜）；**iOS = 编辑 sheet（TextEditor + 预览）**；共享一份 Markdown 渲染、分端编辑、双端观感一致。同时把「隐藏上方毛玻璃 → 隐藏顶栏标题」联动扩展到游戏详情 / 统计 / 整体排名页，并顺手修复全局统计与分组统计「按平台分布」的排序稳定性与条形不等宽问题。beta 2.0 的自动备份 + 清缓存延续。**部署目标 macOS 14.0 / iOS 18.0**。DMG `dist/GameLog-beta-2.1.dmg`、IPA `dist/GameLog-beta-2.1.ipa` 已打包验证。GitHub 未推（tag 未打）。
 
-版本号 `"beta 2.0"`（pbxproj 4 处：macOS/iOS 各 Debug/Release）。工作区干净（HANDOVER 文档与 dist/ 产物被 gitignore，不跟踪）。
+版本号 `"beta 2.1"`（pbxproj 4 处：macOS/iOS 各 Debug/Release）。工作区干净（HANDOVER 文档与 dist/ 产物被 gitignore，不跟踪）。
 
 ## 2. 构建 / 运行 / 测试命令
 
@@ -177,7 +177,7 @@ $DEVELOPER_DIR/usr/bin/simctl launch <UDID> com.abcleg.GameLog
 14. **平台显示排序唯一源是 `Presets.ordered(_:)`**（beta 1.4 抽取）：预设按 `Presets.platforms` 世代倒序、预设外自定义按 canonical 字典序排最后。各 View 直接用，别重新 `.sorted()`。
 15. **`@Query` 不监听实体关系属性变化**；要关系实时变化直接访问 @Model 对象关系属性。
 16. **`NSWorkspace.icon(for: URL)` 在 macOS 26 SDK 不存在**；取 app 图标用 `icon(forFile: Bundle.main.bundlePath)`。
-17. **版本号在 pbxproj `MARKETING_VERSION`**（macOS/iOS 各 Debug/Release，共 4 处），现值 `"beta 2.0"`。部署目标 `MACOSX_DEPLOYMENT_TARGET` 也是两处，现值 `14.0`（iOS 为 `IPHONEOS_DEPLOYMENT_TARGET`，现值 `18.0`）。
+17. **版本号在 pbxproj `MARKETING_VERSION`**（macOS/iOS 各 Debug/Release，共 4 处），现值 `"beta 2.1"`。部署目标 `MACOSX_DEPLOYMENT_TARGET` 也是两处，现值 `14.0`（iOS 为 `IPHONEOS_DEPLOYMENT_TARGET`，现值 `18.0`）。
 18. **macOS app 图标：`INFOPLIST_KEY_CFBundleIconFile` 不被 Xcode 的 `GENERATE_INFOPLIST_FILE` 注入支持**。必须用 asset catalog + pbxproj 设 `ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;`。
 19. **`some Shape` 的 switch 分支不能返回不同类型**；`any Shape` 又不能对存在性类型调 `.fill`/`.stroke`（macOS 26 existential-member-access-limitations）→ 用 **`AnyShape`** 包装。
 20. **Form 里给行加说明文字用 `LabeledContent(label) { ... }`**，左右布局符合 macOS 惯例。
@@ -618,3 +618,56 @@ canonical 存储值也改 + 启动一次性迁移 + 保留旧名展示兜底。
 - **commit** 见 git log（消息前缀 `beta 2.0：`）；**版本号 `"beta 2.0"`**（pbxproj 4 处）；**DMG** `dist/GameLog-beta-2.0.dmg`（卷名 `GameLog beta 2.0`，含 GameLog.app + Applications 链接，6.8MB，挂载验证版本号 beta 2.0）；**IPA** `dist/GameLog-beta-2.0.ipa`（Release-iphonesimulator universal x86_64+arm64 adhoc，解压验证版本号 beta 2.0 + `_CodeSignature/CodeResources`）。
 - **GitHub 未推**：tag 未打。要推：`git tag beta-v2.0 && git push origin main beta-v2.0`（push 需用户凭据，见 §9）。
 - **遗留**：iOS 真机（拍照 / AirDrop 导入 / QLPreviewController / PhotosPicker / TabBar）仍未实测——见 §9 ②。
+
+## 27. beta 2.1 发布记录（2026-08-20，评价区 Markdown 长评 + WYSIWYG 编辑 + 分端编辑，本轮提交）
+
+> 起因：用户是写 personal log，要「像写文章一样」给游戏写一句话评价 + 文章式长评，对详情页评价区不满意。经 grill 会话（Q1–Q11, 八轮）收敛出 beta 2.1 决策（见记忆 review-markdown-design）。**内容 = 评价区重构 + 三处小修 + 两处统计修复**。
+
+### 27.1 评价区重构（核心，决策见记忆 review-markdown-design）
+
+- **结构保留**：`reviewTitle`（一句话 tagline）+ `reviewBody`（长评正文）两个字段不动；tagline 特殊展示。
+- **tagline「导语感」（方案② 引子式）**：作为长评正文首段前的大号引言展示（`font 21pt semibold + italic + lineSpacing 3`），与正文同流但更强——不单独堆头部，也不是文件顶题词。`GameDetailView` 的 `taglineView`。
+- **长评正文 → Markdown 子集**：支持 `#` 标题 / `**` 加粗 / `*` 斜体 / `-` 列表；图片本期砍掉。渲染用共享 `MarkdownReview.swift`（`AttributedString(markdown:)` 方案甲 + 自补列表/块级排版）。
+- **共享渲染、分端编辑、消费者只有一个**：渲染代码一份双端编译；`MarkdownReviewView`（详情页展示）双端一致，字体/字号各自按系统适配（报纸式：纸/网页/手机各有良好体验，不强求像素级）。
+- **macOS = 富文本所见即所得编辑器「写字台」**：
+  - 新增 `Support/MarkdownRichModel.swift`（纯逻辑：`Line` 行模型 kind=body/heading/list + 行内 runs[bold/italic]；`lines(from:)` 复用 `MarkdownReview.parse` 保证与详情页渲染同源；`markdown(from:)` 反向）。
+  - 新增 `Support/MarkdownRichEditor.swift`（macOS-only，`#if os(macOS)`：富文本 NSTextView 壳 + `ReviewRichEditor` 枚举样式常量 + `ObliqueReviewLayoutManager` + `ReviewRichEditorRepresentable` + `ReviewRichTextController`）。
+  - **中文合成斜体（`ObliqueReviewLayoutManager`）**：中文无 Italic 字形（苹方全家族 `hasItalic=false`），对 italic run 里的 CJK 字形（按 Unihan Unicode 范围判别：0x3400–0x4DBF / 0x4E00–0x9FFF / 0x3040–0x30FF / 0x31F0–0x31FF / 0xAC00–0xD7AF / 0xFF00–0xFFEF / 0xF900–0xFAFF）在绘制层施加 ~12° shear（`CGAffineTransform(a:1,b:0,c:-0.21,d:1)`）；拉丁走 SF 真斜体不动。`showCGGlyphs` 已 deprecated（10.15）但仍是 TextKit 1 标准字形钩子，`#available`-class 先例，可接受。详情页 SwiftUI 侧的中文斜体本轮不做（先编辑器）。
+  - 编辑窗口实例 `ReviewEditorView.swift` + `ReviewEditorSession`（`gameID` 共享编辑目标）：`GameLogApp` 新增 `Window(id: "reviewEditor")`（macOS，默认 760×520）。详情页 `reviewEditButton` 设 `session.gameID` + `openWindow(id:)`。**不保存关闭 = 放弃，保存才写回 reviewTitle/reviewBody**。
+- **iOS = 编辑 sheet（`ReviewEditSheet.swift`，无预览切换）**：tagline TextField + 正文 `TextEditor`。详情页「编辑评价」**只留编辑图标（`square.and.pencil`），不带文字**（用户明确要求）。
+- **工具条（`ReviewRichEditor` 五按钮）**：`大`（h1）/ `大小`（h2）/ `B`（粗体）/ `I`（斜体）/ `•`（列表，转正文尺寸）。
+- **⏳ 编辑器直打字偏小（未最终确认）**：NSTextView 真实键盘输入用内部 12pt 默认字体，忽略 `typingAttributes`；已加 `normalizeFonts()`（didChange 后扫描非规格字号 15/16/18/22 修正）+ `shouldChangeTextIn` 设置 typingAttributes。**已构建但用户尚未视觉确认**——下一会话如用户仍反馈「直打字尺寸与正文不一致」，先查 `normalizeFonts()` 是否被 `isNormalizing` 守卫短路或 size 未覆盖。`MarkdownRichEditor.swift` 里仍留有 DEBUG 诊断（写 `/tmp/gamelog_editor_diag.log`）待确认后清理（见 §28 待办）。
+
+### 27.2 其他改动
+
+- **本地化重写 + 文档**：用户手动优化了全部 UI 文案并保存为 `GameLog_Localization_Revised.md`，据此重写三语 `.strings`（237 key × 3 语言逐字精确、placeholder 一致、plutil OK）；新增 `LOCALIZATION.md`（三语本地化对照文档，含代码注释便于本地化后可替换）。
+- **「隐藏上方毛玻璃 → 隐藏顶栏标题」联动扩展到详情/统计/整体排名**：`GameDetailView`（macOS+iOS）、`StatsView`、`StatsRankings.OverallRankingView` 都加 `@AppStorage(UserCustomization.hideToolbarGlassKey)`，`navigationTitle` 在开启时置空——与已有的 `LibraryView` 一致。
+- **统计「按平台分布」两处修复**（`GroupFooter.PlatformBarRow` + `StatsView/GroupFooter` 的 `platformCounts`）：
+  - **同数量平台顺序横跳**：`Dictionary.sorted { $0.value > $1.value }` 不稳定 → 加次级排序（数量相同时按平台名升序）。
+  - **条形宽度受平台名长度影响**：原条形 GeometryReader 拿「整行剩宽」→ 名字越长条形越短。改为 `.background(GeometryReader)` 测整行宽（不影响行高），条形固定 38% 宽、保底 30。**⚠️ 不要用「整行包 GeometryReader」**——它会成为 LazyVGrid 的布局根节点、压缩行高导致放大的平台图标边角重叠（本轮已踩过，见 GroupFooter 现实现）。
+- **`BorderedTextEditor` 加 `onTextViewReady` 钩子**（`PlatformTextFields.swift`）：macOS NSTextView 就绪后暴露引用，供工具条插入/选区操作用。
+- **`GameEditView`**：评价正文下加 `review.bodyHint` 提示（「支持 Markdown：# 标题 / ** 加粗 / * 斜体 / - 列表」）。
+- **`SettingsView`**：去掉「从自动备份恢复」与「导出备份」之间多余的空 Divider。
+
+### 27.3 L10n 新增 key（三语全补）
+
+`review.header/editor/edit/save/source/bodyHint/main/title/subtitle/bold/italic/list`、`game.reviewTitlePlaceholder`（既有）、`validation.reviewTitleRequired`。
+
+### 27.4 已验证（本轮）
+
+- macOS Debug + **Release** 构建 exit 0；ScoreMath 15/15、DataSmoke PASS、ShareRender PASS、**RichReviewTest PASS**（Markdown→富文本→Markdown 往返逐字守恒）；L10n 三语 0 缺失（237 key × 3）。
+- 中文字体斜体合成：`pkill -x GameLog` 重启后用户需视觉确认（本会话已由用户确认「中文这次真的向右轻微倾斜、英文正常」——存档为已确认）。
+
+### 27.5 发布记录
+
+- **commit** 见 git log（消息前缀 `beta 2.1：`）；**版本号 `"beta 2.1"`**（pbxproj 4 处）；**DMG** `dist/GameLog-beta-2.1.dmg`（卷名 `GameLog beta 2.1`，含 GameLog.app + Applications 链接，挂载验证版本号 beta 2.1）；**IPA** `dist/GameLog-beta-2.1.ipa`（Release-iphonesimulator universal x86_64+arm64 adhoc，解压验证版本号 beta 2.1 + `_CodeSignature/CodeResources`）。
+- **GitHub 未推**：tag 未打。要推：`git tag beta-v2.1 && git push origin main beta-v2.1`（push 需用户凭据，见 §9）。
+- **遗留**：iOS 真机（拍照 / AirDrop 导入 / QLPreviewController / PhotosPicker / TabBar）仍未实测；iOS 模拟器上已装 iOS 27 跑通评价编辑 sheet。
+
+## 28. 待办 / 未决项（beta 2.1 后）
+
+1. **编辑器直打字尺寸（未最终确认）**：`normalizeFonts()` 修正已构建但用户未二次验收；确认后就移除 `MarkdownRichEditor.swift` 里的 DEBUG 诊断（写到 `/tmp/gamelog_editor_diag.log` 的 `Self.debug` 与 `#if DEBUG` 块）。
+2. **详情页 SwiftUI 侧中文斜体**：本轮只做编辑器；详情页 `MarkdownReviewView` 渲染的中文斜体在 SwiftUI 侧不做/待评估（CSS 层不确定性）。
+3. **iOS 真机实测**：拍照 / AirDrop 导入 / QLPreviewController / PhotosPicker / TabBar（见 §9 ②）。
+4. **GitHub 推 + tag**（beta-v2.1，需用户凭据）。
+5. **ROADMAP 后续**：发售日自动填充 / 统计可视化 / 封面缓存深化（已实现一部分）。

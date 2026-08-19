@@ -46,6 +46,12 @@
 
 用户曾遇「清缓存 / 版本更新时除 SteamGridDB key 外全丢」事故（HANDOVER §25.5）。beta 2.0 已补：**自动备份**（每次数据改动防抖写完整本地备份、版本升级前快照、空库检测恢复、恢复/导入前快照，iOS 存 Documents/Backups 可经「文件」App 取走）+ **设置「清除缓存」**（只清内存/网络/临时缓存，明确不碰数据与备份）。实现细节见 HANDOVER §26。
 
+## 阶段 5 · 评价区优化（Markdown 长评）✅ 已在 beta 2.1 实现
+
+个人 log「像写文章一样」写游戏评价：一句话评价（tagline）改作长评正文前的大号引言「题眼」；长评正文升级为 Markdown 子集（`#` 标题 / `**` 加粗 / `*` 斜体 / `-` 列表）。**macOS = 富文本所见即所得编辑器**（独立「写字台」窗口，中文斜体合成倾斜）；**iOS = 编辑 sheet**；共享一份 Markdown 渲染、分端编辑。实现细节见 HANDOVER §27。
+
+- 阶段 5 收尾待办：① 编辑器直打字与正文尺寸一致性（`normalizeFonts()`）待用户最终确认，确认后移除 DEBUG 诊断；② 详情页 SwiftUI 渲染侧的中文斜体（本轮只做编辑器）待评估。
+
 ## 穿插 · iOS 真机 / iPad 适配补完
 
 在每次改动后于真机验证：拍照（`UIImagePickerController`）、AirDrop 备份导入、iPad 布局、`QLPreviewController` 照片预览、PhotosPicker、TabBar 全流程。只有真机能完整验证。

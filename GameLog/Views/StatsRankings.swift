@@ -125,6 +125,7 @@ struct RankingBoard: View {
 /// 完整排名页：顶部滑块切换榜单（平均分/六维），每页最多 100 条、底部翻页；工具栏可切换平台（分数按该平台记录算）。
 struct OverallRankingView: View {
     @Environment(\.appLanguageCode) private var language
+    @AppStorage(UserCustomization.hideToolbarGlassKey) private var hideToolbarGlass = false
     @Query(sort: \Game.createdAt) private var games: [Game]
     @State private var selectedPlatform: String?
     @State private var selectedBoard = 0
@@ -247,7 +248,7 @@ struct OverallRankingView: View {
             }
             .padding(.vertical, 10)
         }
-        .navigationTitle(L10n.tr("stats.overallRanking", lang: language))
+        .navigationTitle(hideToolbarGlass ? "" : L10n.tr("stats.overallRanking", lang: language))
         .appToolbar()
         // 点击榜单游戏名 → 编程式 push 详情（本页由 navigationDestination(isPresented:) 推入，
         // 用 item: 在本地注册，避免父级根视图的 Game 目标对本页不可见）。
