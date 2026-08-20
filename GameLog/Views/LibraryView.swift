@@ -33,7 +33,7 @@ struct LibraryView: View {
     @AppStorage("useGridView") private var useGridView = true
     /// 分组视图内局部平台过滤（不持久化，切换分组即重置）。
     @State private var groupPlatformFilter = ""
-    @AppStorage("librarySort") private var sortRaw = LibrarySort.completionDate.rawValue
+    @AppStorage("librarySort") private var sortRaw = LibrarySort.recentEdit.rawValue
     /// 隐藏上方毛玻璃（设置「个性化」开关）：开启 = 无标题 + 完全无毛玻璃（全局应用，各页面一致）。
     @AppStorage(UserCustomization.hideToolbarGlassKey) private var hideToolbarGlass = false
 
