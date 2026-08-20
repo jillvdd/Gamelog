@@ -108,6 +108,11 @@
 "stats.overallRanking" = "整体排名";
 "stats.prevPage" = "上一页";
 "stats.nextPage" = "下一页";
+"stats.scoreBoards" = "分数榜";
+"stats.valueBoards" = "价值榜";
+"stats.byGameValue" = "按游戏价值";
+"stats.byPlatformValue" = "按机器价值";
+"stats.byGroupValue" = "按分组价值";
 "settings.language" = "界面语言";
 "settings.steamgriddb" = "SteamGridDB";
 "settings.steamGridDBKey" = "API Key";

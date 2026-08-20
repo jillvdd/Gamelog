@@ -123,6 +123,141 @@ struct RankingBoard: View {
 // MARK: - 整体排名页
 
 /// 完整排名页：顶部滑块切换榜单（平均分/六维），每页最多 100 条、底部翻页；工具栏可切换平台（分数按该平台记录算）。
+// MARK: - 价值排名
+
+/// 价值榜条目：聚合实体（游戏 / 平台 / 分组）的总估值，按当前语言格式化金额展示。
+struct ValueRankingEntry: Identifiable {
+    let id = UUID()
+    let label: String
+    /// 总估值（按当前语言）；nil = 无估值，排末位。
+    let value: Double?
+    /// 币种展示文本（无估值显示「—」）。
+    let valueText: String
+    /// 关联游戏（仅「按游戏价值」页有，可点进详情）；机器/分组页为 nil。
+    var game: Game?
+}
+
+/// 价值榜计算：游戏 / 平台（机器）/ 分组 三种口径的总估值排名。
+enum ValueRankings {
+
+    /// 按游戏价值：每个游戏的总估值排序（无持有/无估值排末）。
+    static func byGame(games: [Game], language: String) -> [ValueRankingEntry] {
+        games.map { game in
+            let v = game.totalEstimate(for: language)
+            return ValueRankingEntry(
+                label: game.displayName(for: language),
+                value: v,
+                valueText: PriceFormat.string(v, language: language) ?? "—",
+                game: game
+            )
+        }
+        .sorted { ($0.value ?? -1) > ($1.value ?? -1) }
+    }
+
+    /// 按机器（平台）价值：平台下所有游戏的总估值求和排序。
+    static func byPlatform(games: [Game], language: String) -> [ValueRankingEntry] {
+        var byPlatform: [String: Double] = [:]
+        for game in games {
+            guard let v = game.totalEstimate(for: language) else { continue }
+            for p in game.platformList {
+                byPlatform[p, default: 0] += v
+            }
+        }
+        return byPlatform.map { (platform, total) in
+            ValueRankingEntry(
+                label: Presets.display(platform, category: .platform, language: language),
+                value: total,
+                valueText: PriceFormat.string(total, language: language) ?? "—",
+                game: nil
+            )
+        }
+        .sorted { ($0.value ?? -1) > ($1.value ?? -1) }
+    }
+
+    /// 按分组价值：分组下所有游戏的总估值求和排序。
+    static func byGroup(groups: [GameGroup], language: String) -> [ValueRankingEntry] {
+        groups.map { group in
+            let total = group.games.compactMap { $0.totalEstimate(for: language) }.reduce(0, +)
+            return ValueRankingEntry(
+                label: group.name,
+                value: total,
+                valueText: PriceFormat.string(total, language: language) ?? "—",
+                game: nil
+            )
+        }
+        .sorted { ($0.value ?? -1) > ($1.value ?? -1) }
+    }
+}
+
+/// 价值榜卡片：标题 + 名次行（名称 + 估值金额）；仅「游戏价值」页的条目可点进详情。
+struct ValueRankingBoard: View {
+    @Environment(\.appLanguageCode) private var language
+    let title: String
+    let entries: [ValueRankingEntry]
+    var onSelect: (Game) -> Void = { _ in }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(verbatim: title)
+                .font(.headline)
+                .lineLimit(1)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+
+            if entries.isEmpty {
+                LText("stats.noData")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+            } else {
+                ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                    row(rank: index + 1, entry: entry)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 6)
+                        .background(index.isMultiple(of: 2) ? Color.clear : Color.semantic(.quaternarySystemFill))
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(Color.semantic(.controlBackground))
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+
+    private func row(rank: Int, entry: ValueRankingEntry) -> some View {
+        HStack(spacing: 10) {
+            Text(verbatim: "\(rank)")
+                .font(.callout.monospacedDigit())
+                .foregroundStyle(.secondary)
+                .frame(width: 26, alignment: .leading)
+            if let game = entry.game {
+                Button {
+                    onSelect(game)
+                } label: {
+                    Text(verbatim: entry.label)
+                        .font(.callout)
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.plain)
+            } else {
+                Text(verbatim: entry.label)
+                    .font(.callout)
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            Text(verbatim: entry.valueText)
+                .font(.callout.monospacedDigit())
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
 struct OverallRankingView: View {
     @Environment(\.appLanguageCode) private var language
     @AppStorage(UserCustomization.hideToolbarGlassKey) private var hideToolbarGlass = false
@@ -130,6 +265,10 @@ struct OverallRankingView: View {
     @State private var selectedPlatform: String?
     @State private var selectedBoard = 0
     @State private var page = 0
+    /// 顶部大类：分数榜（平均分 + 六维）/ 价值榜（三页）。
+    @State private var category = 0
+    /// 价值榜内页：0 游戏 / 1 机器（平台）/ 2 分组。
+    @State private var valuePage = 0
     /// 点击榜单游戏名 → 编程式 push 到详情（避免推入视图内 NavigationLink 找不到目标）。
     @State private var selectedGame: Game?
 
@@ -163,57 +302,109 @@ struct OverallRankingView: View {
         return Array(all.dropFirst(start).prefix(Self.pageSize))
     }
 
-    var body: some View {
-        VStack(spacing: 0) {
-            Group {
+    /// 价值榜标题（顺序即切换顺序）。
+    private var valueTitles: [String] {
+        [L10n.tr("stats.byGameValue", lang: language),
+         L10n.tr("stats.byPlatformValue", lang: language),
+         L10n.tr("stats.byGroupValue", lang: language)]
+    }
+
+    /// 全部分组（用于「按分组价值」）。
+    @Query private var groups: [GameGroup]
+
+    private var valueEntries: [ValueRankingEntry] {
+        switch valuePage {
+        case 0: return ValueRankings.byGame(games: games, language: language)
+        case 1: return ValueRankings.byPlatform(games: games, language: language)
+        default: return ValueRankings.byGroup(groups: groups, language: language)
+        }
+    }
+
+    /// 顶部大类切换：分数榜（平均分 + 六维）/ 价值榜（游戏 / 机器 / 分组）。
+    private var categorySwitcher: some View {
+        VStack(spacing: 10) {
+            #if os(macOS)
+            Picker("", selection: $category) {
+                Text(verbatim: L10n.tr("stats.scoreBoards", lang: language)).tag(0)
+                Text(verbatim: L10n.tr("stats.valueBoards", lang: language)).tag(1)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            #else
+            Menu {
+                Button { category = 0 } label: {
+                    if category == 0 { Label(L10n.tr("stats.scoreBoards", lang: language), systemImage: "checkmark") }
+                    else { Text(verbatim: L10n.tr("stats.scoreBoards", lang: language)) }
+                }
+                Button { category = 1 } label: {
+                    if category == 1 { Label(L10n.tr("stats.valueBoards", lang: language), systemImage: "checkmark") }
+                    else { Text(verbatim: L10n.tr("stats.valueBoards", lang: language)) }
+                }
+            } label: {
+                Label(category == 0 ? L10n.tr("stats.scoreBoards", lang: language) : L10n.tr("stats.valueBoards", lang: language), systemImage: "list.number")
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(10)
+                    .background(RoundedRectangle(cornerRadius: 8).fill(Color.semantic(.controlBackground)))
+            }
+            #endif
+
+            if category == 1 {
                 #if os(macOS)
-                Picker("", selection: $selectedBoard) {
-                    ForEach(Array(boardTitles.enumerated()), id: \.offset) { index, title in
+                Picker("", selection: $valuePage) {
+                    ForEach(Array(valueTitles.enumerated()), id: \.offset) { index, title in
                         Text(verbatim: title).tag(index)
                     }
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 #else
-                // iOS：7 段 segmented 每段约 52pt 会截断长标签，改用 Menu 展示当前榜单 + 下拉切换。
                 Menu {
-                    ForEach(Array(boardTitles.enumerated()), id: \.offset) { index, title in
-                        Button {
-                            selectedBoard = index
-                        } label: {
-                            if selectedBoard == index {
-                                Label(title, systemImage: "checkmark")
-                            } else {
-                                Text(verbatim: title)
-                            }
+                    ForEach(Array(valueTitles.enumerated()), id: \.offset) { index, title in
+                        Button { valuePage = index } label: {
+                            if valuePage == index { Label(title, systemImage: "checkmark") }
+                            else { Text(verbatim: title) }
                         }
                     }
                 } label: {
-                    Label(boardTitles[selectedBoard], systemImage: "list.number")
+                    Label(valueTitles[valuePage], systemImage: "list.number")
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(10)
-                        .background(
-                            RoundedRectangle(cornerRadius: 8)
-                                .fill(Color.semantic(.controlBackground))
-                        )
+                        .background(RoundedRectangle(cornerRadius: 8).fill(Color.semantic(.controlBackground)))
                 }
                 #endif
             }
-            .padding(16)
-            .onChange(of: selectedBoard) { _, _ in page = 0 }
-            .onChange(of: selectedPlatform) { _, _ in page = 0 }
-            // 数据收缩（删除/改分）导致合格条目数减少时，把越界页码收回来，避免空白榜 + 错页码。
-            .onChange(of: pageCount) { _, newCount in
-                if page >= newCount { page = max(0, newCount - 1) }
-            }
+        }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // 顶部大类：分数榜 / 价值榜。
+            categorySwitcher
+                .padding(16)
+                .onChange(of: selectedBoard) { _, _ in page = 0 }
+                .onChange(of: selectedPlatform) { _, _ in page = 0 }
+                .onChange(of: category) { _, _ in page = 0 }
+                .onChange(of: valuePage) { _, _ in page = 0 }
+                // 数据收缩（删除/改分）导致合格条目数减少时，把越界页码收回来，避免空白榜 + 错页码。
+                .onChange(of: pageCount) { _, newCount in
+                    if page >= newCount { page = max(0, newCount - 1) }
+                }
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    RankingBoard(
-                        title: boardTitles[selectedBoard],
-                        entries: currentEntries,
-                        onSelect: { selectedGame = $0 }
-                    )
+                    if category == 0 {
+                        RankingBoard(
+                            title: boardTitles[selectedBoard],
+                            entries: currentEntries,
+                            onSelect: { selectedGame = $0 }
+                        )
+                    } else {
+                        ValueRankingBoard(
+                            title: valueTitles[valuePage],
+                            entries: valueEntries,
+                            onSelect: { selectedGame = $0 }
+                        )
+                    }
                 }
                 #if os(macOS)
                 .padding(.horizontal, 28)
