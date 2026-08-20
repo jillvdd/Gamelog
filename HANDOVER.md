@@ -674,9 +674,9 @@ canonical 存储值也改 + 启动一次性迁移 + 保留旧名展示兜底。
 
 ---
 
-## 29. beta 2.2（持有页藏品档案化 + 崩溃排查 + 排序/价值榜/持有开关）✅ 功能全部落地并已 git commit（本地领先远程 9 个 commit，未 tag/未推）
+## 29. beta 2.2（持有页藏品档案化 + 崩溃排查 + 排序/价值榜/持有开关）✅ 功能全部落地、已 git commit、DMG/IPA 已打包（beta 2.2，待打 tag 并推 GitHub）
 
-> 当前状态（2026-08-21 凌晨）：beta 2.2 全部功能已重建并跑通 §29.12 全量验证，且本轮又追加了排序、价值榜、持有开关等需求，均已 `git commit`（见下方近期 commit 清单），未打 `beta-v2.2` tag、未推 GitHub。
+> 当前状态（2026-08-21 凌晨）：beta 2.2 全部功能已落地、已 `git commit`、双平台 Release 构建通过、`dist/GameLog-beta-2.2.dmg` 与 `dist/GameLog-beta-2.2.ipa` 已打包并挂载验证（版本号 `beta 2.2`、挂载卷可启动）。待用户确认后打 `beta-v2.2` tag 并推 GitHub（需用户凭据）。
 >
 > 已解决并验证的遗留项：
 > - hover 崩溃（§29.9）随「持有」整体重写消除，用户实测不崩。
@@ -846,6 +846,9 @@ enum CopyAcquisition: String, CaseIterable, Identifiable {
 - `8eba5e0` chore: 主页默认排序改为「最近编辑」。
 - `bd00f16` feat: 整体排名新增价值榜（按游戏价值 / 按机器（平台）价值 / 按分组价值三页；ValueRankingEntry/ValueRankings/ValueRankingBoard 三件套 + 顶部分数榜/价值榜大类切换）。
 - `2835fb7` fix: 新建游戏默认不建持有档案，须勾选「我拥有这份（建持有档案）」才展开填写并建 PhysicalCopy（建档案守卫 `isCreating && collectorMode && createHolding`）。
+- `65e6efd` docs: 更新 §29 beta 2.2 收尾状态（价值榜/排序/持有开关已落地、卡顿与 hover 已解决）。
+- 统计页整体排名「分数榜/价值榜 + 子切换」改为与详情页同款 liquid glass 滑块（`SegmentSlider` 通用组件，mac/iOS 统一，未单独 commit，随本轮收尾一并提交）。
+- Release 构建 + 打包：`dist/GameLog-beta-2.2.dmg`（挂载验证通过）、`dist/GameLog-beta-2.2.ipa`（未签名，含 Payload/GameLog.app），版本号 `beta 2.2`。
 
 **本会话未做 / 留给新 chat：**
 1. ~~hover 崩溃实测（§29.9）~~ — ✅ 已解决：随 beta 2.2 重写消除，用户实测不崩。
@@ -854,7 +857,7 @@ enum CopyAcquisition: String, CaseIterable, Identifiable {
 4. ~~网格缩略图尺寸随比例变动并重叠~~ — ✅ 已解决。
 5. 用户验收 `CopyRegional`/`CopyCondition` 成员（见 §29 头注）。
 6. 用户整体 UI 实测（双视图/总览/编辑弹窗/统计区块/价值榜/排序）。
-7. 上述未决项全绿后：按 HANDOVER §4.3 与记忆「推 GitHub」流程 打 tag `beta-v2.2` + 推 main（需用户凭据）；DMG/IPA 打包见历史 §27.5/§26.5 命令。
+7. ✅ 收尾内容已完成（枚举验收通过、UI 走查、滑块改造、README 重写、版本号 beta 2.2、DMG/IPA 打包并验证）。**待用户确认后**：按 HANDOVER §4.3 与记忆「推 GitHub」流程 打 tag `beta-v2.2` + 推 main（需用户凭据）。
 
 ### 29.14 滑块卡顿排查（2026-08-20 深夜，本会话新增，✅ 已解决）
 
