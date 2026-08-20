@@ -227,13 +227,10 @@ private struct DetailStatusPicker: View {
     /// 紧凑模式（只图标，窄屏如 iPhone 用）；macOS 显示图标 + 小字。
     var compact: Bool = false
 
-    /// 滑块当前列（内部状态，点击立即动画，父重算不影响）。
-    @State private var sliderIndex: Int
-
-    init(status: Binding<GameStatus>, compact: Bool = false) {
-        _status = status
-        self.compact = compact
-        _sliderIndex = State(initialValue: GameStatus.allCases.firstIndex(of: status.wrappedValue) ?? 0)
+    /// 滑块当前列：由 `status` 派生（点击与 onAppear 同步都经 status 驱动），
+    /// 不另存独立状态，避免初始化时因默认值错位而卡在「已通关」。
+    private var sliderIndex: Int {
+        GameStatus.allCases.firstIndex(of: status) ?? 0
     }
 
     var body: some View {
@@ -250,14 +247,12 @@ private struct DetailStatusPicker: View {
                     )
                     .frame(width: cellWidth, height: geo.size.height)
                     .offset(x: CGFloat(sliderIndex) * cellWidth)
-                    .animation(.spring(response: 0.3, dampingFraction: 0.78), value: sliderIndex)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.78), value: status)
                 // 按钮层：每个状态一列，整格可点。
                 HStack(spacing: 0) {
                     ForEach(all) { s in
                         Button {
-                            let idx = all.firstIndex(of: s) ?? 0
-                            guard idx != sliderIndex else { return }
-                            sliderIndex = idx
+                            guard status != s else { return }
                             status = s
                         } label: {
                             VStack(spacing: 3) {
