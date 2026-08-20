@@ -9,6 +9,8 @@
 "library.sortByCompletion" = "クリア日順";
 "library.sortByScoreAsc" = "平均スコア（低い順）";
 "library.sortByScoreDesc" = "平均スコア（高い順）";
+"library.sortByRecentEdit" = "最近編集した順";
+"library.sortByValueDesc" = "価値が高い順";
 "library.sort" = "並び替え";
 "library.gridView" = "グリッド表示";
 "library.listView" = "リスト表示";

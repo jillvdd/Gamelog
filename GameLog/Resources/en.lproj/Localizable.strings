@@ -9,6 +9,8 @@
 "library.sortByCompletion" = "Completion Date";
 "library.sortByScoreAsc" = "Average Score (Low to High)";
 "library.sortByScoreDesc" = "Average Score (High to Low)";
+"library.sortByRecentEdit" = "Recently Edited";
+"library.sortByValueDesc" = "Highest Value";
 "library.sort" = "Sort";
 "library.gridView" = "Grid View";
 "library.listView" = "List View";
