@@ -674,15 +674,24 @@ canonical 存储值也改 + 启动一次性迁移 + 保留旧名展示兜底。
 
 ---
 
-## 29. beta 2.2（持有页藏品档案化 + 崩溃排查）✅ 已重建并全量验证、已 git commit（f03508f）、hover 崩溃随重写消除、滑块卡顿已修复
+## 29. beta 2.2（持有页藏品档案化 + 崩溃排查 + 排序/价值榜/持有开关）✅ 功能全部落地并已 git commit（本地领先远程 9 个 commit，未 tag/未推）
 
-> 当前状态（2026-08-20 深夜）：beta 2.2 全部功能已重建并跑通 §29.12 全量验证（macOS/iOS 双平台构建 SUCCEEDED + ScoreMath 15/15 + DataSmoke 全过 + ShareRender 全过 + RichReview 全过 + L10n 三语 295 key 一致）。已 `git commit`（`f03508f`，未 tag/未推）。hover 崩溃（§29.9）已随「持有」重写消除，用户实测不崩；状态滑块卡顿（§29.14）已修复，用户实测流畅。
+> 当前状态（2026-08-21 凌晨）：beta 2.2 全部功能已重建并跑通 §29.12 全量验证，且本轮又追加了排序、价值榜、持有开关等需求，均已 `git commit`（见下方近期 commit 清单），未打 `beta-v2.2` tag、未推 GitHub。
 >
-> 重建补充说明（用户决策）：① 崩溃排查与功能重建「一次性重建后统一验」；② 持有页**整页**受 collectorMode 门控（非收藏家看不到持有页签）；③ §28 遗留项（编辑器直打字尺寸/详情页中文斜体）用户确认已修好。
+> 已解决并验证的遗留项：
+> - hover 崩溃（§29.9）随「持有」整体重写消除，用户实测不崩。
+> - 状态滑块卡顿（§29.14 差异 A）已修复：视觉由本地 @State 驱动、模型写入延后到 .onDisappear，用户实测流畅。
+> - 状态滑块进入详情停在「已通关」+ 先闪已通关再滑过去：已修（sliderIndex 由 status 派生；GameDetailView.init 构造时同步 detailStatus）。
+> - 网格缩略图尺寸随图片比例变动并重叠（Library/持有）：已修（改用 Color.clear 锚点 + overlay 图案）。
+>
+> 本轮新增功能（均为用户后续需求，已提交）：
+> 1. 主页排序新增「最近编辑」「价值最高」+ 默认排序改为「最近编辑」（`LibrarySort` + `Game.updatedAt` 字段轻量迁移 + `GameEditView` 保存时写 updatedAt）。
+> 2. 整体排名新增「价值榜」大类（按游戏价值 / 按机器（平台）价值 / 按分组价值三页）。
+> 3. 新建游戏默认不建持有档案，须勾选「我拥有这份」才展开填写并建 PhysicalCopy。
 >
 > ⚠️ **两处枚举成员是「按合理推断重建、待用户验收确认」，非原会话产物**：`CopyRegional`（10 档）与 `CopyCondition`（7 档，默认 good）。若用户验收时要调整成员或默认值，改 `Models/PhysicalCopy.swift` 四枚举 + 三语 `Localizable.strings` 的 `copy.regional.*` / `copy.condition.*`。
 >
-> 剩余未决：① 用户验收 `CopyRegional`/`CopyCondition` 成员；② 用户 UI 实测（双视图/总览/编辑弹窗/统计区块）。两者确认后打 tag `beta-v2.2` + 推 GitHub。
+> 剩余未决（用户确认后才可收尾）：① 用户验收 `CopyRegional`/`CopyCondition` 成员；② 用户整体 UI 实测。两者确认后打 tag `beta-v2.2` + 推 GitHub（需用户凭据）。
 
 ### 29.1 总体意图
 
@@ -810,7 +819,7 @@ enum CopyAcquisition: String, CaseIterable, Identifiable {
 - [x] RichReview（Markdown 富文本往返）全过（仅 `showCGGlyphs` deprecated 警告，非错误）
 - [x] L10n 三语 295 key 一致、plutil 三语 OK、0 缺失
 - [x] **hover 崩溃实测不崩**（2026-08-20 深夜，用户实测 Halo→持有 hover 不崩；§29.9 已随 beta 2.2 重写消除，未决项关闭）
-- [ ] 用户实测：网格/列表双视图、总览四格、编辑弹窗 7 档介质/11 档来源、新建默认、统计收藏价值区块、⚠️ 确认 `CopyRegional`/`CopyCondition` 成员是否符合预期（见 §29 头注）
+- [ ] 用户实测（UI 走查）：网格/列表双视图、总览四格、编辑弹窗 7 档介质/11 档来源、新建默认不建持有（勾选才建）、统计收藏价值区块、整体排名价值榜三页、主页排序新增两项与默认、⚠️ 确认 `CopyRegional`/`CopyCondition` 成员是否符合预期（见 §29 头注）
 
 ### 29.13 本会话（2026-08-20 晚）交付物与文件清单
 
@@ -828,13 +837,26 @@ enum CopyAcquisition: String, CaseIterable, Identifiable {
 - `Scripts/DataSmokeTest/main.swift` — 加 §29.11 迁移断言 + 头注释命令补 `EnumPickerRow.swift`/`L10n.swift`/`AppLanguage.swift`。
 - `GameLog.xcodeproj/project.pbxproj` — `MARKETING_VERSION` 4 处 `"beta 2.1"` → `"beta 2.2"`（因 `PBXFileSystemSynchronizedRootGroup`，新增 `.swift` 自动进 target，无需手改 pbxproj 文件引用）。
 
-**本会话未做 / 留给新 chat：**
-1. ~~hover 崩溃实测（§29.9）~~ — ✅ 已解决：用户 2026-08-20 深夜实测 Halo→持有 hover 不崩，随 beta 2.2 重写消除。
-2. 用户验收 `CopyRegional`/`CopyCondition` 成员（见 §29 头注）。
-3. 用户 UI 实测（双视图/总览/编辑弹窗/统计区块）。
-4. 上述未决项全绿后：按 HANDOVER §4.3 与记忆「推 GitHub」流程 打 tag `beta-v2.2` + 推 main（需用户凭据）；DMG/IPA 打包见历史 §27.5/§26.5 命令。commit 已做（`f03508f` beta 2.2，含滑块修复与持有重写）。
+**后续增量 commit（2026-08-20 深夜 ~ 2026-08-21 凌晨，均为用户后续需求，已提交）：**
+- `e26269d` fix: 进入详情页状态滑块先闪「已通关」再滑到正确状态（sliderIndex 由 status 派生 + GameDetailView.init 构造时同步 detailStatus）。
+- `1571cb9` fix: 状态滑块进入详情一律停在「已通关」（sliderIndex 不再独立 @State，改由 status 派生）。
+- `90bdb08` fix: 网格缩略图调高（Library 2:3、持有首图 3:4）。
+- `fa5edc6` fix: 网格缩略图尺寸随图片比例变动并重叠（Library/持有网格，改用 Color.clear 锚点 + overlay 安全图案）。
+- `0222b97` feat: 主页排序新增「最近编辑」与「价值最高」（Game.updatedAt 字段轻量迁移 + GameEditView 保存写 updatedAt + Game.totalEstimate(for:)）。
+- `8eba5e0` chore: 主页默认排序改为「最近编辑」。
+- `bd00f16` feat: 整体排名新增价值榜（按游戏价值 / 按机器（平台）价值 / 按分组价值三页；ValueRankingEntry/ValueRankings/ValueRankingBoard 三件套 + 顶部分数榜/价值榜大类切换）。
+- `2835fb7` fix: 新建游戏默认不建持有档案，须勾选「我拥有这份（建持有档案）」才展开填写并建 PhysicalCopy（建档案守卫 `isCreating && collectorMode && createHolding`）。
 
-### 29.14 滑块卡顿排查（2026-08-20 深夜，本会话新增，尚未解决）
+**本会话未做 / 留给新 chat：**
+1. ~~hover 崩溃实测（§29.9）~~ — ✅ 已解决：随 beta 2.2 重写消除，用户实测不崩。
+2. ~~状态滑块卡顿（§29.14）~~ — ✅ 已解决：本地 @State 驱动视觉、模型写入延后 .onDisappear，用户实测流畅。
+3. ~~状态滑块初始化错位（停在已通关 / 先闪再滑）~~ — ✅ 已解决。
+4. ~~网格缩略图尺寸随比例变动并重叠~~ — ✅ 已解决。
+5. 用户验收 `CopyRegional`/`CopyCondition` 成员（见 §29 头注）。
+6. 用户整体 UI 实测（双视图/总览/编辑弹窗/统计区块/价值榜/排序）。
+7. 上述未决项全绿后：按 HANDOVER §4.3 与记忆「推 GitHub」流程 打 tag `beta-v2.2` + 推 main（需用户凭据）；DMG/IPA 打包见历史 §27.5/§26.5 命令。
+
+### 29.14 滑块卡顿排查（2026-08-20 深夜，本会话新增，✅ 已解决）
 
 > 用户反馈：详情页「状态滑块」（想玩/在玩/搁置/弃坑/长线游玩/已通关，6 列）点击卡顿、mac 版滑动动画期间持续掉帧；而「详情/持有」滑块、「持有中网格/列表」滑块**不卡**。本轮已多次尝试均无效，已回退到最初基准状态，待新 chat 继续。
 
