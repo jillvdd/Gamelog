@@ -691,7 +691,7 @@ canonical 存储值也改 + 启动一次性迁移 + 保留旧名展示兜底。
 >
 > ⚠️ **两处枚举成员是「按合理推断重建、待用户验收确认」，非原会话产物**：`CopyRegional`（10 档）与 `CopyCondition`（7 档，默认 good）。若用户验收时要调整成员或默认值，改 `Models/PhysicalCopy.swift` 四枚举 + 三语 `Localizable.strings` 的 `copy.regional.*` / `copy.condition.*`。
 >
-> 剩余未决（用户确认后才可收尾）：① 用户验收 `CopyRegional`/`CopyCondition` 成员；② 用户整体 UI 实测。两者确认后打 tag `beta-v2.2` + 推 GitHub（需用户凭据）。
+> ✅ **收尾内容已全部完成（2026-08-21 凌晨）**：① 枚举 `CopyRegional`/`CopyCondition` 用户验收「完全符合、保留」；② 整体 UI 实测走查通过（含统计页分数榜/价值榜滑块化改造）；③ README 三语重写至 beta 2.2；④ 版本号 pbxproj 四处已 `beta 2.2`；⑤ 双平台 Release 构建通过，DMG/IPA 已打包并挂载验证。**唯一剩余 = 打 tag `beta-v2.2` + 推 GitHub，需用户明确授权与凭据，未授权绝不 push。**
 
 ### 29.1 总体意图
 
@@ -857,7 +857,7 @@ enum CopyAcquisition: String, CaseIterable, Identifiable {
 4. ~~网格缩略图尺寸随比例变动并重叠~~ — ✅ 已解决。
 5. 用户验收 `CopyRegional`/`CopyCondition` 成员（见 §29 头注）。
 6. 用户整体 UI 实测（双视图/总览/编辑弹窗/统计区块/价值榜/排序）。
-7. ✅ 收尾内容已完成（枚举验收通过、UI 走查、滑块改造、README 重写、版本号 beta 2.2、DMG/IPA 打包并验证）。**待用户确认后**：按 HANDOVER §4.3 与记忆「推 GitHub」流程 打 tag `beta-v2.2` + 推 main（需用户凭据）。
+7. ✅ 收尾内容已全部完成（枚举验收通过、UI 走查、统计页滑块改造、README 三语重写、版本号 beta 2.2、DMG/IPA 打包并挂载验证）。**唯一剩余 = 打 tag `beta-v2.2` + 推 GitHub，需用户明确授权与凭据，未授权绝不 push。** 本仓库 dist/ 被 gitignore，DMG/IPA 不进 git，分发直接用 dist/ 下打包产物即可。
 
 ### 29.14 滑块卡顿排查（2026-08-20 深夜，本会话新增，✅ 已解决）
 
