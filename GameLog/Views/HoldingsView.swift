@@ -408,7 +408,7 @@ private struct CopyGridCellView: View {
     /// 避免 Image 自带比例撑高单元格导致与相邻卡片重叠）。
     private var thumbnailGrid: some View {
         Color.clear
-            .aspectRatio(1, contentMode: .fit)
+            .aspectRatio(3.0 / 4.0, contentMode: .fit)
             .overlay {
                 if let data = firstImage, let image = AppImage(data: data) {
                     Image(appImage: image)
