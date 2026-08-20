@@ -404,29 +404,26 @@ private struct CopyGridCellView: View {
         #endif
     }
 
-    /// 首图方格（固定 1:1，用 §4.22 的安全图案：Color.clear 占位 + overlay Image，不用 zero-intrinsic 方块套 ScrollView）。
+    /// 首图方格（固定 1:1，用 §4.22 的安全图案：Color.clear 占位确定尺寸 + overlay Image 覆盖裁剪，
+    /// 避免 Image 自带比例撑高单元格导致与相邻卡片重叠）。
     private var thumbnailGrid: some View {
-        Group {
-            if let data = firstImage, let image = AppImage(data: data) {
-                Image(appImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(maxWidth: .infinity, maxHeight: 160)
-                    .frame(minHeight: 120)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .onTapGesture { onEnlarge(data) }
-            } else {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 8).fill(Color.semantic(.quaternarySystemFill))
-                    Image(systemName: "photo")
-                        .foregroundStyle(.tertiary)
+        Color.clear
+            .aspectRatio(1, contentMode: .fit)
+            .overlay {
+                if let data = firstImage, let image = AppImage(data: data) {
+                    Image(appImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .onTapGesture { onEnlarge(data) }
+                } else {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 8).fill(Color.semantic(.quaternarySystemFill))
+                        Image(systemName: "photo")
+                            .foregroundStyle(.tertiary)
+                    }
                 }
-                .frame(maxWidth: .infinity, minHeight: 120, maxHeight: 160)
             }
-        }
-        .frame(height: 160)
-        .frame(maxWidth: .infinity)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
     private func capsule(_ text: String) -> some View {
