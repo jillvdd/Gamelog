@@ -8,7 +8,7 @@ Interface languages: **简体中文 / 日本語 / English** (switch instantly in
 
 ## Features
 
-- **Game Library**: grid / list view toggle; search by name + aliases + localized names; filter by status / platform / group; group management (macOS sidebar / iOS filter menu), a game can belong to several groups; sort by name / release date / completion date / average score (low to high or high to low). The library score is the mean of the record averages of all scored completions, rounded to 0.1; unscored games show "Unrated".
+- **Game Library**: grid / list view toggle; search by name + aliases + localized names; filter by status / platform / group; group management (macOS sidebar / iOS filter menu), a game can belong to several groups; sort by name / release date / completion date / average score (low to high or high to low) / **recently edited** / **highest value**, defaulting to "recently edited". The library score is the mean of the record averages of all scored completions, rounded to 0.1; unscored games show "Unrated".
 - **Game Status** (beta 1.9): six statuses — Backlog / Playing / Paused / Dropped / Completed / Long-Running. Lightweight states need no completion records or scores; move to Completed to attach them. Filter the library by status, pick in the detail page; stats exclude non-completed games.
 - **Game Detail**: review area (one-line tagline intro + long-form body), all completions (edit / append / delete), six-dimension colored bar chart; an extra "Holdings" tab when Collector Mode is on.
 - **Review (Markdown long-form, beta 2.1)**: the one-line verdict (tagline) renders as a large lead-in "thesis"; the review body supports a Markdown subset (headings `#` / bold `**` / italic `*` / lists `-`) like a well-set article. **macOS = WYSIWYG rich-text editor** (a dedicated "writing desk" window; the toolbar applies styles directly, saved back to Markdown; CJK italics are synthesized with a shear at draw time); **iOS = editing sheet (TextEditor + preview)**. Per-platform editing share one Markdown renderer, so both platforms look consistent.
@@ -16,11 +16,11 @@ Interface languages: **简体中文 / 日本語 / English** (switch instantly in
 - **Completions**: platform, completion date (can be "None"), completion degree (main story / all side quests / all endings / platinum / multiple playthroughs / speedrun / custom), playtime (can be "None"), and notes.
 - **Date Picker**: macOS three-column wheel (year / month / day, handles Feb 29 and month-end clamping); iOS uses the system date picker.
 - **Groups**: create / rename / delete; pick games to join via context menu (macOS) or menu (iOS); per-group stats and review.
-- **Collector Mode** (Settings toggle): "Details / Holdings" segmented switch on the detail page; each game can have multiple physical editions (edition name + quantity + up to 6 photos); photos open in the system viewer; included in backups.
+- **Collector Mode** (Settings toggle): "Details / Holdings" segmented switch on the detail page; each game can have multiple holdings (medium / edition / condition / source / region / price / estimated value / purchase date / notes + up to 6 photos), forming a **collection archive**. New games do **not** get a holding by default — you must toggle "I own this (create holding)" to expand the fields and build the archive. The Holdings view offers grid / list layouts, a top overview (edition count / total quantity / total spent / total estimated value), capsule-style metadata, and a full edit sheet; photos open in the system viewer; included in backups.
 - **Cover Art**: import from your device, or search & download via the [SteamGridDB](https://www.steamgriddb.com) API (requires an API Key in Settings, searches as you type); optional **auto-match cover** (about 0.6s after you stop typing, picks the first portrait hit — never overwrites an existing cover, silent on failure). Search results show cover thumbnails. On iOS, adding an image pops a "Photos / Files / Camera" menu.
 - **Personalization**: username (20 chars), avatar (circular crop), macOS app icon (rounded-square crop), auto-match cover toggle, hide top frosted glass (macOS 15+), keep-original-images toggle, platform-logos toggle (on by default; turning it off hides brand logos in platform pickers / grouping views). A custom icon reflects on the Dock immediately and persists across restarts.
 - **Share Images**: single game → single card (portrait 1080×1920 or landscape 1920×1080); multi-select → one overview image; by group → a group share card (in-group cover grid + platform distribution). Branded watermark, localized per language, saveable as PNG or via the system share sheet; on iOS you can also save the image directly to the Photos album (requires add-photo permission).
-- **Stats & Rankings**: total completions, library average, platform distribution; average-score leaderboard + six-dimension boards (top 5 / 10 per dimension); the "Overall Ranking" page switches between 7 boards, pages up to 100 entries per page, filters by platform.
+- **Stats & Rankings**: total completions, library average, platform distribution, and collection value (when Collector Mode is on: edition count / total quantity / total spent / total estimated value); average-score leaderboard + six-dimension boards (top 5 / 10 per dimension); the "Overall Ranking" page switches between **Score Boards** and **Value Boards** at the top — Score Boards hold 7 boards (average + six dimensions), Value Boards hold three pages (by game value / by platform (machine) value / by group value), each paging up to 100 entries and filterable by platform.
 - **Backup**: export the whole library to a single JSON (covers embedded as base64), including username / avatar / icon, restorable as a whole, compatible with older backups; import asks for confirmation. On iOS, export uses the system share sheet (AirDrop / Save to Files, etc.).
 - **Auto Backup** (beta 2.0): automatically writes a full local backup (one rolling file) whenever your data changes; keeps a snapshot of the old version before upgrades; if the library is empty but a backup exists, asks on launch whether to restore; snapshots before restore / import so you can undo. On iOS, backups live in Documents/Backups (visible in the Files app), so you can still grab them if the app can't launch (e.g. expired signing cert).
 - **Clear Cache** (beta 2.0): Settings → Storage & Cache shows current cache usage and clears it with one tap (cover/image decode caches, network cache, temp files) — never touches your game data or backups.
@@ -35,7 +35,7 @@ Interface languages: **简体中文 / 日本語 / English** (switch instantly in
 ## Requirements
 
 - macOS 14.0+; iOS 18.0+ (iPhone / iPad)
-- Xcode 16+ (SwiftData / Swift macros support; project verified with Xcode 27 beta)
+- **Xcode 27 beta** (the project requires the iOS 27 runtime; plain Xcode 26 can't pair the simulator — build with `/Users/abc/Downloads/Xcode-beta.app`)
 
 ## Build & Run
 
@@ -59,7 +59,7 @@ Or open `GameLog.xcodeproj` in Xcode and Run the `GameLog` (macOS) or `GameLog-i
 
 ## Installing on iPhone (IPA)
 
-This repository provides a Release IPA (`dist/GameLog-beta-2.1.ipa`), unsigned — you need to sign it yourself before installing.
+This repository provides a Release IPA (`dist/GameLog-beta-2.2.ipa`), unsigned — you need to sign it yourself before installing.
 
 > Tip: for simulator or daily development debugging, just Run from Xcode — no IPA needed.
 

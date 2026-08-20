@@ -321,57 +321,63 @@ struct OverallRankingView: View {
     }
 
     /// 顶部大类切换：分数榜（平均分 + 六维）/ 价值榜（游戏 / 机器 / 分组）。
+    /// 顶部大类 + 子切换：全部用通用分段滑块（与详情页「详情/持有」滑块同款视觉）。
     private var categorySwitcher: some View {
         VStack(spacing: 10) {
-            #if os(macOS)
-            Picker("", selection: $category) {
-                Text(verbatim: L10n.tr("stats.scoreBoards", lang: language)).tag(0)
-                Text(verbatim: L10n.tr("stats.valueBoards", lang: language)).tag(1)
+            SegmentSlider(
+                titles: [L10n.tr("stats.scoreBoards", lang: language),
+                         L10n.tr("stats.valueBoards", lang: language)],
+                selection: $category
+            )
+            if category == 0 {
+                SegmentSlider(titles: boardTitles, selection: $selectedBoard)
+            } else {
+                SegmentSlider(titles: valueTitles, selection: $valuePage)
             }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            #else
-            Menu {
-                Button { category = 0 } label: {
-                    if category == 0 { Label(L10n.tr("stats.scoreBoards", lang: language), systemImage: "checkmark") }
-                    else { Text(verbatim: L10n.tr("stats.scoreBoards", lang: language)) }
-                }
-                Button { category = 1 } label: {
-                    if category == 1 { Label(L10n.tr("stats.valueBoards", lang: language), systemImage: "checkmark") }
-                    else { Text(verbatim: L10n.tr("stats.valueBoards", lang: language)) }
-                }
-            } label: {
-                Label(category == 0 ? L10n.tr("stats.scoreBoards", lang: language) : L10n.tr("stats.valueBoards", lang: language), systemImage: "list.number")
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(10)
-                    .background(RoundedRectangle(cornerRadius: 8).fill(Color.semantic(.controlBackground)))
-            }
-            #endif
+        }
+    }
 
-            if category == 1 {
-                #if os(macOS)
-                Picker("", selection: $valuePage) {
-                    ForEach(Array(valueTitles.enumerated()), id: \.offset) { index, title in
-                        Text(verbatim: title).tag(index)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                #else
-                Menu {
-                    ForEach(Array(valueTitles.enumerated()), id: \.offset) { index, title in
-                        Button { valuePage = index } label: {
-                            if valuePage == index { Label(title, systemImage: "checkmark") }
-                            else { Text(verbatim: title) }
+    /// 通用分段滑块（liquid glass 胶囊 + 内部色块 offset + spring 动画），双端通用。
+    private struct SegmentSlider: View {
+        let titles: [String]
+        @Binding var selection: Int
+
+        var body: some View {
+            GeometryReader { geo in
+                let cellWidth = geo.size.width / CGFloat(titles.count)
+                ZStack(alignment: .topLeading) {
+                    RoundedRectangle(cornerRadius: 9)
+                        .fill(Color.accentColor.opacity(0.18))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 9)
+                                .strokeBorder(Color.accentColor.opacity(0.45), lineWidth: 1)
+                        )
+                        .frame(width: cellWidth, height: geo.size.height)
+                        .offset(x: CGFloat(selection) * cellWidth)
+                        .animation(.spring(response: 0.3, dampingFraction: 0.78), value: selection)
+                    HStack(spacing: 0) {
+                        ForEach(Array(titles.enumerated()), id: \.offset) { idx, title in
+                            Button {
+                                guard selection != idx else { return }
+                                selection = idx
+                            } label: {
+                                Text(verbatim: title)
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.55)
+                                    .foregroundStyle(selection == idx ? Color.accentColor : Color.secondary)
+                                    .frame(width: cellWidth, height: geo.size.height)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
-                } label: {
-                    Label(valueTitles[valuePage], systemImage: "list.number")
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(10)
-                        .background(RoundedRectangle(cornerRadius: 8).fill(Color.semantic(.controlBackground)))
                 }
-                #endif
+            }
+            .frame(height: 44)
+            .background {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(.thinMaterial)
             }
         }
     }
