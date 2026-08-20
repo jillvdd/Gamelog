@@ -257,6 +257,7 @@
 "copy.noArchive" = "所持品はまだありません";
 "stats.collectorValue" = "コレクション価値";
 "game.holdingArchive" = "所持アーカイブ";
+"game.createHolding" = "これを所持（アーカイブ作成）";
 "game.holdingArchiveHint" = "新規ゲームと一緒に物理的な所持（エディション、メディア、入手元、価格…）を記録します。";
 
 "date.year" = "年";

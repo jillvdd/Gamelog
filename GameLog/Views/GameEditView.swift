@@ -230,6 +230,8 @@ struct GameEditView: View {
     @State private var holdingHasDate = false
     @State private var holdingDate = Date()
     @State private var holdingNotes = ""
+    /// 新建时是否真的拥有这份（借的/订阅的不算持有）；默认 false，勾选才展开填写并建档案。
+    @State private var createHolding = false
 
     @State private var validationError: String?
     @State private var showingCoverSearch = false
@@ -418,53 +420,58 @@ struct GameEditView: View {
             }
 
             if isCreating && collectorMode {
-                Section(L10n.tr("game.holdingArchive", lang: language)) {
-                    Text(verbatim: L10n.tr("game.holdingArchiveHint", lang: language))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    LabeledContent(L10n.tr("copy.version", lang: language)) {
-                        BorderedTextField(text: $holdingVersion, placeholder: L10n.tr("copy.versionPlaceholder", lang: language))
-                    }
-                    Stepper(value: $holdingCount, in: 1...999) {
-                        HStack {
-                            LText("copy.count")
-                            Spacer()
-                            Text(verbatim: "\(holdingCount)").monospacedDigit()
+                Section {
+                    Toggle(L10n.tr("game.createHolding", lang: language), isOn: $createHolding)
+                    if createHolding {
+                        Text(verbatim: L10n.tr("game.holdingArchiveHint", lang: language))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        LabeledContent(L10n.tr("copy.version", lang: language)) {
+                            BorderedTextField(text: $holdingVersion, placeholder: L10n.tr("copy.versionPlaceholder", lang: language))
+                        }
+                        Stepper(value: $holdingCount, in: 1...999) {
+                            HStack {
+                                LText("copy.count")
+                                Spacer()
+                                Text(verbatim: "\(holdingCount)").monospacedDigit()
+                            }
+                        }
+                        EnumPickerRow(title: L10n.tr("copy.media", lang: language),
+                                      cases: CopyMedia.allCases, selection: $holdingMedia, language: language)
+                        if holdingMedia.isPhysical {
+                            EnumPickerRow(title: L10n.tr("copy.condition", lang: language),
+                                          cases: CopyCondition.allCases, selection: $holdingCondition, language: language)
+                        }
+                        EnumPickerRow(title: L10n.tr("copy.regional", lang: language),
+                                      cases: CopyRegional.allCases, selection: $holdingRegional, language: language)
+                        EnumPickerRow(title: L10n.tr("copy.acquisition", lang: language),
+                                      cases: CopyAcquisition.allCases, selection: $holdingAcquisition, language: language)
+                        LabeledContent(L10n.tr("copy.price", lang: language)) {
+                            BorderedTextField(text: $holdingPriceText, placeholder: "0")
+                                #if os(macOS)
+                                .frame(width: 160)
+                                #else
+                                .frame(maxWidth: .infinity)
+                                #endif
+                        }
+                        LabeledContent(L10n.tr("copy.estValue", lang: language)) {
+                            BorderedTextField(text: $holdingEstText, placeholder: "0")
+                                #if os(macOS)
+                                .frame(width: 160)
+                                #else
+                                .frame(maxWidth: .infinity)
+                                #endif
+                        }
+                        Toggle(L10n.tr("copy.purchaseDate", lang: language), isOn: $holdingHasDate)
+                        if holdingHasDate {
+                            DateMenuPicker(title: L10n.tr("copy.purchaseDate", lang: language), selection: $holdingDate)
+                        }
+                        LabeledContent(L10n.tr("copy.notes", lang: language)) {
+                            BorderedTextField(text: $holdingNotes, placeholder: L10n.tr("copy.notesPlaceholder", lang: language))
                         }
                     }
-                    EnumPickerRow(title: L10n.tr("copy.media", lang: language),
-                                  cases: CopyMedia.allCases, selection: $holdingMedia, language: language)
-                    if holdingMedia.isPhysical {
-                        EnumPickerRow(title: L10n.tr("copy.condition", lang: language),
-                                      cases: CopyCondition.allCases, selection: $holdingCondition, language: language)
-                    }
-                    EnumPickerRow(title: L10n.tr("copy.regional", lang: language),
-                                  cases: CopyRegional.allCases, selection: $holdingRegional, language: language)
-                    EnumPickerRow(title: L10n.tr("copy.acquisition", lang: language),
-                                  cases: CopyAcquisition.allCases, selection: $holdingAcquisition, language: language)
-                    LabeledContent(L10n.tr("copy.price", lang: language)) {
-                        BorderedTextField(text: $holdingPriceText, placeholder: "0")
-                            #if os(macOS)
-                            .frame(width: 160)
-                            #else
-                            .frame(maxWidth: .infinity)
-                            #endif
-                    }
-                    LabeledContent(L10n.tr("copy.estValue", lang: language)) {
-                        BorderedTextField(text: $holdingEstText, placeholder: "0")
-                            #if os(macOS)
-                            .frame(width: 160)
-                            #else
-                            .frame(maxWidth: .infinity)
-                            #endif
-                    }
-                    Toggle(L10n.tr("copy.purchaseDate", lang: language), isOn: $holdingHasDate)
-                    if holdingHasDate {
-                        DateMenuPicker(title: L10n.tr("copy.purchaseDate", lang: language), selection: $holdingDate)
-                    }
-                    LabeledContent(L10n.tr("copy.notes", lang: language)) {
-                        BorderedTextField(text: $holdingNotes, placeholder: L10n.tr("copy.notesPlaceholder", lang: language))
-                    }
+                } header: {
+                    Text(verbatim: L10n.tr("game.holdingArchive", lang: language))
                 }
             }
 
@@ -679,8 +686,8 @@ struct GameEditView: View {
                 context.insert(completion)
             }
 
-            // 收藏家模式：随新建游戏一起建一份实体持有（含完整档案）。
-            if collectorMode {
+            // 收藏家模式：仅当用户勾选「持有」才随新建游戏建一份实体持有（借的/订阅的不算持有）。
+            if collectorMode && createHolding {
                 let version = holdingVersion.trimmingCharacters(in: .whitespaces).isEmpty
                     ? L10n.tr("copy.versionAuto", [1], lang: language)
                     : holdingVersion.trimmingCharacters(in: .whitespaces)
