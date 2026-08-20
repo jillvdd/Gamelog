@@ -9,7 +9,8 @@
 //     GameLog/Models/PhysicalCopy.swift GameLog/Models/Presets.swift \
 //     GameLog/Support/ScoreMath.swift GameLog/Support/ExportImport.swift \
 //     GameLog/Support/UserCustomization.swift GameLog/Support/PlatformImage.swift \
-//     -plugin-path /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib/swift/host/plugins
+//     GameLog/Support/EnumPickerRow.swift GameLog/Support/L10n.swift GameLog/Support/AppLanguage.swift \
+//     -plugin-path <Xcode-beta 插件路径>
 //   /tmp/gamelog_datasmoke
 import Foundation
 import SwiftData
@@ -321,6 +322,54 @@ try BackupManager.decodeAndReplace(legacyData, into: context)
 try context.save()
 let legacyImported = (try? context.fetch(FetchDescriptor<Game>()))?.first { $0.name == "旧版游戏" }
 check("状态机：旧备份缺 status → 默认已通关", legacyImported?.statusValue == .completed)
+
+// MARK: - 持有档案枚举 migrate（beta 2.2）
+
+check("介质 migrate: physical → physicalStandard", CopyMedia.migrate("physical") == .physicalStandard)
+check("介质 migrate: digital → digitalStandard", CopyMedia.migrate("digital") == .digitalStandard)
+check("介质 migrate: code → physicalCode", CopyMedia.migrate("code") == .physicalCode)
+check("介质 migrate: 新值原样", CopyMedia.migrate("digitalPremium") == .digitalPremium)
+check("介质 migrate: 未知兜底 standard", CopyMedia.migrate("???") == .physicalStandard)
+check("介质 isPhysical: 实体三类+digitalCode 真", CopyMedia.physicalStandard.isPhysical && CopyMedia.physicalSpecial.isPhysical && CopyMedia.physicalLimited.isPhysical && CopyMedia.physicalCode.isPhysical)
+check("介质 isPhysical: 数字三类 假", !CopyMedia.digitalStandard.isPhysical && !CopyMedia.digitalPremium.isPhysical && !CopyMedia.digitalUpgrade.isPhysical)
+
+check("来源 migrate: firstHand → officialChannelOverseas", CopyAcquisition.migrate("firstHand") == .officialChannelOverseas)
+check("来源 migrate: secondHand → personalSecondHand", CopyAcquisition.migrate("secondHand") == .personalSecondHand)
+check("来源 migrate: 新值原样", CopyAcquisition.migrate("digitalStore") == .digitalStore)
+check("来源 migrate: 未知兜底 other", CopyAcquisition.migrate("???") == .other)
+
+// 版本区分 / 品相 migrate 兜底
+check("版本区分 migrate: 未知兜底 standard", CopyRegional.migrate("???") == .standard)
+check("品相 migrate: 未知兜底 good", CopyCondition.migrate("???") == .good)
+
+// hasCondition 随 media.isPhysical 联动
+let physC = PhysicalCopy(version: "v", media: .physicalStandard)
+let digiC = PhysicalCopy(version: "v", media: .digitalStandard)
+check("hasCondition: 实体真 / 数字假", physC.hasCondition && !digiC.hasCondition)
+
+// 三语价格严格隔离（不跨语言回退）
+let pricedC = PhysicalCopy(version: "v", priceZh: 399, priceJa: nil, priceEn: 60)
+check("价格: zh=399", pricedC.price(for: "zh-Hans") == 399)
+check("价格: en=60", pricedC.price(for: "en") == 60)
+check("价格: ja=nil（不回退 zh/en）", pricedC.price(for: "ja") == nil)
+
+// 旧备份持有（physical/code/firstHand）导入后落对枚举（经 migrate，非 flatMap(rawValue)）
+let legacyCopyJSON = """
+{"version":1,"exportedAt":"2026-01-01T00:00:00Z","groups":[],
+ "games":[{"name":"旧持有游戏","aliases":[],"reviewTitle":"","reviewBody":"","groupNames":[],
+   "completions":[],
+   "copies":[{"version":"首发版","count":2,"images":[],"mediaRaw":"physical","acquisitionRaw":"firstHand"}]}]}
+"""
+try BackupManager.decodeAndReplace(legacyCopyJSON.data(using: .utf8)!, into: context)
+try context.save()
+if let legacyCopyGame = (try? context.fetch(FetchDescriptor<Game>()))?.first(where: { $0.name == "旧持有游戏" }),
+   let legacyCopy = legacyCopyGame.copies.first {
+    check("旧持有导入: mediaRaw=physical → physicalStandard", legacyCopy.media == .physicalStandard)
+    check("旧持有导入: acquisitionRaw=firstHand → officialChannelOverseas", legacyCopy.acquisition == .officialChannelOverseas)
+    check("旧持有导入: hasCondition 实体为真", legacyCopy.hasCondition)
+} else {
+    check("旧持有导入: 解析到游戏与持有", false)
+}
 
 print(failures == 0 ? "DATA SMOKE TEST PASSED" : "DATA SMOKE TEST FAILED: \(failures) failures")
 exit(failures == 0 ? 0 : 1)

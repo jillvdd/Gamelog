@@ -30,6 +30,11 @@ enum GameStatus: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
     var labelKey: String { "status.\(rawValue)" }
+
+    /// 是否「已通关」或「长线游玩」：两者都挂通关记录、详情页显示记录区、卡片显示评分。
+    var isCompletedOrLongRunning: Bool {
+        self == .completed || self == .longRunning
+    }
 }
 
 /// 一个游戏（库条目）。创建时带首条通关记录，之后可追加。

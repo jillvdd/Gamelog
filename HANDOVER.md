@@ -671,3 +671,191 @@ canonical 存储值也改 + 启动一次性迁移 + 保留旧名展示兜底。
 3. **iOS 真机实测**：拍照 / AirDrop 导入 / QLPreviewController / PhotosPicker / TabBar（见 §9 ②）。
 4. **GitHub 推 + tag**（beta-v2.1，需用户凭据）。
 5. **ROADMAP 后续**：发售日自动填充 / 统计可视化 / 封面缓存深化（已实现一部分）。
+
+---
+
+## 29. beta 2.2（持有页藏品档案化 + 崩溃排查）⚠️ 已重建并通过全量验证、尚未 git commit、崩溃未确认解决
+
+> 当前状态（2026-08-20 晚）：beta 2.2 全部功能**已在本会话重建并跑通 §29.12 全量验证**（macOS/iOS 双平台构建 SUCCEEDED + bin mtime 20:50:14 已部署 `/Applications` 并重启 + ScoreMath 15/15 + DataSmoke 全过含 §29.11 迁移断言 + ShareRender 全过 + RichReview 全过 + L10n 三语 295 key 一致 plutil OK）。**仍未 `git commit`**——原因：§29.9 hover 崩溃虽按「移出 GeometryReader」假设修复并部署，但**尚未被用户实测确认不崩**；崩溃未确认解决前按铁律禁止 commit/tag/推 GitHub。
+>
+> 重建补充说明（用户决策）：① 崩溃排查与功能重建「一次性重建后统一验」（不先复验旧修复）；② 持有页**整页**受 collectorMode 门控（非收藏家看不到持有页签）；③ §28 遗留项（编辑器直打字尺寸/详情页中文斜体）用户确认已修好，本轮只做 §29。
+>
+> ⚠️ **两处枚举成员是「按合理推断重建、待用户验收确认」，非原会话产物**：`CopyRegional`（10 档：standard/cn/hk/tw/jp/us/eu/kr/asia/asiaEn）与 `CopyCondition`（7 档：sealed/mint/excellent/good/fair/worn/damaged，默认值 good）。§29.7 列了 CopyMedia、§29.8 列了 CopyAcquisition，但**规格本身漏列** CopyRegional / CopyCondition 成员（原会话可能存于已丢弃的工作区）。若用户验收时要调整成员或默认值，改 `Models/PhysicalCopy.swift` 四枚举 + 三语 `Localizable.strings` 的 `copy.regional.*` / `copy.condition.*`。
+>
+> 头号未决：持有页 hover 崩溃（§29.9）。功能需求与崩溃修复是正交的两件事——功能已按本规格落地，崩溃需单独实测确认。
+
+### 29.1 总体意图
+
+把详情页「持有」页签从「版本名 + 数量 + 照片」的简单列表，升级成**藏品档案（collection archive）**：记录每一份实体的介质、版本区分、品相、来源、地区、价格与估值，并支持网格/列表双视图、顶部总览、统计收藏价值。
+
+### 29.2 数据模型（`PhysicalCopy` 扩展）
+
+1. **介质 `CopyMedia`（7 档，见 §29.7）**：实体标准版 / 实体特别版 / 实体限定版 / 数字标准版 / 数字高级版 / 数字升级包 / 实体版（内附游戏兑换码）。`isPhysical` 判定（实体三类 + 实体版兑换码 = true；数字三类 = false）。
+2. **版本区分 `CopyRegional`（10 档）**：地区/版本维度，与介质正交。
+3. **品相 `CopyCondition`（7 档）**：仅实体类有意义；`hasCondition = media.isPhysical`。
+4. **来源 `CopyAcquisition`（11 档，见 §29.8）**：介质/品相/来源三者各自 `CaseIterable`，枚举项 labelKey 平铺列出（现有 enumPicker 机制，不进子分组）。
+5. **三语价格 / 估值**：各存独立槽位 `priceZh/Ja/En` + `estValueZh/Ja/En`；`price(for:)/estValue(for:)` 严格按当前语言取单一槽位、未填返回 nil（不跨语言回退）。
+6. **存档稳健性**：所有枚举存 rawValue 带**声明处默认值**（SwiftData 轻量迁移填旧行）；派生属性 get 走 `migrate()` 兜底，set 写 rawValue。⚠️ 此默认值必须在声明处给（`var mediaRaw: String = CopyMedia.physicalStandard.rawValue`），仅 init 默认不够——否则触发 `NSMigrationError: missing attribute values on mandatory destination attribute`。
+
+### 29.3 导入导出（`ExportImport.swift`）
+
+7. `CopyDTO` 全档案字段（全部 Optional，旧备份缺字段用默认值）；编码写出 `mediaRaw/regionalRaw/conditionRaw/acquisitionRaw` 等。
+8. 解码导入：枚举字段 `copyDTO.x.map(X.migrate) ?? .xxxDefault`（**必须走 `migrate()` 而非 `flatMap(rawValue)`，否则旧备份里的 `physical/code/firstHand/secondHand` 会落空**）；三语价格/估值 `prefix(6)` 截断防止超 6 张/越界。旧备份缺字段不覆盖（§24 不变量）。
+
+### 29.4 持有页 UI（`HoldingsView.swift`）
+
+9. **网格 / 列表双视图**：`useGridView` `@AppStorage` 跨会话记忆（同 Library）；工具栏切换按钮。`gridModeContent` = `CopyGridCellView`（首图当主视觉 + 余下 +N 角标 + 版本名×数量 + 介质/版本区分/品相胶囊 + 价格 + 编辑/加图/删除）；列表 = `CopyCardView` 档案列表。
+10. **顶部总览条 `overviewBar`**：该游戏版本数 / 总数量 / 总花费 / 总估值四格（macOS 横排 HStack、iOS `LazyVGrid` 2 列），`PriceFormat` 格式化，未填显示 `—`。
+11. **档案信息区 `archiveInfoSection`**（在 `CopyCardView` 内）：介质 → 版本区分 → 品相（仅实体显示）→ 来源 → 购买日 + 备注。标签字号刻意**大于版本名标题**（`.title3.weight(.semibold)` 约 20pt vs 版本名 `.headline` 约 17pt），弱化标题、突出档案。
+12. **`archiveInfoSection` 的胶囊行布局（关键，见 §29.10）**：用自写 `WrappingLayout`（SwiftUI `Layout` 协议）按内容自适应宽度换行，**不要**用 `LazyVGrid(.adaptive)`——后者空间不足会压缩单格宽度，配合 `.lineLimit(1)` 把长标签截断成省略号（如「官方渠道海淘」→「官方渠道…」）。
+13. **编辑入口统一为 `CopyEditSheet`**：完整档案编辑（含改名），取代原 `RenameCopySheet`；照片增删逻辑（pick/process/remove）迁入 `CopyGridCellView`。
+
+### 29.5 新建流程（`GameEditView.swift`）
+
+14. 仅 `isCreating && collectorMode` 显示「持有档案」Section：随游戏新建持有 + 版本名/介质/版本区分/品相（仅 `media.isPhysical` 显示）/来源/价格（当前语言一框）/估值/购买日期 Toggle/备注。默认 `copyMedia = .physicalStandard`、`copyAcquisition = .officialChannelOverseas`、品相随 `copyMedia.isPhysical` 联动显示。
+
+### 29.6 统计（`StatsView.swift`）
+
+15. **「收藏价值」区块**：`collectorMode && totalCopyCount > 0` 才显示，版本数/总数量/总花费/总估值。计算属性 `totalCopyCount/totalCopyQuantity/totalSpent/totalEstimate` 与 HoldingsView 同名逻辑按「全库」vs「按游戏」各自实现（可接受双份）。
+
+### 29.7 介质枚举 `CopyMedia`（7 档，含迁移）
+
+```
+enum CopyMedia: String, CaseIterable, Identifiable {
+    case physicalStandard  // 实体标准版
+    case physicalSpecial   // 实体特别版（首发、封套、铁盒、幻彩…）
+    case physicalLimited   // 实体限定版（限量版、收藏版…）
+    case digitalStandard   // 数字标准版
+    case digitalPremium    // 数字高级版（高级版、豪华版…）
+    case digitalUpgrade    // 数字升级包（Game Pass、数字版升级…）
+    case physicalCode      // 实体版（内附游戏兑换码）
+    var isPhysical: Bool { /* 前四项 true，后三项 false */ }
+    static func migrate(_ raw: String) -> CopyMedia {
+        if let v = CopyMedia(rawValue: raw) { return v }
+        switch raw {            // 旧三态 → 新细分（默认兜底标准版）
+        case "physical": return .physicalStandard
+        case "digital":  return .digitalStandard
+        case "code":     return .physicalCode
+        default:         return .physicalStandard
+        }
+    }
+}
+```
+- `hasCondition`（在 `PhysicalCopy`）= `media.isPhysical`（旧实现 `media != .digital` 已废弃，因现在不止一个 `.digital`）。
+- `CopyEditSheet` 与 `GameEditView` 的品相显示/写入判断，从 `media != .digital` 改为 `media.isPhysical`（两处文件各两处）。
+
+### 29.8 来源枚举 `CopyAcquisition`（11 档，含迁移）
+
+去掉 `firstHand`(首发)；`secondHand`(二手) 拆成三档；新增 5 项海淘类；保留数字商店/兑换/其他。
+
+```
+enum CopyAcquisition: String, CaseIterable, Identifiable {
+    case officialChannelOverseas   // 官方渠道海淘
+    case dealerChannelOverseas     // 经销商渠道海淘
+    case overseasDirectShipping    // 境外直邮
+    case proxy                     // 代购
+    case thirdPartyStore           // 第三方店铺购入
+    case secondHandStoreOverseas   // 二手店海淘
+    case personalSecondHandOverseas// 个人二手海淘
+    case personalSecondHand        // 个人二手
+    case digitalStore              // 数字商店（保留）
+    case redemption               // 兑换（保留）
+    case other                     // 其他（保留）
+    static func migrate(_ raw: String) -> CopyAcquisition {
+        if let v = CopyAcquisition(rawValue: raw) { return v }
+        switch raw {
+        case "firstHand":   return .officialChannelOverseas
+        case "secondHand":  return .personalSecondHand
+        default:            return .other
+        }
+    }
+}
+```
+- 迁移映射（用户拍板）：旧 `firstHand → officialChannelOverseas`，旧 `secondHand → personalSecondHand`；新值直通。
+- 界面标签 `copy.acquisition` 三语改为「来源」(zh) / 入手元 (ja) / Source (en)。
+- 默认新建来源从首发切到 `officialChannelOverseas`（承接原意）。
+
+### 29.9 持有页 hover 崩溃（最高优先级未决）
+
+- **现象**：只有「有持点数据的游戏（Halo Campaign Evolved）」打开详情页→「持有」时，鼠标 hover 到持有卡片即崩。栈 `_postWindowNeedsUpdateConstraints` → `abort()`（SIGABRT）。真实 reason（命令行跑 app 抓到）：`The window has been marked as needing another Update Constraints in Window pass, but it has already had more Update Constraints in Window passes than there are views in the window` = **macOS 27 beta SwiftUI 8.0 在 hover(hitTest) 时触发 ScrollView 的 `requestImmediateUpdate` 无限递归**。
+- **已证伪**（所有猜测均失败）：① 移除 `.fixedSize()`；② 禁用全部 10 处 `.help()`；③ 把 holdings 分支移出 `GeometryReader`；④ 嵌套 `.adaptive` 改固定列 + 移除 `.onHover` 视图插入；⑤ 给 `.adaptive` 加 `maximum`；⑥ 移除 `ThumbnailView` 的 `.onHover` 状态变更（**注意：全库唯一 `.onHover` 在 HoldingsView.swift:430，移除后仍崩，证明 hover 状态变更非根因**）。
+- **根因仍在查**：崩溃是纯布局反馈循环（hover hitTest → `ScrollViewCommitMutation.commit` → `requestImmediateUpdate` → `setNeedsUpdateConstraints` → 超护栏），与 SwiftUI 状态变更无关。
+- **排查铁律**：① 用命令行跑 app（`NSConstraintBasedLayoutVisualizeMutuallyExclusiveConstraints=YES /Applications/GameLog.app/Contents/MacOS/GameLog > ~/gamelog_run.log 2>&1 &`）拿 stderr 里的 reason 文本，crash report 的 abort 栈永远给不到原因；② 崩溃未确认解决前**禁止 commit/tag/推 GitHub**；③ 对比不崩的 `LibraryView`（`ScrollView{LazyVGrid(.adaptive(minimum:150,maximum:200))}` 无 GeometryReader、卡片 0 处 `.help()`、无 `.onHover`）——差异点即嫌疑（持有分支被 `GameDetailView` 的 `GeometryReader{ScrollView{…}}` 包裹，且 `HoldingsView` 网格单元用 `Color.clear.aspectRatio(1)` 零固有尺寸的方块）。
+
+### 29.10 UI 视觉微调（用户迭代结论，来自 beta 2.2 后多轮反馈）
+
+列表（横向）档案视图 `archiveInfoSection` 的胶囊标签最终形态（保留作重实现基准）：
+- 字号：`.title3.weight(.semibold)`（约 20pt，**大于**版本名 `.headline`），刻意弱化标题、突出档案。
+- 布局：自写 `WrappingLayout`（`Layout` 协议）按内容自适应宽度、放不下换行，**不用 `LazyVGrid(.adaptive)`**（会截断长标签）。每个胶囊 `.fixedSize()` + `.lineLimit(1)` + 横向 padding 12 + 纵向 5。
+- 胶囊间距：`WrappingLayout(spacing: 8)`（用户要求「翻倍」）。
+- 左侧距离：胶囊行 `.padding(.leading, -2)`（负向抵消卡片 14pt 内边距，首胶囊起点约 12pt，基本对齐版本名）。
+- ⚠️ 这些数值是用户逐轮微调的偏好终点，重实现时直接套用，不要再走一遍「太小/太贴/太松」的往返。若用户在新构建上提出新调整，按新反馈改，并更新本节。
+
+### 29.11 本地化与测试
+
+16. **三语各 295 key**（实际值；§29 原估算「291」偏低）。介质 7 + 版本区分 10 + 品相 7 + 来源 11 + 价格/估值/日期/备注/编辑/视图切换/总览/统计区块等。三语 key 集合完全一致、0 缺失（`plutil -lint` 通过，2026-08-20 实测 zh=en=ja=295）。
+17. **`DataSmokeTest`** 覆盖：介质/来源 `migrate`（physical/digital/code/firstHand/secondHand/未知兜底/新值原样）、`isPhysical` 联动、`hasCondition` 联动、三语价格严格隔离（zh=399/en=60/ja=nil）、版本区分/品相 migrate 兜底、旧备份持有（physical/firstHand）导入落对枚举。2026-08-20 实测全 PASS。
+18. **测试脚手架命令已修**：`Scripts/DataSmokeTest/main.swift` 与 `ShareRenderTest` 头注释的 `swiftc` 命令已补 `EnumPickerRow.swift` / `L10n.swift` / `AppLanguage.swift`（beta 1.6 后 `LabelKeyed`/`L10n`/`AppLanguage` 跨文件，旧命令编译不过）。
+
+### 29.12 验证清单（重建后实测，2026-08-20）
+
+- [x] macOS Debug 构建 BUILD SUCCEEDED（beta Xcode，`/tmp/GameLogDD-mac`；bin mtime 20:50:14；已 `cp -R` 到 `/Applications` 并 `pkill -x GameLog && open` 重启套用）
+- [x] iOS Simulator Debug 构建 BUILD SUCCEEDED（`generic/platform=iOS Simulator`，`/tmp/GameLogDD-ios`；指定具体机型会落到 My Mac 报错，用 generic 目标）
+- [x] ScoreMath 15/15
+- [x] DataSmoke 全过（含 §29.11 迁移断言，23 项 PASS）
+- [x] ShareRender 全过
+- [x] RichReview（Markdown 富文本往返）全过（仅 `showCGGlyphs` deprecated 警告，非错误）
+- [x] L10n 三语 295 key 一致、plutil 三语 OK、0 缺失
+- [ ] **hover 崩溃实测不崩**（部署 20:50:14 版本，**待用户实测**：命令行带 reason 捕获启动，复现 Halo→持有 hover；仍崩则读 `~/gamelog_run.log` 的 reason 二分。§29.9 的「移出 GeometryReader」假设未实测前，此框保持未勾）
+- [ ] 用户实测：网格/列表双视图、总览四格、编辑弹窗 7 档介质/11 档来源、新建默认、统计收藏价值区块、⚠️ 确认 `CopyRegional`/`CopyCondition` 成员是否符合预期（见 §29 头注）
+
+### 29.13 本会话（2026-08-20 晚）交付物与文件清单
+
+**改动文件（相对 beta 2.1 基线）：**
+- `GameLog/Models/PhysicalCopy.swift` — `CopyMedia`/`CopyRegional`/`CopyCondition`/`CopyAcquisition` 四枚举（各 `CaseIterable, Identifiable, LabelKeyed` + `labelKey` + `migrate`）+ `PhysicalCopy` 扩展全档案字段（`mediaRaw`/`regionalRaw`/`conditionRaw`/`acquisitionRaw` 声明处带默认值；`priceZh/Ja/En`/`estValueZh/Ja/En` 三语价格；`purchaseDate`/`notes`）+ 派生 get/set（`media`/`regional`/`condition`/`acquisition`/`hasCondition`/`price(for:)`/`estValue(for:)`/`setPrice`/`setEstValue`）。新增 `LabelKeyed` 协议在 `EnumPickerRow.swift`。
+- `GameLog/Support/ExportImport.swift` — `CopyDTO` 加全档案字段（全 Optional）+ 编码写出 + 解码走 `migrate()`（非 `flatMap(rawValue)`）+ 旧备份缺字段不覆盖。
+- `GameLog/Support/PriceFormat.swift` — **新增**，按语言格式化货币（zh_CN/ja_JP/en_US）。
+- `GameLog/Support/EnumPickerRow.swift` — **新增**，通用枚举选择行（`LabelKeyed` 约束），供 `HoldingsView`/`GameEditView` 共用（原 `HoldingsView` 内 `private` 版已删，改引用此共享版）。
+- `GameLog/Views/HoldingsView.swift` — **重写**：`useGridView` `@AppStorage`（key `customization.useHoldingsGridView`，在 `UserCustomization.swift` 新增）+ 网格/列表切换 + `overviewBar` 四格 + `CopyGridCellView`（首图主视觉 + 余下 +N + 版本名×数量 + 介质/版本区分/品相胶囊（`WrappingLayout`）+ 价格 + 编辑/加图/删除，照片增删迁入）/ `CopyCardView`+`archiveInfoSection`（§29.10 胶囊布局，`WrappingLayout` 取代 `LazyVGrid(.adaptive)`）/ `CopyEditSheet`（取代 `RenameCopySheet`，完整档案编辑含改名）/ `WrappingLayout`（自写 `Layout` 协议）。**自带 `ScrollView`**（移出 `GameDetailView` 的 GeometryReader，见 §29.9）。
+- `GameLog/Views/GameDetailView.swift` — body 改 `Group { if collectorMode && tab==holdings { HoldingsView } else { GeometryReader { ScrollView { ... } } } }`：holdings 分支完全移出 GeometryReader（§29.9 最后假设）。
+- `GameLog/Views/GameEditView.swift` — 加 `collectorMode` `@AppStorage` + 仅 `isCreating && collectorMode` 显示「持有档案」Section（版本名/数量/介质/版本区分/品相(仅 `media.isPhysical`)/来源/价格(当前语言一框)/估值/购买日 Toggle/备注）+ 新建保存时随游戏建 `PhysicalCopy`（价格按当前语言写对应槽位）。
+- `GameLog/Views/StatsView.swift` — 加 `collectorMode` `@AppStorage` + `collectorValueSection`（仅 `collectorMode && totalCopyCount>0`）：版本数/总数量/总花费/总估值（全库汇总，与 HoldingsView 同名逻辑各实现一份）。
+- `GameLog/Support/UserCustomization.swift` — 加 `useHoldingsGridViewKey`。
+- `GameLog/Resources/{zh-Hans,en,ja}.lproj/Localizable.strings` — 各加 55 key（四枚举 35 + 通用 20），三语一致。
+- `Scripts/DataSmokeTest/main.swift` — 加 §29.11 迁移断言 + 头注释命令补 `EnumPickerRow.swift`/`L10n.swift`/`AppLanguage.swift`。
+- `GameLog.xcodeproj/project.pbxproj` — `MARKETING_VERSION` 4 处 `"beta 2.1"` → `"beta 2.2"`（因 `PBXFileSystemSynchronizedRootGroup`，新增 `.swift` 自动进 target，无需手改 pbxproj 文件引用）。
+
+**本会话未做 / 留给新 chat：**
+1. hover 崩溃实测（§29.9）— 部署 20:50:14 版本待用户复现 Halo→持有 hover 确认不崩；崩溃未确认前**禁止 commit/tag/推 GitHub**。
+2. 用户验收 `CopyRegional`/`CopyCondition` 成员（见 §29 头注）。
+3. 用户 UI 实测（双视图/总览/编辑弹窗/统计区块）。
+4. 上述三项全绿后：按 HANDOVER §4.3 与记忆「推 GitHub」流程 `git add` + commit（前缀 `beta 2.2：`）+ 打 tag `beta-v2.2` + 推 main（需用户凭据）；DMG/IPA 打包见历史 §27.5/§26.5 命令。
+
+### 29.14 滑块卡顿排查（2026-08-20 深夜，本会话新增，尚未解决）
+
+> 用户反馈：详情页「状态滑块」（想玩/在玩/搁置/弃坑/长线游玩/已通关，6 列）点击卡顿、mac 版滑动动画期间持续掉帧；而「详情/持有」滑块、「持有中网格/列表」滑块**不卡**。本轮已多次尝试均无效，已回退到最初基准状态，待新 chat 继续。
+
+**现象细分（用户实测口径）：**
+- 状态滑块：① 本身无 hover 效果；② 点击后停顿一下才滑动，且比另两个滑块"久很多"；③ 滑动动画很卡（仅 macOS，iOS 仅点击顿一下即 A 类、不持续卡）。
+- 对照：详情/持有滑块、网格/列表滑块点击顺、滑动顺（mac 也不卡）。
+
+**已排除的错误选项（均试过、卡顿无变化、已回退）：**
+1. ❌ 背景 `.thinMaterial` → 换成 `Color.semantic(.controlBackground)`：无变化（注：`.thinMaterial` 仍保留在三个滑块，回退后状态栏/详情持有/网格列表背景都是 `.thinMaterial`；另两个不卡滑块也是 `.thinMaterial`，故非材质问题）。
+2. ❌ 去掉 6 列 `.help()` tooltip：无变化（已回退，状态栏现仍带 `.help(L10n.tr(s.labelKey,...))`）。
+3. ❌ 把每列抽成稳定子视图 `StatusCell` + 缓存 `cellWidth` 到 `@State`：无变化（已回退删掉 `StatusCell`，状态栏现仍是 ForEach 内联列）。
+
+**仍待查的真因方向（未动过，是状态滑块 vs 不卡滑块的剩余差异）：**
+- **差异 A（最可能）：模型写入引发的整页重算。** 状态滑块点击 → `onChanged` 回调 → `game.statusValue = newValue` + `context.save()`（见 `GameDetailView.swift` ~531 行 `DetailStatusPicker(status: $detailStatus) { newValue in guard newValue != game.statusValue else { return }; game.statusValue = newValue; try? context.save() }`）。这会触发整个 `GameDetailView` body 重算（状态变化驱动记录区显隐、卡片状态等）。另两个滑块只改本地 `@State`（`detailTab` / `useGridView`），**不碰 SwiftData 模型、不触发父级 body 重算**。"点击停顿比另两个久很多"极符合此——同步写模型 + 整页重算的开销。
+- **差异 B：状态栏在 `GeometryReader` 内 + 6 列 `ForEach(all)`** 每次 body 重算重建（但内联重构后 HoldingsView 也是类似结构，需对比）。
+- **差异 C：动画参数**——三个滑块都用 `.spring(response:0.3, dampingFraction:0.78)`，一致，非差异。
+
+**建议的下一步验证（最小代价定位真因）：** 临时把状态滑块的 `onChanged` 回调改成**空操作**（不写 `game`、不 `save()`），构建实测点击是否瞬间变流畅。若变流畅 → 真因是差异 A（模型写入/整页重算），解决方案方向：① 状态变更用 `withTransaction(.init(animation:nil))` 或包 `DispatchQueue.main.async` 隔离；② 或从 `@Binding status` 解耦，本地先动画、退出详情页时才批量持久化；③ 把 `GameDetailView` 里依赖 `game.statusValue` 的子视图用 `@ViewBuilder` 隔离、避免整页 body 重算。**注意 §4.17/§6.28 铁律：SwiftUI 里状态变更包 `DispatchQueue.main.async` 是已确立写法，但本会话试过的 async 延后（在 Button 闭包里 `DispatchQueue.main.async { status = s; onChanged(s) }`）回退时已删，且当时仍卡，说明单纯延后写入不够——根因更可能是整页 body 因 `game` 模型变化而重算，而非写入时机。**
+
+**当前代码基准状态（回退后，可直接在此基础上改）：**
+- `GameLog/Views/GameDetailView.swift` 的 `DetailStatusPicker`：`.thinMaterial` 背景、内联 `ForEach(all) { s in ... }` 列、每列 `.help()`、点击同步 `status = s; onChanged(s)`、`sliderIndex` 本地 `@State` 驱动 offset 动画。
+- `detailTabPicker`（详情/持有）：2 列液态玻璃滑块，点击只改 `detailTab`/`tabSliderIndex` 本地 `@State`，不写模型。
+- `HoldingsView` 网格/列表切换：2 列液态玻璃滑块，点击只改 `useGridView`/`gridSliderIndex`（后者 `.onAppear` 同步），不写模型。
+
+**✅ 已修复（2026-08-20 深夜）：** 真因确为差异 A（点击即写 SwiftData 模型触发整页 body 重算）。
+- 改动 `GameDetailView.swift`：`DetailStatusPicker` 删掉 `onChanged` 闭包，改为纯 `@Binding status` + 本地 `sliderIndex` 驱动视觉；点击只改本地 `@State`（`status`/`sliderIndex`），**完全不碰模型**。模型写入延后到 `.onDisappear` 的 `persistStatusIfChanged()`（仅 `detailStatus != game.statusValue` 才 `game.statusValue = detailStatus; context.save()`）。`GameDetailView` 内两处 `game.isCompletedOrLongRunning` 依赖（工具栏「加记录」按钮、通关记录区显隐）改为 `detailStatus.isCompletedOrLongRunning`，新增 `GameStatus.isCompletedOrLongRunning`（Bool）扩展，确保点击即时显隐而不触发模型重算；`GameCardView` 仍用 `Game.isCompletedOrLongRunning`（反映已持久化状态），不受影响。
+- 验证：mac/iOS 双平台构建 SUCCEEDED 并部署 `/Applications` 重启（bin mtime 22:49 晚于源码）；ScoreMath 15/15、DataSmoke 全 PASS、ShareRender 全 PASS、L10n 三语 295 key 一致 0 缺失。待用户实测点击流畅度确认。

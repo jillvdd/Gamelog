@@ -40,11 +40,25 @@ struct GameDTO: Codable {
     var status: String?
 }
 
-/// 一条持有记录（版本 + 数量 + 最多 6 张照片 base64）。
+/// 一条持有记录（版本 + 数量 + 最多 6 张照片 base64 + 藏品档案全字段）。
+/// 旧版备份缺字段 → 全部 Optional，导入时用默认值兜底，不覆盖现状（§24 不变量）。
 struct CopyDTO: Codable {
     var version: String
     var count: Int
     var images: [String]
+    // 藏品档案（旧备份缺字段 → nil）。
+    var mediaRaw: String?
+    var regionalRaw: String?
+    var conditionRaw: String?
+    var acquisitionRaw: String?
+    var priceZh: Double?
+    var priceJa: Double?
+    var priceEn: Double?
+    var estValueZh: Double?
+    var estValueJa: Double?
+    var estValueEn: Double?
+    var purchaseDate: Date?
+    var notes: String?
 }
 
 struct CompletionDTO: Codable {
@@ -104,7 +118,19 @@ enum BackupManager {
                         CopyDTO(
                             version: copy.version,
                             count: copy.count,
-                            images: copy.images.map { $0.base64EncodedString() }
+                            images: copy.images.map { $0.base64EncodedString() },
+                            mediaRaw: copy.mediaRaw,
+                            regionalRaw: copy.regionalRaw,
+                            conditionRaw: copy.conditionRaw,
+                            acquisitionRaw: copy.acquisitionRaw,
+                            priceZh: copy.priceZh,
+                            priceJa: copy.priceJa,
+                            priceEn: copy.priceEn,
+                            estValueZh: copy.estValueZh,
+                            estValueJa: copy.estValueJa,
+                            estValueEn: copy.estValueEn,
+                            purchaseDate: copy.purchaseDate,
+                            notes: copy.notes.isEmpty ? nil : copy.notes
                         )
                     },
                     status: game.status
@@ -205,7 +231,7 @@ enum BackupManager {
                 context.insert(completion)
             }
 
-            // 持有记录（旧版备份缺字段 → 保持现状不创建）
+            // 持有记录（旧版备份缺字段 → 默认值兜底；枚举走 migrate 而非 flatMap(rawValue)）
             if let copies = gameDTO.copies {
                 for copyDTO in copies {
                     let copy = PhysicalCopy(
@@ -213,6 +239,18 @@ enum BackupManager {
                         count: max(1, copyDTO.count),
                         images: copyDTO.images.prefix(6).compactMap { Data(base64Encoded: $0) }
                     )
+                    copy.media = CopyMedia.migrate(copyDTO.mediaRaw ?? "")
+                    copy.regional = CopyRegional.migrate(copyDTO.regionalRaw ?? "")
+                    copy.condition = CopyCondition.migrate(copyDTO.conditionRaw ?? "")
+                    copy.acquisition = CopyAcquisition.migrate(copyDTO.acquisitionRaw ?? "")
+                    copy.priceZh = copyDTO.priceZh
+                    copy.priceJa = copyDTO.priceJa
+                    copy.priceEn = copyDTO.priceEn
+                    copy.estValueZh = copyDTO.estValueZh
+                    copy.estValueJa = copyDTO.estValueJa
+                    copy.estValueEn = copyDTO.estValueEn
+                    copy.purchaseDate = copyDTO.purchaseDate
+                    copy.notes = copyDTO.notes ?? ""
                     copy.game = game
                     context.insert(copy)
                 }

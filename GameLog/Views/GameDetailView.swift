@@ -224,17 +224,15 @@ private struct LocalizedNamesSubtitle: View {
 private struct DetailStatusPicker: View {
     @Environment(\.appLanguageCode) private var language
     @Binding var status: GameStatus
-    let onChanged: (GameStatus) -> Void
     /// 紧凑模式（只图标，窄屏如 iPhone 用）；macOS 显示图标 + 小字。
     var compact: Bool = false
 
     /// 滑块当前列（内部状态，点击立即动画，父重算不影响）。
     @State private var sliderIndex: Int
 
-    init(status: Binding<GameStatus>, compact: Bool = false, onChanged: @escaping (GameStatus) -> Void) {
+    init(status: Binding<GameStatus>, compact: Bool = false) {
         _status = status
         self.compact = compact
-        self.onChanged = onChanged
         _sliderIndex = State(initialValue: GameStatus.allCases.firstIndex(of: status.wrappedValue) ?? 0)
     }
 
@@ -261,7 +259,6 @@ private struct DetailStatusPicker: View {
                             guard idx != sliderIndex else { return }
                             sliderIndex = idx
                             status = s
-                            onChanged(s)
                         } label: {
                             VStack(spacing: 3) {
                                 Image(systemName: s.statusIcon)
@@ -322,6 +319,8 @@ struct GameDetailView: View {
     let game: Game
 
     @State private var detailTab: DetailTab = .details
+    /// 详情/持有滑块当前列（内部状态驱动，点击即时动画，不依赖父视图重算）。
+    @State private var tabSliderIndex: Int = 0
     @State private var showingEditGame = false
     @State private var showingAddCompletion = false
     @State private var editingCompletion: Completion?
@@ -346,7 +345,16 @@ struct GameDetailView: View {
         !game.reviewTitle.isEmpty || !game.reviewBody.isEmpty
     }
 
+    /// 仅在离开详情页时把本地选中的状态写回模型；未变更则跳过（避免无谓的 SwiftData 写入）。
+    private func persistStatusIfChanged() {
+        guard detailStatus != game.statusValue else { return }
+        game.statusValue = detailStatus
+        try? context.save()
+    }
+
     var body: some View {
+        // 单 ScrollView 内联铺开：游戏信息 → (详情|持有) 滑块 → 详情内容 / 持有档案内联在信息下方。
+        // 不再整页替换（§29.9：HoldingsView 已去掉自带 ScrollView，作为内联子视图承载于本 ScrollView）。
         GeometryReader { geo in
             ScrollView {
                 VStack(alignment: .leading, spacing: 28) {
@@ -354,10 +362,11 @@ struct GameDetailView: View {
                     if collectorMode {
                         detailTabPicker
                     }
+                    if !collectorMode || detailTab == .details {
+                        detailsContent(width: geo.size.width)
+                    }
                     if collectorMode && detailTab == .holdings {
                         HoldingsView(game: game)
-                    } else {
-                        detailsContent(width: geo.size.width)
                     }
                 }
                 #if os(macOS)
@@ -371,6 +380,8 @@ struct GameDetailView: View {
         }
         .navigationTitle(hideToolbarGlass ? "" : game.displayName(for: language))
         .onAppear { detailStatus = game.statusValue }
+        // 离开详情页时才把状态变更持久化到模型（§29.14 差异 A：避免点击即时写 SwiftData 触发整页重算卡顿）。
+        .onDisappear { persistStatusIfChanged() }
         // 全屏毛玻璃下推 + 「隐藏上方毛玻璃」开关由全局 appToolbar() 统一处理。
         .appToolbar()
         .toolbar {
@@ -380,7 +391,7 @@ struct GameDetailView: View {
                 } label: {
                     Label(L10n.tr("library.share", lang: language), systemImage: "square.and.arrow.up")
                 }
-                if game.isCompletedOrLongRunning {
+                if detailStatus.isCompletedOrLongRunning {
                     Button {
                         showingAddCompletion = true
                     } label: {
@@ -521,13 +532,11 @@ struct GameDetailView: View {
             }
             LocalizedNamesSubtitle(game: game, currentLanguage: language)
 
-            // 状态机：自定义滑动条（offset 滑块），点击即切换并保存。
+            // 状态机：自定义滑动条（offset 滑块），点击即切换本地选中态并即时动画。
+            // 模型写入延后到离开详情页（.onDisappear）才持久化，避免点击即同步写 SwiftData
+            // 触发整页 body 重算导致的滑块卡顿（§29.14 差异 A）。
             // 图标 + 文字同显（含 iOS：只有图标用户会看不懂含义）。
-            DetailStatusPicker(status: $detailStatus) { newValue in
-                guard newValue != game.statusValue else { return }
-                game.statusValue = newValue
-                try? context.save()
-            }
+            DetailStatusPicker(status: $detailStatus)
 
             if let date = game.releaseDate {
                 Text(verbatim: date.formatted(date: .long, time: .omitted))
@@ -666,14 +675,46 @@ struct GameDetailView: View {
         }
     }
 
-    /// 「详情 / 持有」分段切换（收藏家模式开启时显示在分数下方）。
+    /// 「详情 / 持有」液态玻璃滑块切换（收藏家模式开启时显示在信息下方）。
+    /// 复刻 DetailStatusPicker 视觉：.thinMaterial 底 + accent 半透明滑块 + spring 动画；切到持有时档案内联铺在信息下方。
     private var detailTabPicker: some View {
-        Picker("", selection: $detailTab) {
-            Text(verbatim: L10n.tr("detail.details", lang: language)).tag(DetailTab.details)
-            Text(verbatim: L10n.tr("detail.holdings", lang: language)).tag(DetailTab.holdings)
+        GeometryReader { geo in
+            let all: [DetailTab] = [.details, .holdings]
+            let cellWidth = geo.size.width / CGFloat(all.count)
+            ZStack(alignment: .topLeading) {
+                RoundedRectangle(cornerRadius: 9)
+                    .fill(Color.accentColor.opacity(0.18))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 9)
+                            .strokeBorder(Color.accentColor.opacity(0.45), lineWidth: 1)
+                    )
+                    .frame(width: cellWidth, height: geo.size.height)
+                    .offset(x: CGFloat(tabSliderIndex) * cellWidth)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.78), value: tabSliderIndex)
+                HStack(spacing: 0) {
+                    ForEach(Array(all.enumerated()), id: \.offset) { _, tab in
+                        Button {
+                            let idx = all.firstIndex(of: tab) ?? 0
+                            guard idx != tabSliderIndex else { return }
+                            tabSliderIndex = idx
+                            detailTab = tab
+                        } label: {
+                            Text(verbatim: L10n.tr(tab == .details ? "detail.details" : "detail.holdings", lang: language))
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(detailTab == tab ? Color.accentColor : Color.secondary)
+                                .frame(width: cellWidth, height: geo.size.height)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
         }
-        .pickerStyle(.segmented)
-        .labelsHidden()
+        .frame(height: 44)
+        .background {
+            RoundedRectangle(cornerRadius: 12)
+                .fill(.thinMaterial)
+        }
         #if os(macOS)
         .frame(maxWidth: 280, alignment: .leading)
         #else
@@ -708,7 +749,8 @@ struct GameDetailView: View {
     @ViewBuilder
     private var completionsSection: some View {
         // 已通关/长线游玩显示通关记录区；想玩等在玩轻量状态隐藏（数据保留，切回已通关恢复显示）。
-        if game.isCompletedOrLongRunning {
+        // 用本地 detailStatus 即时反映点击，避免依赖 game.statusValue（模型写入延后到 onDisappear）。
+        if detailStatus.isCompletedOrLongRunning {
             VStack(alignment: .leading, spacing: 12) {
                 HStack {
                     LText("game.completions")

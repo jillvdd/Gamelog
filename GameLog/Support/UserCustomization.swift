@@ -30,6 +30,8 @@ enum UserCustomization {
     static let platformIconsKey = "customization.platformIcons"
     /// 自动备份开关（默认开启=每次数据改动后自动写完整本地备份）。
     static let autoBackupKey = "customization.autoBackup"
+    /// 持有页网格 / 列表视图切换（默认开启=网格），跨会话记忆，同 Library。
+    static let useHoldingsGridViewKey = "customization.useHoldingsGridView"
 
     /// 用户名长度上限（设置页输入与导入时统一截断）。
     static let usernameMaxLength = 20
