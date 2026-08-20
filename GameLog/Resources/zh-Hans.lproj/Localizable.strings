@@ -257,6 +257,7 @@
 "copy.noArchive" = "还没有藏品档案";
 "stats.collectorValue" = "收藏价值";
 "game.holdingArchive" = "持有档案";
+"game.createHolding" = "我拥有这份（建持有档案）";
 "game.holdingArchiveHint" = "随新建游戏一起记录一份实体持有（版本、介质、来源、价格等）。";
 
 "date.year" = "年";

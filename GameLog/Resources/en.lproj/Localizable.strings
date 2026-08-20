@@ -257,6 +257,7 @@
 "copy.noArchive" = "No Holdings Yet";
 "stats.collectorValue" = "Collection Value";
 "game.holdingArchive" = "Holding Archive";
+"game.createHolding" = "I own this (create holding)";
 "game.holdingArchiveHint" = "Record a physical holding (edition, media, source, price…) with the new game.";
 
 "date.year" = "Year";
