@@ -12,6 +12,8 @@ enum LibrarySort: String, CaseIterable, Identifiable {
     case completionDate
     case scoreAscending
     case scoreDescending
+    case recentEdit
+    case valueDescending
 
     var id: String { rawValue }
 }
@@ -92,6 +94,12 @@ struct LibraryView: View {
         case .scoreDescending:
             // 未评分（nil）按 -1 处理，排在已评分之后。
             result.sort { ($0.rawLibraryScore(platform: nil) ?? -1) > ($1.rawLibraryScore(platform: nil) ?? -1) }
+        case .recentEdit:
+            // 最近编辑：无编辑记录退回创建时间；越新越靠前。
+            result.sort { $0.lastEditedAt > $1.lastEditedAt }
+        case .valueDescending:
+            // 价值最高（总估值，按当前语言）；无估值（nil）排最后。
+            result.sort { ($0.totalEstimate(for: language) ?? -1) > ($1.totalEstimate(for: language) ?? -1) }
         }
         return result
     }
@@ -432,6 +440,24 @@ struct LibraryView: View {
                             Label(L10n.tr("library.sortByScoreDesc", lang: language), systemImage: "checkmark")
                         } else {
                             Text(verbatim: L10n.tr("library.sortByScoreDesc", lang: language))
+                        }
+                    }
+                    Button {
+                        sortRaw = LibrarySort.recentEdit.rawValue
+                    } label: {
+                        if sortOption == .recentEdit {
+                            Label(L10n.tr("library.sortByRecentEdit", lang: language), systemImage: "checkmark")
+                        } else {
+                            Text(verbatim: L10n.tr("library.sortByRecentEdit", lang: language))
+                        }
+                    }
+                    Button {
+                        sortRaw = LibrarySort.valueDescending.rawValue
+                    } label: {
+                        if sortOption == .valueDescending {
+                            Label(L10n.tr("library.sortByValueDesc", lang: language), systemImage: "checkmark")
+                        } else {
+                            Text(verbatim: L10n.tr("library.sortByValueDesc", lang: language))
                         }
                     }
                 } label: {

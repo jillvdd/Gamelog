@@ -9,6 +9,8 @@
 "library.sortByCompletion" = "按通关日期";
 "library.sortByScoreAsc" = "平均分（从低到高）";
 "library.sortByScoreDesc" = "平均分（从高到低）";
+"library.sortByRecentEdit" = "最近编辑";
+"library.sortByValueDesc" = "价值最高";
 "library.sort" = "排序";
 "library.gridView" = "网格视图";
 "library.listView" = "列表视图";

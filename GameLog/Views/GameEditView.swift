@@ -718,6 +718,7 @@ struct GameEditView: View {
             game.reviewTitle = reviewTitle
             game.reviewBody = reviewBody
             game.groups = allGroups.filter { groupIDs.contains($0.persistentModelID) }
+            game.updatedAt = .now
         }
         dismiss()
     }

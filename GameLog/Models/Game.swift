@@ -56,6 +56,8 @@ final class Game {
     var reviewTitle: String
     var reviewBody: String
     var createdAt: Date
+    /// 最近一次编辑时间（编辑详情保存时更新）；nil = 从未编辑（排序时退回 createdAt）。
+    var updatedAt: Date?
     /// 状态机状态（GameStatus.rawValue）。默认已通关；想玩/在玩等轻量状态无通关记录。
     var status: String = GameStatus.completed.rawValue
 
@@ -84,6 +86,7 @@ final class Game {
         self.reviewTitle = reviewTitle
         self.reviewBody = reviewBody
         self.createdAt = createdAt
+        self.updatedAt = createdAt
         self.status = status.rawValue
         self.completions = []
         self.copies = []
@@ -99,6 +102,18 @@ extension Game {
     var statusValue: GameStatus {
         get { GameStatus(rawValue: status) ?? .completed }
         set { status = newValue.rawValue }
+    }
+
+    /// 该游戏全部持有版本的总估值（按语言），无持有/无估值则 nil。
+    /// 用于主页「价值最高」排序；与 HoldingsView/StatsView 的 totalEstimate 同口径。
+    func totalEstimate(for language: String) -> Double? {
+        let vals = copies.compactMap { $0.estValue(for: language) }
+        return vals.isEmpty ? nil : vals.reduce(0, +)
+    }
+
+    /// 最近编辑时间（无编辑记录时退回创建时间），用于「最近编辑」排序。
+    var lastEditedAt: Date {
+        updatedAt ?? createdAt
     }
 
     /// 是否「已通关」或「长线游玩」：两者都挂通关记录、详情页显示记录区、卡片显示评分。
