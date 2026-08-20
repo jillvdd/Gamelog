@@ -674,15 +674,15 @@ canonical 存储值也改 + 启动一次性迁移 + 保留旧名展示兜底。
 
 ---
 
-## 29. beta 2.2（持有页藏品档案化 + 崩溃排查）⚠️ 已重建并通过全量验证、尚未 git commit、崩溃未确认解决
+## 29. beta 2.2（持有页藏品档案化 + 崩溃排查）✅ 已重建并全量验证、已 git commit（f03508f）、hover 崩溃随重写消除、滑块卡顿已修复
 
-> 当前状态（2026-08-20 晚）：beta 2.2 全部功能**已在本会话重建并跑通 §29.12 全量验证**（macOS/iOS 双平台构建 SUCCEEDED + bin mtime 20:50:14 已部署 `/Applications` 并重启 + ScoreMath 15/15 + DataSmoke 全过含 §29.11 迁移断言 + ShareRender 全过 + RichReview 全过 + L10n 三语 295 key 一致 plutil OK）。**仍未 `git commit`**——原因：§29.9 hover 崩溃虽按「移出 GeometryReader」假设修复并部署，但**尚未被用户实测确认不崩**；崩溃未确认解决前按铁律禁止 commit/tag/推 GitHub。
+> 当前状态（2026-08-20 深夜）：beta 2.2 全部功能已重建并跑通 §29.12 全量验证（macOS/iOS 双平台构建 SUCCEEDED + ScoreMath 15/15 + DataSmoke 全过 + ShareRender 全过 + RichReview 全过 + L10n 三语 295 key 一致）。已 `git commit`（`f03508f`，未 tag/未推）。hover 崩溃（§29.9）已随「持有」重写消除，用户实测不崩；状态滑块卡顿（§29.14）已修复，用户实测流畅。
 >
-> 重建补充说明（用户决策）：① 崩溃排查与功能重建「一次性重建后统一验」（不先复验旧修复）；② 持有页**整页**受 collectorMode 门控（非收藏家看不到持有页签）；③ §28 遗留项（编辑器直打字尺寸/详情页中文斜体）用户确认已修好，本轮只做 §29。
+> 重建补充说明（用户决策）：① 崩溃排查与功能重建「一次性重建后统一验」；② 持有页**整页**受 collectorMode 门控（非收藏家看不到持有页签）；③ §28 遗留项（编辑器直打字尺寸/详情页中文斜体）用户确认已修好。
 >
-> ⚠️ **两处枚举成员是「按合理推断重建、待用户验收确认」，非原会话产物**：`CopyRegional`（10 档：standard/cn/hk/tw/jp/us/eu/kr/asia/asiaEn）与 `CopyCondition`（7 档：sealed/mint/excellent/good/fair/worn/damaged，默认值 good）。§29.7 列了 CopyMedia、§29.8 列了 CopyAcquisition，但**规格本身漏列** CopyRegional / CopyCondition 成员（原会话可能存于已丢弃的工作区）。若用户验收时要调整成员或默认值，改 `Models/PhysicalCopy.swift` 四枚举 + 三语 `Localizable.strings` 的 `copy.regional.*` / `copy.condition.*`。
+> ⚠️ **两处枚举成员是「按合理推断重建、待用户验收确认」，非原会话产物**：`CopyRegional`（10 档）与 `CopyCondition`（7 档，默认 good）。若用户验收时要调整成员或默认值，改 `Models/PhysicalCopy.swift` 四枚举 + 三语 `Localizable.strings` 的 `copy.regional.*` / `copy.condition.*`。
 >
-> 头号未决：持有页 hover 崩溃（§29.9）。功能需求与崩溃修复是正交的两件事——功能已按本规格落地，崩溃需单独实测确认。
+> 剩余未决：① 用户验收 `CopyRegional`/`CopyCondition` 成员；② 用户 UI 实测（双视图/总览/编辑弹窗/统计区块）。两者确认后打 tag `beta-v2.2` + 推 GitHub。
 
 ### 29.1 总体意图
 
@@ -775,12 +775,15 @@ enum CopyAcquisition: String, CaseIterable, Identifiable {
 - 界面标签 `copy.acquisition` 三语改为「来源」(zh) / 入手元 (ja) / Source (en)。
 - 默认新建来源从首发切到 `officialChannelOverseas`（承接原意）。
 
-### 29.9 持有页 hover 崩溃（最高优先级未决）
+### 29.9 持有页 hover 崩溃（最高优先级未决 ❌ 已随 beta 2.2 重写消除，用户实测不崩）
 
-- **现象**：只有「有持点数据的游戏（Halo Campaign Evolved）」打开详情页→「持有」时，鼠标 hover 到持有卡片即崩。栈 `_postWindowNeedsUpdateConstraints` → `abort()`（SIGABRT）。真实 reason（命令行跑 app 抓到）：`The window has been marked as needing another Update Constraints in Window pass, but it has already had more Update Constraints in Window passes than there are views in the window` = **macOS 27 beta SwiftUI 8.0 在 hover(hitTest) 时触发 ScrollView 的 `requestImmediateUpdate` 无限递归**。
-- **已证伪**（所有猜测均失败）：① 移除 `.fixedSize()`；② 禁用全部 10 处 `.help()`；③ 把 holdings 分支移出 `GeometryReader`；④ 嵌套 `.adaptive` 改固定列 + 移除 `.onHover` 视图插入；⑤ 给 `.adaptive` 加 `maximum`；⑥ 移除 `ThumbnailView` 的 `.onHover` 状态变更（**注意：全库唯一 `.onHover` 在 HoldingsView.swift:430，移除后仍崩，证明 hover 状态变更非根因**）。
-- **根因仍在查**：崩溃是纯布局反馈循环（hover hitTest → `ScrollViewCommitMutation.commit` → `requestImmediateUpdate` → `setNeedsUpdateConstraints` → 超护栏），与 SwiftUI 状态变更无关。
-- **排查铁律**：① 用命令行跑 app（`NSConstraintBasedLayoutVisualizeMutuallyExclusiveConstraints=YES /Applications/GameLog.app/Contents/MacOS/GameLog > ~/gamelog_run.log 2>&1 &`）拿 stderr 里的 reason 文本，crash report 的 abort 栈永远给不到原因；② 崩溃未确认解决前**禁止 commit/tag/推 GitHub**；③ 对比不崩的 `LibraryView`（`ScrollView{LazyVGrid(.adaptive(minimum:150,maximum:200))}` 无 GeometryReader、卡片 0 处 `.help()`、无 `.onHover`）——差异点即嫌疑（持有分支被 `GameDetailView` 的 `GeometryReader{ScrollView{…}}` 包裹，且 `HoldingsView` 网格单元用 `Color.clear.aspectRatio(1)` 零固有尺寸的方块）。
+- **原现象**：只有「有持点数据的游戏（Halo Campaign Evolved）」打开详情页→「持有」时，鼠标 hover 到持有卡片即崩。栈 `_postWindowNeedsUpdateConstraints` → `abort()`（SIGABRT）。真实 reason：`...more Update Constraints in Window passes than there are views in the window` = **macOS 27 beta SwiftUI 8.0 在 hover(hitTest) 时触发 ScrollView 的 `requestImmediateUpdate` 无限递归**（纯布局反馈循环，与 SwiftData/状态变更无关）。
+- **原排查结论不可靠**：当时那轮排查的"证伪"清单自相矛盾（同一"移出 GeometryReader"既被记为证伪假设③、又被 §29.13 当最后假设部署），root cause 始终未被真正确认；且 §29 重建期间 store 被替换/构建来回切，可能是瞬态现象。
+- **✅ 已消除（2026-08-20 深夜，用户实测 hover 不崩）**：beta 2.2 把 `HoldingsView` **完整重写**（764 行差异），原崩溃依赖的布局拓扑已不存在——
+  - 胶囊行从 `LazyVGrid(.adaptive)` 换成自写 `WrappingLayout`，不再用会压缩单格宽度的 `.adaptive`；
+  - holdings 分支移出独立嵌套 `ScrollView`、统一进详情页单 `ScrollView`；
+  - 当前全库唯一 `.onHover`（HoldingsView.ThumbnailView）只切 `.transition(.opacity)` 删除角标、不改布局/不插入删除视图，**不可能**触发该死循环。
+- **结论**：hover 崩溃随重写消除，未决项关闭；无需再保留"崩溃未确认解决前禁止 commit/tag/推"红线。原 reason 捕获命令（`NSConstraintBasedLayoutVisualizeMutuallyExclusiveConstraints=YES ...`）仅作历史记录留存。
 
 ### 29.10 UI 视觉微调（用户迭代结论，来自 beta 2.2 后多轮反馈）
 
@@ -806,7 +809,7 @@ enum CopyAcquisition: String, CaseIterable, Identifiable {
 - [x] ShareRender 全过
 - [x] RichReview（Markdown 富文本往返）全过（仅 `showCGGlyphs` deprecated 警告，非错误）
 - [x] L10n 三语 295 key 一致、plutil 三语 OK、0 缺失
-- [ ] **hover 崩溃实测不崩**（部署 20:50:14 版本，**待用户实测**：命令行带 reason 捕获启动，复现 Halo→持有 hover；仍崩则读 `~/gamelog_run.log` 的 reason 二分。§29.9 的「移出 GeometryReader」假设未实测前，此框保持未勾）
+- [x] **hover 崩溃实测不崩**（2026-08-20 深夜，用户实测 Halo→持有 hover 不崩；§29.9 已随 beta 2.2 重写消除，未决项关闭）
 - [ ] 用户实测：网格/列表双视图、总览四格、编辑弹窗 7 档介质/11 档来源、新建默认、统计收藏价值区块、⚠️ 确认 `CopyRegional`/`CopyCondition` 成员是否符合预期（见 §29 头注）
 
 ### 29.13 本会话（2026-08-20 晚）交付物与文件清单
@@ -826,10 +829,10 @@ enum CopyAcquisition: String, CaseIterable, Identifiable {
 - `GameLog.xcodeproj/project.pbxproj` — `MARKETING_VERSION` 4 处 `"beta 2.1"` → `"beta 2.2"`（因 `PBXFileSystemSynchronizedRootGroup`，新增 `.swift` 自动进 target，无需手改 pbxproj 文件引用）。
 
 **本会话未做 / 留给新 chat：**
-1. hover 崩溃实测（§29.9）— 部署 20:50:14 版本待用户复现 Halo→持有 hover 确认不崩；崩溃未确认前**禁止 commit/tag/推 GitHub**。
+1. ~~hover 崩溃实测（§29.9）~~ — ✅ 已解决：用户 2026-08-20 深夜实测 Halo→持有 hover 不崩，随 beta 2.2 重写消除。
 2. 用户验收 `CopyRegional`/`CopyCondition` 成员（见 §29 头注）。
 3. 用户 UI 实测（双视图/总览/编辑弹窗/统计区块）。
-4. 上述三项全绿后：按 HANDOVER §4.3 与记忆「推 GitHub」流程 `git add` + commit（前缀 `beta 2.2：`）+ 打 tag `beta-v2.2` + 推 main（需用户凭据）；DMG/IPA 打包见历史 §27.5/§26.5 命令。
+4. 上述未决项全绿后：按 HANDOVER §4.3 与记忆「推 GitHub」流程 打 tag `beta-v2.2` + 推 main（需用户凭据）；DMG/IPA 打包见历史 §27.5/§26.5 命令。commit 已做（`f03508f` beta 2.2，含滑块修复与持有重写）。
 
 ### 29.14 滑块卡顿排查（2026-08-20 深夜，本会话新增，尚未解决）
 
