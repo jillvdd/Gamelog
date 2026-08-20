@@ -108,6 +108,11 @@
 "stats.overallRanking" = "総合ランキング";
 "stats.prevPage" = "前へ";
 "stats.nextPage" = "次へ";
+"stats.scoreBoards" = "スコア順";
+"stats.valueBoards" = "価値順";
+"stats.byGameValue" = "ゲーム価値順";
+"stats.byPlatformValue" = "機種価値順";
+"stats.byGroupValue" = "グループ価値順";
 "settings.language" = "表示言語";
 "settings.steamgriddb" = "SteamGridDB";
 "settings.steamGridDBKey" = "API Key";

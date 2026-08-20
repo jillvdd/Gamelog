@@ -108,6 +108,11 @@
 "stats.overallRanking" = "Overall Ranking";
 "stats.prevPage" = "Previous";
 "stats.nextPage" = "Next";
+"stats.scoreBoards" = "Score Boards";
+"stats.valueBoards" = "Value Boards";
+"stats.byGameValue" = "By Game Value";
+"stats.byPlatformValue" = "By Platform Value";
+"stats.byGroupValue" = "By Group Value";
 "settings.language" = "Language";
 "settings.steamgriddb" = "SteamGridDB";
 "settings.steamGridDBKey" = "API Key";
