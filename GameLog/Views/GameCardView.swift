@@ -70,7 +70,7 @@ struct GameCardView: View {
         // 固定 3:4 方格锚点：用 Color.clear 占位确定尺寸，图片 scaledToFill 覆盖裁剪，
         // 避免 Image 自带比例撑高单元格导致与相邻卡片重叠（参见 §4.22 安全图案）。
         Color.clear
-            .aspectRatio(3.0 / 4.0, contentMode: .fit)
+            .aspectRatio(2.0 / 3.0, contentMode: .fit)
             .overlay {
                 if let image = game.coverImage {
                     Image(appImage: image)
