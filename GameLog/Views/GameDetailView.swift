@@ -323,7 +323,8 @@ struct GameDetailView: View {
     @State private var showingDeleteGame = false
     @State private var showingShare = false
     /// 状态机选中值：绑定局部 @State 隔离，避免每次点击时因 game 模型变化导致 Picker 重绘重载。
-    @State private var detailStatus = GameStatus.completed
+    /// 初始值在 init 中取自 game.statusValue，确保首帧即正确（不闪一下「已通关」再滑过去）。
+    @State private var detailStatus: GameStatus
     #if os(macOS)
     @Environment(\.openWindow) private var openWindow
     #else
@@ -345,6 +346,12 @@ struct GameDetailView: View {
         guard detailStatus != game.statusValue else { return }
         game.statusValue = detailStatus
         try? context.save()
+    }
+
+    /// 构造时即把状态滑块初始值设为游戏当前状态，避免首帧先用默认值画「已通关」再弹簧滑过去。
+    init(game: Game) {
+        self.game = game
+        _detailStatus = State(initialValue: game.statusValue)
     }
 
     var body: some View {
