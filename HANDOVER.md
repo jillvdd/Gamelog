@@ -695,9 +695,9 @@ canonical 存储值也改 + 启动一次性迁移 + 保留旧名展示兜底。
 
 ### 29.16 收尾 commit 清单（2026-08-21 上午，new chat 接手后用户走查满意并授权 commit）
 
-> 工作树 14 个 modified 文件（11 源码 + HANDOVER.md + DataSmokeTest，外加接手后新增的 `ExportImport.swift` 平台字段改动）。无 untracked。本地领先远程 1 commit，待打 `beta-v2.3` tag 并推 GitHub（需用户凭据）。
+> 工作树 15 个 modified 文件（含 pbxproj 版本号变更）。无 untracked。本地领先远程 1 commit，待打 `beta-v2.3` tag 并推 GitHub（需用户凭据）。
 
-**commit `beta 2.3：收尾（分享滑块化/排序/iOS补全/分组Markdown/持有胶囊横排/价格估值左右/介质11档/品相重写/地区重写/标签改动/持有平台）`**（14 文件 +505/−242）：
+**commit `beta 2.3：收尾（分享滑块化/排序/iOS补全/分组Markdown/持有胶囊横排/价格估值左右/介质11档/品相重写/地区重写/标签改动/持有平台/版本号2.3）`**（15 文件 +533/−249）：
 - `SharePanelView.swift` + `StatsRankings.swift`：分享面板 `mode`/`size` 两处 `.segmented` Picker 换成 `SegmentSlider`（顶层 `internal` 通用组件）。
 - `LibraryView.swift`：iOS 排序菜单补全 `recentEdit`/`valueDescending`（7 项与 macOS 一致）；排序顺序置顶「最近编辑」。
 - `GroupFooter.swift`：分组评价 `MarkdownReviewView` 渲染；`GroupReviewSection` 编辑按钮 macOS 走 `reviewEditor` 独立窗口、iOS 弹 sheet。
@@ -709,6 +709,7 @@ canonical 存储值也改 + 启动一次性迁移 + 保留旧名展示兜底。
 - `ExportImport.swift`：持有档案 `CopyDTO` 加 `platform`，导出/导入往返。
 - `Scripts/DataSmokeTest/main.swift`：品相 unknown→used 兜底断言；地区兜底 jp 断言；持有平台写入/备份往返断言。
 - `HANDOVER.md`：本 §29.16 收尾清单 + §29 头注刷新。
+- `GameLog.xcodeproj/project.pbxproj`：`MARKETING_VERSION` 4 处 `beta 2.2` → `beta 2.3`。
 
 **验证（提交前已跑，全 PASS）**：macOS/iOS Debug 双平台构建 SUCCEEDED；ScoreMath 15/15；DataSmoke PASSED（含上述新增断言）；ShareRender PASSED；L10n 三语各 307 key、0 缺失、plutil OK。
 
