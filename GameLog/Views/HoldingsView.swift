@@ -344,12 +344,16 @@ private struct CopyGridCellView: View {
                 Spacer()
             }
 
-            // 介质 / 版本区分 / 品相 胶囊。
+            // 介质 / 版本区分 / 品相 / 来源 横排胶囊。
             WrappingLayout(spacing: 8) {
                 capsule(L10n.tr(copy.media.labelKey, lang: language))
                 capsule(L10n.tr(copy.regional.labelKey, lang: language))
                 if copy.hasCondition {
                     capsule(L10n.tr(copy.condition.labelKey, lang: language))
+                }
+                capsule(L10n.tr(copy.acquisition.labelKey, lang: language))
+                if !copy.platform.isEmpty {
+                    platformCapsule(copy.platform, language: language)
                 }
             }
             .padding(.leading, -2)
@@ -424,16 +428,6 @@ private struct CopyGridCellView: View {
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: 8))
-    }
-
-    private func capsule(_ text: String) -> some View {
-        Text(verbatim: text)
-            .font(.system(size: 12))
-            .padding(.horizontal, 12)
-            .padding(.vertical, 5)
-            .background(Capsule().fill(Color.accentColor.opacity(0.12)))
-            .fixedSize()
-            .lineLimit(1)
     }
 
     @ViewBuilder
@@ -600,27 +594,36 @@ private struct CopyCardView: View {
     /// 标签字号 .title3.weight(.semibold)（约 20pt）> 版本名 .headline（约 17pt），弱化标题、突出档案。
     private var archiveInfoSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            archiveRow(label: L10n.tr("copy.media", lang: language),
-                        value: L10n.tr(copy.media.labelKey, lang: language))
-            archiveRow(label: L10n.tr("copy.regional", lang: language),
-                        value: L10n.tr(copy.regional.labelKey, lang: language))
-            if copy.hasCondition {
-                archiveRow(label: L10n.tr("copy.condition", lang: language),
-                            value: L10n.tr(copy.condition.labelKey, lang: language))
+            // 介质 / 版本区分 / 品相 / 来源 横排胶囊（与网格单元格同款）。
+            WrappingLayout(spacing: 8) {
+                capsule(L10n.tr(copy.media.labelKey, lang: language))
+                capsule(L10n.tr(copy.regional.labelKey, lang: language))
+                if copy.hasCondition {
+                    capsule(L10n.tr(copy.condition.labelKey, lang: language))
+                }
+                capsule(L10n.tr(copy.acquisition.labelKey, lang: language))
+                if !copy.platform.isEmpty {
+                    platformCapsule(copy.platform, language: language)
+                }
             }
-            archiveRow(label: L10n.tr("copy.acquisition", lang: language),
-                        value: L10n.tr(copy.acquisition.labelKey, lang: language))
+            .padding(.leading, -2)
             if let date = copy.purchaseDate {
                 archiveRow(label: L10n.tr("copy.purchaseDate", lang: language),
                             value: date.formatted(date: .abbreviated, time: .omitted))
             }
-            if let price = copy.price(for: language) {
-                archiveRow(label: L10n.tr("copy.price", lang: language),
-                            value: PriceFormat.string(price, language: language) ?? "")
-            }
-            if let est = copy.estValue(for: language) {
-                archiveRow(label: L10n.tr("copy.estValue", lang: language),
-                            value: PriceFormat.string(est, language: language) ?? "")
+            // 价格 / 估值 横向左右并列（仅当至少一项存在时显示该行）。
+            if copy.price(for: language) != nil || copy.estValue(for: language) != nil {
+                HStack(alignment: .firstTextBaseline, spacing: 24) {
+                    if let price = copy.price(for: language) {
+                        archiveRow(label: L10n.tr("copy.price", lang: language),
+                                    value: PriceFormat.string(price, language: language) ?? "")
+                    }
+                    if let est = copy.estValue(for: language) {
+                        archiveRow(label: L10n.tr("copy.estValue", lang: language),
+                                    value: PriceFormat.string(est, language: language) ?? "")
+                    }
+                    Spacer()
+                }
             }
             if !copy.notes.isEmpty {
                 VStack(alignment: .leading, spacing: 2) {
@@ -785,6 +788,7 @@ struct CopyEditSheet: View {
     @State private var regional: CopyRegional
     @State private var condition: CopyCondition
     @State private var acquisition: CopyAcquisition
+    @State private var platform: String
     @State private var priceText: String
     @State private var estValueText: String
     @State private var hasPurchaseDate = false
@@ -798,9 +802,10 @@ struct CopyEditSheet: View {
         _version = State(initialValue: copy?.version ?? L10n.tr("copy.versionAuto", [game.copies.count + 1], lang: lang))
         _count = State(initialValue: copy?.count ?? 1)
         _media = State(initialValue: copy?.media ?? .physicalStandard)
-        _regional = State(initialValue: copy?.regional ?? .standard)
-        _condition = State(initialValue: copy?.condition ?? .good)
+        _regional = State(initialValue: copy?.regional ?? .jp)
+        _condition = State(initialValue: copy?.condition ?? .used)
         _acquisition = State(initialValue: copy?.acquisition ?? .officialChannelOverseas)
+        _platform = State(initialValue: (copy?.platform.isEmpty ?? true) ? Presets.platforms[0] : copy!.platform)
         _priceText = State(initialValue: copy?.price(for: lang).map { String(format: "%.0f", $0) } ?? "")
         _estValueText = State(initialValue: copy?.estValue(for: lang).map { String(format: "%.0f", $0) } ?? "")
         _hasPurchaseDate = State(initialValue: copy?.purchaseDate != nil)
@@ -840,7 +845,16 @@ struct CopyEditSheet: View {
                         }
                     }
                 }
-                Section(L10n.tr("copy.media", lang: language)) {
+                Section {
+                    PresetOrCustomPicker(
+                        title: L10n.tr("completion.platform", lang: language),
+                        presets: Presets.platforms,
+                        category: .platform,
+                        collapsible: true,
+                        value: $platform
+                    )
+                }
+                Section {
                     EnumPickerRow(title: L10n.tr("copy.media", lang: language),
                                   cases: CopyMedia.allCases,
                                   selection: $media,
@@ -852,13 +866,13 @@ struct CopyEditSheet: View {
                                       language: language)
                     }
                 }
-                Section(L10n.tr("copy.regional", lang: language)) {
+                Section {
                     EnumPickerRow(title: L10n.tr("copy.regional", lang: language),
                                   cases: CopyRegional.allCases,
                                   selection: $regional,
                                   language: language)
                 }
-                Section(L10n.tr("copy.acquisition", lang: language)) {
+                Section {
                     EnumPickerRow(title: L10n.tr("copy.acquisition", lang: language),
                                   cases: CopyAcquisition.allCases,
                                   selection: $acquisition,
@@ -922,6 +936,7 @@ struct CopyEditSheet: View {
         target.regional = regional
         target.condition = condition
         target.acquisition = acquisition
+        target.platform = platform
         target.setPrice(parsedPrice, for: language)
         target.setEstValue(parsedEst, for: language)
         target.purchaseDate = hasPurchaseDate ? purchaseDate : nil
@@ -968,6 +983,31 @@ struct PhotoPreviewController: UIViewControllerRepresentable {
     }
 }
 #endif
+
+/// 档案属性胶囊（介质 / 版本区分 / 品相 / 来源）：统一横排样式，网格与列表视图共用。
+fileprivate func capsule(_ text: String) -> some View {
+    Text(verbatim: text)
+        .font(.system(size: 12))
+        .padding(.horizontal, 12)
+        .padding(.vertical, 5)
+        .background(Capsule().fill(Color.accentColor.opacity(0.12)))
+        .fixedSize()
+        .lineLimit(1)
+}
+
+/// 平台胶囊（带平台图标），仅当持有档案填了平台时展示。
+fileprivate func platformCapsule(_ platform: String, language: String) -> some View {
+    HStack(spacing: 4) {
+        PlatformIcon(platform: platform, size: 12)
+        Text(verbatim: Presets.display(platform, category: .platform, language: language))
+    }
+    .font(.system(size: 12))
+    .padding(.horizontal, 12)
+    .padding(.vertical, 5)
+    .background(Capsule().fill(Color.accentColor.opacity(0.12)))
+    .fixedSize()
+    .lineLimit(1)
+}
 
 // MARK: - 自写 WrappingLayout（按内容自适应宽度换行，不用 LazyVGrid(.adaptive) 以免截断长标签）
 

@@ -4,11 +4,15 @@ import SwiftData
 #if os(macOS)
 
 /// 共享的评价编辑会话：详情页把当前编辑目标写入 `gameID`，独立窗口据此加载。
-/// 独立窗口是单例场景，切换游戏编辑时靠 `.id(gameID)` 重建内部视图。
+/// 分组编辑写入 `groupID`（单字段 review，无题眼）。独立窗口是单例场景，
+/// 切换编辑目标时靠 `.id(targetID)` 重建内部视图。game / group 互斥，仅一个有效。
 @MainActor
 final class ReviewEditorSession: ObservableObject {
     static let shared = ReviewEditorSession()
     @Published var gameID: PersistentIdentifier?
+    @Published var groupID: PersistentIdentifier?
+    /// 当前编辑目标的 ID（游戏优先），供 `.id()` 重建内部状态。
+    var targetID: PersistentIdentifier? { gameID ?? groupID }
     private init() {}
 }
 
@@ -24,28 +28,43 @@ struct ReviewEditorView: View {
     @StateObject private var controller = ReviewRichTextController()
 
     @State private var game: Game?
+    @State private var group: GameGroup?
     @State private var reviewTitle = ""
 
     var body: some View {
         Group {
             if let game {
                 editorContent(game)
+            } else if let group {
+                editorContent(group)
             } else {
                 ProgressView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .id(session.gameID) // 切换编辑目标时重建内部状态
-        .task(id: session.gameID) { load() }
+        .id(session.targetID) // 切换编辑目标时重建内部状态
+        .task(id: session.targetID) { load() }
         .background(WindowSizer()) // 打开即放大到可用屏幕，营造备忘录式沉浸写作
     }
 
     private func load() {
+        // 分组编辑：单字段 review，无题眼。
+        if let gid = session.groupID,
+           let resolved = context.model(for: gid) as? GameGroup {
+            group = resolved
+            game = nil
+            reviewTitle = ""
+            controller.load(markdown: resolved.review)
+            return
+        }
+        // 游戏编辑（默认路径，不破坏既有行为）。
         guard let id = session.gameID, let resolved = context.model(for: id) as? Game else {
             game = nil
+            group = nil
             return
         }
         game = resolved
+        group = nil
         reviewTitle = resolved.reviewTitle
         controller.load(markdown: resolved.reviewBody)
     }
@@ -74,7 +93,7 @@ struct ReviewEditorView: View {
                 }
                 .keyboardShortcut(.cancelAction)
                 Button(L10n.tr("review.save", lang: language)) {
-                    save(game)
+                    saveCurrent()
                 }
                 .keyboardShortcut("s", modifiers: .command)
                 .buttonStyle(.borderedProminent)
@@ -91,6 +110,49 @@ struct ReviewEditorView: View {
             Divider()
 
             // 大富文本书写区：占满剩余空间，像备忘录一样连续滚动。
+            ReviewRichEditorRepresentable { textView in
+                controller.register(textView)
+            }
+            .padding(.horizontal, 40)
+            .padding(.vertical, 20)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+        .frame(minWidth: 640, minHeight: 480)
+    }
+
+    /// 分组版编辑内容：单字段 review，无题眼输入框。
+    @ViewBuilder
+    private func editorContent(_ group: GameGroup) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // 顶栏：当前分组名 + 保存 / 取消
+            HStack(alignment: .center, spacing: 12) {
+                Text(verbatim: group.name)
+                    .font(.title2.bold())
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Spacer()
+                Button(L10n.tr("common.cancel", lang: language)) {
+                    dismissWindow()
+                }
+                .keyboardShortcut(.cancelAction)
+                Button(L10n.tr("review.save", lang: language)) {
+                    saveCurrent()
+                }
+                .keyboardShortcut("s", modifiers: .command)
+                .buttonStyle(.borderedProminent)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
+
+            Divider()
+
+            // 格式工具条（与游戏版一致）
+            formatToolbar
+                .padding(.vertical, 4)
+
+            Divider()
+
+            // 大富文本书写区
             ReviewRichEditorRepresentable { textView in
                 controller.register(textView)
             }
@@ -154,9 +216,14 @@ struct ReviewEditorView: View {
         .help(help)
     }
 
-    private func save(_ game: Game) {
-        game.reviewTitle = reviewTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-        game.reviewBody = controller.markdown
+    /// 保存当前编辑目标：游戏写回 reviewTitle/reviewBody，分组写回单字段 review。
+    private func saveCurrent() {
+        if let game {
+            game.reviewTitle = reviewTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+            game.reviewBody = controller.markdown
+        } else if let group {
+            group.review = controller.markdown
+        }
         try? context.save()
         dismissWindow()
     }

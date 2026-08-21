@@ -51,6 +51,7 @@ struct CopyDTO: Codable {
     var regionalRaw: String?
     var conditionRaw: String?
     var acquisitionRaw: String?
+    var platform: String?
     var priceZh: Double?
     var priceJa: Double?
     var priceEn: Double?
@@ -123,6 +124,7 @@ enum BackupManager {
                             regionalRaw: copy.regionalRaw,
                             conditionRaw: copy.conditionRaw,
                             acquisitionRaw: copy.acquisitionRaw,
+                            platform: copy.platform.isEmpty ? nil : copy.platform,
                             priceZh: copy.priceZh,
                             priceJa: copy.priceJa,
                             priceEn: copy.priceEn,
@@ -243,6 +245,7 @@ enum BackupManager {
                     copy.regional = CopyRegional.migrate(copyDTO.regionalRaw ?? "")
                     copy.condition = CopyCondition.migrate(copyDTO.conditionRaw ?? "")
                     copy.acquisition = CopyAcquisition.migrate(copyDTO.acquisitionRaw ?? "")
+                    copy.platform = copyDTO.platform ?? ""
                     copy.priceZh = copyDTO.priceZh
                     copy.priceJa = copyDTO.priceJa
                     copy.priceEn = copyDTO.priceEn

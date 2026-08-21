@@ -143,9 +143,14 @@ struct GroupStatsSection: View {
     }
 }
 
-/// 分组视图底部的评价区块：展示分组评价，点「编辑」弹窗修改。
+/// 分组视图底部的评价区块：展示分组评价，点「编辑」修改。
+/// macOS 用与游戏同款的独立写字台窗口（ReviewEditorSession + reviewEditor 窗口）；
+/// iOS 弹出纯文本编辑 sheet（与游戏 iOS 编辑一致）。
 struct GroupReviewSection: View {
     @Environment(\.appLanguageCode) private var language
+    #if os(macOS)
+    @Environment(\.openWindow) private var openWindow
+    #endif
     let group: GameGroup
 
     @State private var showingEditor = false
@@ -157,30 +162,57 @@ struct GroupReviewSection: View {
                     .font(.title3.bold())
                 Spacer()
                 Button {
+                    #if os(macOS)
+                    ReviewEditorSession.shared.groupID = group.persistentModelID
+                    ReviewEditorSession.shared.gameID = nil
+                    openWindow(id: "reviewEditor")
+                    #else
                     showingEditor = true
+                    #endif
                 } label: {
                     Label(L10n.tr("common.edit", lang: language), systemImage: "pencil")
                 }
             }
-            Text(verbatim: group.review.isEmpty ? L10n.tr("group.reviewEmpty", lang: language) : group.review)
-                .font(.callout)
-                .foregroundStyle(.secondary)
-                .textSelection(.enabled)
-                .lineSpacing(4)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(14)
-                .background(
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(Color.semantic(.controlBackground))
-                )
+            if group.review.isEmpty {
+                Text(verbatim: L10n.tr("group.reviewEmpty", lang: language))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(14)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(Color.semantic(.controlBackground))
+                    )
+            } else {
+                MarkdownReviewView(markdown: group.review)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(14)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(Color.semantic(.controlBackground))
+                    )
+            }
         }
         .sheet(isPresented: $showingEditor) {
-            GroupReviewEditSheet(group: group)
+            groupReviewEditSheet
         }
+    }
+
+    /// 分组评价编辑 sheet：仅 iOS 使用（macOS 走独立写字台窗口）。
+    @ViewBuilder
+    private var groupReviewEditSheet: some View {
+        #if os(iOS)
+        GroupReviewEditSheet(group: group)
+        #else
+        EmptyView()
+        #endif
     }
 }
 
-/// 编辑分组评价的弹窗（显式保存）。
+/// iOS 编辑分组评价的 sheet：纯文本 Markdown 输入（与游戏 iOS 编辑一致，无内置预览）。
+/// macOS 走独立写字台窗口（ReviewEditorView），不使用此 sheet。
+#if os(iOS)
 struct GroupReviewEditSheet: View {
     @Environment(\.appLanguageCode) private var language
     @Environment(\.dismiss) private var dismiss
@@ -193,30 +225,27 @@ struct GroupReviewEditSheet: View {
     }
 
     var body: some View {
-        VStack(spacing: 16) {
-            LText("group.reviewEdit")
-                .font(.headline)
-            BorderedTextEditor(text: $text, minHeight: 180)
-                #if os(macOS)
-                .frame(width: 460)
-                #else
-                .frame(maxWidth: .infinity)
-                #endif
-            HStack {
-                Button(L10n.tr("common.cancel", lang: language)) { dismiss() }
-                    .keyboardShortcut(.cancelAction)
-                Button(L10n.tr("common.save", lang: language)) {
-                    group.review = text
-                    dismiss()
+        NavigationStack {
+            VStack(alignment: .leading, spacing: 0) {
+                TextEditor(text: $text)
+                    .font(.body)
+                    .padding(4)
+            }
+            .navigationTitle(L10n.tr("group.reviewEdit", lang: language))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(L10n.tr("common.cancel", lang: language)) { dismiss() }
                 }
-                .keyboardShortcut(.defaultAction)
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(L10n.tr("review.save", lang: language)) {
+                        group.review = text
+                        dismiss()
+                    }
+                    .fontWeight(.semibold)
+                }
             }
         }
-        .padding(24)
-        #if os(macOS)
-        .frame(width: 540)
-        #else
-        .frame(maxWidth: .infinity)
-        #endif
     }
 }
+#endif

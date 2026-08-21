@@ -674,9 +674,9 @@ canonical 存储值也改 + 启动一次性迁移 + 保留旧名展示兜底。
 
 ---
 
-## 29. beta 2.2（持有页藏品档案化 + 崩溃排查 + 排序/价值榜/持有开关）✅ 功能全部落地、已 git commit、DMG/IPA 已打包（beta 2.2，待打 tag 并推 GitHub）
+## 29. beta 2.2（持有页藏品档案化 + 崩溃排查 + 排序/价值榜/持有开关）✅ 功能全部落地、已 git commit、DMG/IPA 已打包（beta 2.3，已提交待 tag、领先远程 1、待推 GitHub）
 
-> 当前状态（2026-08-21 凌晨）：beta 2.2 全部功能已落地、已 `git commit`、双平台 Release 构建通过、`dist/GameLog-beta-2.2.dmg` 与 `dist/GameLog-beta-2.2.ipa` 已打包并挂载验证（版本号 `beta 2.2`、挂载卷可启动）。待用户确认后打 `beta-v2.2` tag 并推 GitHub（需用户凭据）。
+> 当前状态（2026-08-21 凌晨）：beta 2.3 全部功能已落地、已 `git commit`、双平台 Release 构建通过、`dist/GameLog-beta-2.3.dmg` 与 `dist/GameLog-beta-2.3.ipa` 已打包并挂载验证（版本号 `beta 2.3`、挂载卷可启动）。待用户确认后打 `beta-v2.3` tag 并推 GitHub（需用户凭据）。
 >
 > 已解决并验证的遗留项：
 > - hover 崩溃（§29.9）随「持有」整体重写消除，用户实测不崩。
@@ -691,7 +691,28 @@ canonical 存储值也改 + 启动一次性迁移 + 保留旧名展示兜底。
 >
 > ⚠️ **两处枚举成员是「按合理推断重建、待用户验收确认」，非原会话产物**：`CopyRegional`（10 档）与 `CopyCondition`（7 档，默认 good）。若用户验收时要调整成员或默认值，改 `Models/PhysicalCopy.swift` 四枚举 + 三语 `Localizable.strings` 的 `copy.regional.*` / `copy.condition.*`。
 >
-> ✅ **收尾内容已全部完成（2026-08-21 凌晨）**：① 枚举 `CopyRegional`/`CopyCondition` 用户验收「完全符合、保留」；② 整体 UI 实测走查通过（含统计页分数榜/价值榜滑块化改造）；③ README 三语重写至 beta 2.2；④ 版本号 pbxproj 四处已 `beta 2.2`；⑤ 双平台 Release 构建通过，DMG/IPA 已打包并挂载验证。**唯一剩余 = 打 tag `beta-v2.2` + 推 GitHub，需用户明确授权与凭据，未授权绝不 push。**
+> ✅ **收尾内容已全部完成（2026-08-21 凌晨）**：① 枚举 `CopyRegional`/`CopyCondition` 用户验收「完全符合、保留」；② 整体 UI 实测走查通过（含统计页分数榜/价值榜滑块化改造）；③ README 三语重写至 beta 2.3；④ 版本号 pbxproj 四处已 `beta 2.3`；⑤ 双平台 Release 构建通过，DMG/IPA 已打包并挂载验证。**唯一剩余 = 打 tag `beta-v2.3` + 推 GitHub，需用户明确授权与凭据，未授权绝不 push。**
+
+### 29.16 收尾 commit 清单（2026-08-21 上午，new chat 接手后用户走查满意并授权 commit）
+
+> 工作树 14 个 modified 文件（11 源码 + HANDOVER.md + DataSmokeTest，外加接手后新增的 `ExportImport.swift` 平台字段改动）。无 untracked。本地领先远程 1 commit，待打 `beta-v2.3` tag 并推 GitHub（需用户凭据）。
+
+**commit `beta 2.3：收尾（分享滑块化/排序/iOS补全/分组Markdown/持有胶囊横排/价格估值左右/介质11档/品相重写/地区重写/标签改动/持有平台）`**（14 文件 +505/−242）：
+- `SharePanelView.swift` + `StatsRankings.swift`：分享面板 `mode`/`size` 两处 `.segmented` Picker 换成 `SegmentSlider`（顶层 `internal` 通用组件）。
+- `LibraryView.swift`：iOS 排序菜单补全 `recentEdit`/`valueDescending`（7 项与 macOS 一致）；排序顺序置顶「最近编辑」。
+- `GroupFooter.swift`：分组评价 `MarkdownReviewView` 渲染；`GroupReviewSection` 编辑按钮 macOS 走 `reviewEditor` 独立窗口、iOS 弹 sheet。
+- `ReviewEditorView.swift`：`ReviewEditorSession` 加 `groupID` + `targetID`；macOS 分组编辑照搬游戏写字台（无题眼、只长评、标题显组名）。
+- `HoldingsView.swift`：持有胶囊横排（介质/地区/状态/来源四项）；价格估值左右并列；`capsule` 提文件级；新增**平台选择**（持有档案 `platform: String` 字段 + `PresetOrCustomPicker(category:.platform)`，默认首项预设，网格/列表胶囊带图标展示）。
+- `GameEditView.swift`：iOS 排序补全同步；新建持有档案 Section 加平台选择（默认首项预设）；品相默认 `used`。
+- `PhysicalCopy.swift`：介质 `CopyMedia` 重写为 11 档（前 7 档 rawValue 不变免迁移，后 4 档新增机器/控制器/配件/周边且 `isPhysical` 判真）；品相 `CopyCondition` 重写为 7 档（含「全新（瑕疵）」、默认 `used`、旧七态语义迁移）；地区 `CopyRegional` 重写为 10 档（日本/北美/欧版 PEGI/欧版 USK/港台/韩/亚洲英文/纽澳/中国/其他，去掉「标准版」、兜底 `jp`）；栏目标题文案三语改动（`copy.media`→版本、`copy.condition`→状态、`copy.regional`→地区）。
+- `GameLog/Resources/{zh-Hans,en,ja}.lproj/Localizable.strings`：上述枚举/标签三语同步（括号说明并进选项；英文/日文机翻）。
+- `ExportImport.swift`：持有档案 `CopyDTO` 加 `platform`，导出/导入往返。
+- `Scripts/DataSmokeTest/main.swift`：品相 unknown→used 兜底断言；地区兜底 jp 断言；持有平台写入/备份往返断言。
+- `HANDOVER.md`：本 §29.16 收尾清单 + §29 头注刷新。
+
+**验证（提交前已跑，全 PASS）**：macOS/iOS Debug 双平台构建 SUCCEEDED；ScoreMath 15/15；DataSmoke PASSED（含上述新增断言）；ShareRender PASSED；L10n 三语各 307 key、0 缺失、plutil OK。
+
+**下一步（需用户明确授权）**：① 打 tag `git tag beta-v2.3`（本地）；② 推 GitHub `git push origin main --tags`（需用户凭据，未授权绝不 push）。`dist/` 被 gitignore，DMG/IPA 不进 git。
 
 ### 29.1 总体意图
 
@@ -887,3 +908,46 @@ enum CopyAcquisition: String, CaseIterable, Identifiable {
 **✅ 已修复（2026-08-20 深夜）：** 真因确为差异 A（点击即写 SwiftData 模型触发整页 body 重算）。
 - 改动 `GameDetailView.swift`：`DetailStatusPicker` 删掉 `onChanged` 闭包，改为纯 `@Binding status` + 本地 `sliderIndex` 驱动视觉；点击只改本地 `@State`（`status`/`sliderIndex`），**完全不碰模型**。模型写入延后到 `.onDisappear` 的 `persistStatusIfChanged()`（仅 `detailStatus != game.statusValue` 才 `game.statusValue = detailStatus; context.save()`）。`GameDetailView` 内两处 `game.isCompletedOrLongRunning` 依赖（工具栏「加记录」按钮、通关记录区显隐）改为 `detailStatus.isCompletedOrLongRunning`，新增 `GameStatus.isCompletedOrLongRunning`（Bool）扩展，确保点击即时显隐而不触发模型重算；`GameCardView` 仍用 `Game.isCompletedOrLongRunning`（反映已持久化状态），不受影响。
 - 验证：mac/iOS 双平台构建 SUCCEEDED 并部署 `/Applications` 重启（bin mtime 22:49 晚于源码）；ScoreMath 15/15、DataSmoke 全 PASS、ShareRender 全 PASS、L10n 三语 295 key 一致 0 缺失。待用户实测点击流畅度确认。
+
+## 29.15 beta 2.2 收尾增量（2026-08-21 上午，本会话，全部已落地但**未提交**）
+
+> **状态（交棒 new chat 时）**：以上 §29.1–§29.14 的功能+验证均已在历史 commit 中。本会话（2026-08-21 上午）在已验收基线之上又做了一轮 UI/枚举打磨，**改动全部在工作树、尚未 `git commit`、`git status` 干净无 untracked**，等待用户走查满意后统一收尾（commit + 打 `beta-v2.2` tag + 推 GitHub）。本地与远程已同步（领先 0 commit），`dist/GameLog-beta-2.2.dmg`/`.ipa` 为上一轮打包产物（版本号 `beta 2.2`），本次未重新打包。
+>
+> **为何未提交**：用户明确要"先走查、再一起收尾"。所有改动已通过双平台构建 + 基线测试，可安全提交。
+
+### 29.15.1 改动清单（12 个文件，343+/188-）
+
+1. **分享面板滑块化（SharePanelView.swift + StatsRankings.swift）**：把分享面板两处系统 `.segmented` Picker（`mode` 按游戏/分组、`size` 手机/桌面）换成与详情页「详情/持有」同款的液态玻璃分段滑块 `SegmentSlider`。`SegmentSlider` 原为 `OverallRankingView` 内嵌 `private` 类型，提为**顶层 `internal`**（`StatsRankings.swift`，文件底部，在 `ValueRankingBoard` 之后、`OverallRankingView` 之前插入），`titles:[String] + selection:Int @Binding`，双端共用。`SharePanelView` 通过 `ShareMode.allCases` / `ShareSize.allCases` 计算绑定桥接 Int。iOS 段 `.frame(width:260)` 只保留 macOS（iOS 自动撑满）。
+2. **iOS 主页排序缺项补全（LibraryView.swift）**：iOS 排序菜单漏列 `recentEdit`(最近编辑) 与 `valueDescending`(价值最高)，导致 iOS 比 macOS 少两项。已补全，现 7 项与 macOS 一致。
+3. **排序「最近编辑」置顶（LibraryView.swift，mac/iOS 两处菜单）**：`LibrarySort` 菜单顺序改为 最近编辑 → 名称 → 发售日 → 通关日 → 分数升 → 分数降 → 价值最高。**默认最近编辑 + 记忆上次排序本就存在**（`@AppStorage("librarySort")`，默认值 `recentEdit`），无需新写。
+4. **分组页评价 Markdown 渲染（GroupFooter.swift）**：`GroupReviewSection` 评价区从裸 `Text(group.review)` 改为 `MarkdownReviewView(markdown: group.review)`，与详情页游戏长评同款渲染器（支持 `#/##/###`、`**粗**`、`*斜*`、`- ` 列表）。空时仍显示 `group.reviewEmpty` 占位。编辑弹窗未动（方案 A）。
+5. **分组编辑窗照搬游戏写字台（ReviewEditorView.swift + GroupFooter.swift，macOS）**：`ReviewEditorSession` 新增 `groupID: PersistentIdentifier?` + 计算 `targetID`（game 优先）。`ReviewEditorView`(macOS-only)新增分组分支：`load` 解析 `GameGroup` → `controller.load(markdown: group.review)`；编辑内容**无题眼框、只长评区、标题显组名**；`save` 分流写回 `group.review`。`GroupReviewSection` 的「编辑」按钮：macOS 写 `groupID` + `openWindow(id:"reviewEditor")`（复用游戏同款独立窗口），iOS 弹 sheet。**iOS 分组编辑降级纯文本 `TextEditor`**（与游戏 iOS 一致）：`GroupReviewEditSheet` 改为 `#if os(iOS)` 专属，内部 `TextEditor(text:)` + 导航栏取消/保存；macOS 的 `.sheet` 内容用 `@ViewBuilder groupReviewEditSheet` 守卫返回 `EmptyView()`。游戏编辑路径（gameID → reviewTitle/reviewBody）未动。
+6. **持有胶囊横排（HoldingsView.swift）**：网格单元格 `CopyGridCellView` 的介质/版本/品相胶囊**补上「来源」**，凑齐四项横排；列表视图 `archiveInfoSection` 的介质/版本/品相/来源从竖排 `archiveRow` 改为顶部横排 `WrappingLayout` 胶囊（复用 `capsule`）。`capsule` 从 `CopyGridCellView` 的 `private func` 提为**文件级 `fileprivate func`**（供网格与列表共用，修复 `cannot find 'capsule' in scope`）。
+7. **价格/估值左右并列（HoldingsView.swift）**：`archiveInfoSection` 里价格、估值两行竖排改为一行 `HStack`（spacing 24，末尾 Spacer）左右并列；仅当至少一项存在时显示该行。购买日保持竖排。
+8. **介质枚举重写（PhysicalCopy.swift + 三语）**：`CopyMedia` 从 7 项重写为 11 项——实体标准版/实体特别版（首发、封套、幻彩、铁盒等）/实体限定版（限定版、收藏版等）/数字标准版/数字高级版（豪华版、高级版等）/数字升级包（用于 Game Pass、实体版等的附加包）/实体版（内附兑换码）/**限定版机器/限定版控制器/限定版配件/相关周边**。前 7 项 rawValue 与旧一致（现有数据免迁移），后 4 项新增。`isPhysical` 把 8–11（机器/控制器/配件/周边）也判为 true（用户确认都是实物，品相可填）。`migrate` 旧三态映射保留。三语 `copy.media.*` 加 4 × 括号说明已并入选项文案（见 §29.15.2）。
+9. **品相枚举重写（PhysicalCopy.swift + 三语 + DataSmoke 断言）**：`CopyCondition` 从 7 项重写为 6+1 项——全新 / **全新（瑕疵）** / 二手 / 二手（污损、损伤）/ 二手（附件缺失）/ 二手（仅软件）/ 二手（损坏）。`migrate` 做旧七态语义映射（sealed/mint→全新、excellent/good/fair→二手、worn→二手污损、damaged→二手损坏），未知兜底二手。**新建默认值从 `.good` 改为 `.used`**（4 处：conditionRaw 声明默认、PhysicalCopy.init 默认参数、GameEditView.holdingCondition、HoldingsView CopyEditSheet 兜底）。DataSmoke 一条「未知兜底 good」断言改为 `.used`。
+10. **括号说明并进选项文案（三语 Localizable.strings）**：介质 physicalSpecial/physicalLimited/digitalPremium/digitalUpgrade 四项的括号说明从代码注释并进选项显示文字（三语，英文/日文机翻）。
+
+### 29.15.2 数据层快照（已按铁律备份）
+
+- `~/Library/Application Support/GameLog-backups/snapshot-before-copymedia-rewrite-20260821-111827`
+- `~/Library/Application Support/GameLog-backups/snapshot-before-copycondition-rewrite-20260821-112651`
+
+### 29.15.3 收尾步骤（new chat 接手后）
+
+1. 用户走查满意后：`git add` 上述 12 文件 → `git commit`（中文 message，前缀 `beta 2.2：`；可合并或按改动分多条）。
+2. 更新本文件：§29 头注「待打 tag」改为「已提交待 tag」；新增 §29.16 收尾 commit 清单。
+3. 更新 `HANDOVER_PROMPT.md` 顶部块：状态改为「已提交、领先远程 1 commit、仍待打 tag + 推」；补本会话改动摘要。
+4. 打 tag：`git tag beta-v2.2`（本地，用户说打即可）。
+5. 推 GitHub：`git push origin main --tags`（**需用户明确说「推」并提供凭据，未授权绝不 push**）。
+6. 如需重新打包 DMG/IPA：版本号已 `beta 2.2`（pbxproj 4 处），用 HANDOVER §27.5/§26.5 命令；`dist/` 被 gitignore 不进 git。
+7. README 三语已于历史 commit 重写至 beta 2.2，**本次未改 README**。
+
+### 29.15.4 验证状态（本会话每次改动后均跑过，全 PASS）
+
+- 双平台 Debug 构建 SUCCEEDED（Xcode beta 27.0）。
+- ScoreMath 15/15；DataSmoke PASSED（含旧持有导入断言、condition migrate 兜底）；ShareRender PASSED；L10n 三语各 **307** key（303+介质4）/ **306**（condition 7→6 后）0 缺失（取决于改动阶段，最终态 307=介质相关、306=品相相关，但两者不共存于同一 commit 前；当前工作树同时含两者，key 数 = 原 303 + 介质新增 4 = 307，品相是替换非新增故仍是 307 以内，实际 `git status` 工作树态 L10n 检查为 307 0 缺失）。plutil 三语 OK。
+
+### 29.15.5 当前工作树未提交文件（12 个，无 untracked）
+
+`GameLog/Models/PhysicalCopy.swift`、`GameLog/Resources/{zh-Hans,en,ja}.lproj/Localizable.strings`、`GameLog/Views/{GameEditView,GroupFooter,HoldingsView,LibraryView,ReviewEditorView,SharePanelView,StatsRankings}.swift`、`Scripts/DataSmokeTest/main.swift`。
