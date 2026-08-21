@@ -339,8 +339,8 @@ check("来源 migrate: 新值原样", CopyAcquisition.migrate("digitalStore") ==
 check("来源 migrate: 未知兜底 other", CopyAcquisition.migrate("???") == .other)
 
 // 版本区分 / 品相 migrate 兜底
-check("版本区分 migrate: 未知兜底 standard", CopyRegional.migrate("???") == .standard)
-check("品相 migrate: 未知兜底 good", CopyCondition.migrate("???") == .good)
+check("版本区分 migrate: 未知兜底 jp", CopyRegional.migrate("???") == .jp)
+check("品相 migrate: 未知兜底 used", CopyCondition.migrate("???") == .used)
 
 // hasCondition 随 media.isPhysical 联动
 let physC = PhysicalCopy(version: "v", media: .physicalStandard)
@@ -369,6 +369,24 @@ if let legacyCopyGame = (try? context.fetch(FetchDescriptor<Game>()))?.first(whe
     check("旧持有导入: hasCondition 实体为真", legacyCopy.hasCondition)
 } else {
     check("旧持有导入: 解析到游戏与持有", false)
+}
+
+// 持有档案平台字段：写入 / 导出导入往返
+let platGame = Game(name: "持有机平台", reviewTitle: "")
+context.insert(platGame)
+let platCopy = PhysicalCopy(version: "v", platform: "PS5")
+platCopy.game = platGame
+context.insert(platCopy)
+try? context.save()
+check("持有: 平台写入", platCopy.platform == "PS5")
+let platJSON = try BackupManager.encode(games: [platGame], groups: [])
+try BackupManager.decodeAndReplace(platJSON, into: context)
+try context.save()
+if let platImported = (try? context.fetch(FetchDescriptor<Game>()))?.first(where: { $0.name == "持有机平台" }),
+   let platCopy2 = platImported.copies.first {
+    check("持有: 平台备份往返", platCopy2.platform == "PS5")
+} else {
+    check("持有: 平台备份往返", false)
 }
 
 print(failures == 0 ? "DATA SMOKE TEST PASSED" : "DATA SMOKE TEST FAILED: \(failures) failures")

@@ -222,9 +222,10 @@ struct GameEditView: View {
     @State private var holdingVersion = ""
     @State private var holdingCount = 1
     @State private var holdingMedia: CopyMedia = .physicalStandard
-    @State private var holdingRegional: CopyRegional = .standard
-    @State private var holdingCondition: CopyCondition = .good
+    @State private var holdingRegional: CopyRegional = .jp
+    @State private var holdingCondition: CopyCondition = .used
     @State private var holdingAcquisition: CopyAcquisition = .officialChannelOverseas
+    @State private var holdingPlatform = Presets.platforms[0]
     @State private var holdingPriceText = ""
     @State private var holdingEstText = ""
     @State private var holdingHasDate = false
@@ -446,6 +447,13 @@ struct GameEditView: View {
                                       cases: CopyRegional.allCases, selection: $holdingRegional, language: language)
                         EnumPickerRow(title: L10n.tr("copy.acquisition", lang: language),
                                       cases: CopyAcquisition.allCases, selection: $holdingAcquisition, language: language)
+                        PresetOrCustomPicker(
+                            title: L10n.tr("completion.platform", lang: language),
+                            presets: Presets.platforms,
+                            category: .platform,
+                            collapsible: true,
+                            value: $holdingPlatform
+                        )
                         LabeledContent(L10n.tr("copy.price", lang: language)) {
                             BorderedTextField(text: $holdingPriceText, placeholder: "0")
                                 #if os(macOS)
@@ -700,6 +708,7 @@ struct GameEditView: View {
                     regional: holdingRegional,
                     condition: holdingCondition,
                     acquisition: holdingAcquisition,
+                    platform: holdingPlatform.trimmingCharacters(in: .whitespaces),
                     priceZh: language == "zh-Hans" ? Double(trimmedPrice) : nil,
                     priceJa: language == "ja" ? Double(trimmedPrice) : nil,
                     priceEn: language == "en" ? Double(trimmedPrice) : nil,

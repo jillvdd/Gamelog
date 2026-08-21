@@ -258,6 +258,52 @@ struct ValueRankingBoard: View {
     }
 }
 
+/// 通用分段滑块（liquid glass 胶囊 + 内部色块 offset + spring 动画），双端通用。
+/// 与详情页「详情/持有」滑块同款视觉，统计页分数榜/价值榜与分享面板共用。
+struct SegmentSlider: View {
+    let titles: [String]
+    @Binding var selection: Int
+
+    var body: some View {
+        GeometryReader { geo in
+            let cellWidth = geo.size.width / CGFloat(titles.count)
+            ZStack(alignment: .topLeading) {
+                RoundedRectangle(cornerRadius: 9)
+                    .fill(Color.accentColor.opacity(0.18))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 9)
+                            .strokeBorder(Color.accentColor.opacity(0.45), lineWidth: 1)
+                    )
+                    .frame(width: cellWidth, height: geo.size.height)
+                    .offset(x: CGFloat(selection) * cellWidth)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.78), value: selection)
+                HStack(spacing: 0) {
+                    ForEach(Array(titles.enumerated()), id: \.offset) { idx, title in
+                        Button {
+                            guard selection != idx else { return }
+                            selection = idx
+                        } label: {
+                            Text(verbatim: title)
+                                .font(.system(size: 11, weight: .semibold))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.55)
+                                .foregroundStyle(selection == idx ? Color.accentColor : Color.secondary)
+                                .frame(width: cellWidth, height: geo.size.height)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+        .frame(height: 44)
+        .background {
+            RoundedRectangle(cornerRadius: 12)
+                .fill(.thinMaterial)
+        }
+    }
+}
+
 struct OverallRankingView: View {
     @Environment(\.appLanguageCode) private var language
     @AppStorage(UserCustomization.hideToolbarGlassKey) private var hideToolbarGlass = false
@@ -333,51 +379,6 @@ struct OverallRankingView: View {
                 SegmentSlider(titles: boardTitles, selection: $selectedBoard)
             } else {
                 SegmentSlider(titles: valueTitles, selection: $valuePage)
-            }
-        }
-    }
-
-    /// 通用分段滑块（liquid glass 胶囊 + 内部色块 offset + spring 动画），双端通用。
-    private struct SegmentSlider: View {
-        let titles: [String]
-        @Binding var selection: Int
-
-        var body: some View {
-            GeometryReader { geo in
-                let cellWidth = geo.size.width / CGFloat(titles.count)
-                ZStack(alignment: .topLeading) {
-                    RoundedRectangle(cornerRadius: 9)
-                        .fill(Color.accentColor.opacity(0.18))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 9)
-                                .strokeBorder(Color.accentColor.opacity(0.45), lineWidth: 1)
-                        )
-                        .frame(width: cellWidth, height: geo.size.height)
-                        .offset(x: CGFloat(selection) * cellWidth)
-                        .animation(.spring(response: 0.3, dampingFraction: 0.78), value: selection)
-                    HStack(spacing: 0) {
-                        ForEach(Array(titles.enumerated()), id: \.offset) { idx, title in
-                            Button {
-                                guard selection != idx else { return }
-                                selection = idx
-                            } label: {
-                                Text(verbatim: title)
-                                    .font(.system(size: 11, weight: .semibold))
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.55)
-                                    .foregroundStyle(selection == idx ? Color.accentColor : Color.secondary)
-                                    .frame(width: cellWidth, height: geo.size.height)
-                                    .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
-            }
-            .frame(height: 44)
-            .background {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(.thinMaterial)
             }
         }
     }

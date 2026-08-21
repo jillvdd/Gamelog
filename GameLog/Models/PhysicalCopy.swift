@@ -12,15 +12,21 @@ enum CopyMedia: String, CaseIterable, Identifiable, LabelKeyed {
     case physicalLimited   // 实体限定版（限量版、收藏版…）
     case digitalStandard   // 数字标准版
     case digitalPremium    // 数字高级版（高级版、豪华版…）
-    case digitalUpgrade    // 数字升级包（Game Pass、数字版升级…）
+    case digitalUpgrade    // 数字升级包（Game Pass、实体版… 的附加包）
     case physicalCode      // 实体版（内附游戏兑换码）
+    case limitedMachine    // 限定版机器
+    case limitedController // 限定版控制器
+    case limitedAccessory  // 限定版配件
+    case relatedMerch     // 相关周边
     var id: String { rawValue }
     var labelKey: String { "copy.media.\(rawValue)" }
 
-    /// 实体类（光盘 / 卡带 / 兑换码）：true；数字类（标准/高级/升级）：false。
+    /// 实物类（含游戏光盘 / 卡带 / 兑换码，以及限定版机器 / 控制器 / 配件 / 周边）：true；
+    /// 数字类（标准 / 高级 / 升级包）：false。实物才显示「品相」。
     var isPhysical: Bool {
         switch self {
-        case .physicalStandard, .physicalSpecial, .physicalLimited, .physicalCode: true
+        case .physicalStandard, .physicalSpecial, .physicalLimited, .physicalCode,
+             .limitedMachine, .limitedController, .limitedAccessory, .relatedMerch: true
         default: false
         }
     }
@@ -37,42 +43,49 @@ enum CopyMedia: String, CaseIterable, Identifiable, LabelKeyed {
     }
 }
 
-/// 版本区分（10 档）：地区 / 版本维度，与介质正交。
-/// ⚠️ §29 规格未列成员，按合理 zh 优先列表重建，待用户在验收时核对/调整。
+/// 版本区分（地区维度，10 档），与介质正交。
 enum CopyRegional: String, CaseIterable, Identifiable, LabelKeyed {
-    case standard  // 标准版
-    case cn         // 国行
-    case hk         // 港版
-    case tw         // 台版
-    case jp         // 日版
-    case us         // 美版
-    case eu         // 欧版
+    case jp         // 日本（CERO）
+    case us         // 北美（ESRB）
+    case euPegi     // 欧版（PEGI）
+    case euUsk      // 欧版（USK）
+    case hkTw       // 港台版
     case kr         // 韩版
-    case asia       // 亚版
-    case asiaEn     // 亚英版
+    case asiaEn     // 亚洲英文版
+    case anz        // 纽澳版
+    case cn         // 中国版
+    case other      // 其他
     var id: String { rawValue }
     var labelKey: String { "copy.regional.\(rawValue)" }
 
     static func migrate(_ raw: String) -> CopyRegional {
-        CopyRegional(rawValue: raw) ?? .standard
+        CopyRegional(rawValue: raw) ?? .jp
     }
 }
 
 /// 品相（7 档）：仅实体类有意义（`hasCondition = media.isPhysical`）。
 /// ⚠️ §29 规格未列成员，按合理 zh 优先列表重建，待用户在验收时核对/调整。
 enum CopyCondition: String, CaseIterable, Identifiable, LabelKeyed {
-    case sealed    // 全新未拆
-    case mint      // 近全新
-    case excellent  // 极好
-    case good      // 良好
-    case fair      // 一般
-    case worn      // 有使用痕迹
-    case damaged   // 有瑕疵 / 破损
+    case brandNew          // 全新
+    case brandNewFlawed     // 全新（瑕疵）
+    case used              // 二手
+    case usedSoiled        // 二手（污损、损伤）
+    case usedMissingParts  // 二手（附件缺失）
+    case usedSoftwareOnly  // 二手（仅软件）
+    case usedDamaged       // 二手（损坏）
     var id: String { rawValue }
     var labelKey: String { "copy.condition.\(rawValue)" }
 
+    /// 旧七态 → 新六态（保留语义），未知兜底二手。
     static func migrate(_ raw: String) -> CopyCondition {
-        CopyCondition(rawValue: raw) ?? .good
+        if let v = CopyCondition(rawValue: raw) { return v }
+        switch raw {
+        case "sealed", "mint":        return .brandNew
+        case "excellent", "good", "fair": return .used
+        case "worn":                  return .usedSoiled
+        case "damaged":               return .usedDamaged
+        default:                      return .used
+        }
     }
 }
 
@@ -124,11 +137,13 @@ final class PhysicalCopy {
     /// 介质（7 档）。
     var mediaRaw: String = CopyMedia.physicalStandard.rawValue
     /// 版本区分（10 档，地区 / 版本维度，与介质正交）。
-    var regionalRaw: String = CopyRegional.standard.rawValue
+    var regionalRaw: String = CopyRegional.jp.rawValue
     /// 品相（7 档，仅实体类有意义）。
-    var conditionRaw: String = CopyCondition.good.rawValue
+    var conditionRaw: String = CopyCondition.used.rawValue
     /// 来源（11 档）。
     var acquisitionRaw: String = CopyAcquisition.officialChannelOverseas.rawValue
+    /// 平台（canonical 值，如 "PS5"；空 = 未指定，与游戏级平台口径一致）。
+    var platform: String = ""
 
     /// 三语价格各自独立槽位（按当前语言取单一槽位，未填 nil，不跨语言回退）。
     var priceZh: Double?
@@ -145,8 +160,9 @@ final class PhysicalCopy {
     var notes: String = ""
 
     init(version: String, count: Int = 1, images: [Data] = [], createdAt: Date = .now,
-         media: CopyMedia = .physicalStandard, regional: CopyRegional = .standard,
-         condition: CopyCondition = .good, acquisition: CopyAcquisition = .officialChannelOverseas,
+         media: CopyMedia = .physicalStandard, regional: CopyRegional = .jp,
+         condition: CopyCondition = .used, acquisition: CopyAcquisition = .officialChannelOverseas,
+         platform: String = "",
          priceZh: Double? = nil, priceJa: Double? = nil, priceEn: Double? = nil,
          estValueZh: Double? = nil, estValueJa: Double? = nil, estValueEn: Double? = nil,
          purchaseDate: Date? = nil, notes: String = "") {
@@ -159,6 +175,7 @@ final class PhysicalCopy {
         self.regionalRaw = regional.rawValue
         self.conditionRaw = condition.rawValue
         self.acquisitionRaw = acquisition.rawValue
+        self.platform = platform
         self.priceZh = priceZh
         self.priceJa = priceJa
         self.priceEn = priceEn

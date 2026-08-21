@@ -398,6 +398,15 @@ struct LibraryView: View {
             ToolbarItem {
                 Menu {
                     Button {
+                        sortRaw = LibrarySort.recentEdit.rawValue
+                    } label: {
+                        if sortOption == .recentEdit {
+                            Label(L10n.tr("library.sortByRecentEdit", lang: language), systemImage: "checkmark")
+                        } else {
+                            Text(verbatim: L10n.tr("library.sortByRecentEdit", lang: language))
+                        }
+                    }
+                    Button {
                         sortRaw = LibrarySort.name.rawValue
                     } label: {
                         if sortOption == .name {
@@ -440,15 +449,6 @@ struct LibraryView: View {
                             Label(L10n.tr("library.sortByScoreDesc", lang: language), systemImage: "checkmark")
                         } else {
                             Text(verbatim: L10n.tr("library.sortByScoreDesc", lang: language))
-                        }
-                    }
-                    Button {
-                        sortRaw = LibrarySort.recentEdit.rawValue
-                    } label: {
-                        if sortOption == .recentEdit {
-                            Label(L10n.tr("library.sortByRecentEdit", lang: language), systemImage: "checkmark")
-                        } else {
-                            Text(verbatim: L10n.tr("library.sortByRecentEdit", lang: language))
                         }
                     }
                     Button {
@@ -503,6 +503,15 @@ struct LibraryView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Button {
+                        sortRaw = LibrarySort.recentEdit.rawValue
+                    } label: {
+                        if sortOption == .recentEdit {
+                            Label(L10n.tr("library.sortByRecentEdit", lang: language), systemImage: "checkmark")
+                        } else {
+                            Text(verbatim: L10n.tr("library.sortByRecentEdit", lang: language))
+                        }
+                    }
+                    Button {
                         sortRaw = LibrarySort.name.rawValue
                     } label: {
                         if sortOption == .name {
@@ -545,6 +554,15 @@ struct LibraryView: View {
                             Label(L10n.tr("library.sortByScoreDesc", lang: language), systemImage: "checkmark")
                         } else {
                             Text(verbatim: L10n.tr("library.sortByScoreDesc", lang: language))
+                        }
+                    }
+                    Button {
+                        sortRaw = LibrarySort.valueDescending.rawValue
+                    } label: {
+                        if sortOption == .valueDescending {
+                            Label(L10n.tr("library.sortByValueDesc", lang: language), systemImage: "checkmark")
+                        } else {
+                            Text(verbatim: L10n.tr("library.sortByValueDesc", lang: language))
                         }
                     }
                     Divider()

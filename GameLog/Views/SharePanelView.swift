@@ -126,11 +126,13 @@ struct SharePanelView: View {
 
     private var selectionList: some View {
         VStack(spacing: 0) {
-            Picker("", selection: $mode) {
-                Text(verbatim: L10n.tr("share.byGames", lang: language)).tag(ShareMode.games)
-                Text(verbatim: L10n.tr("share.byGroups", lang: language)).tag(ShareMode.groups)
-            }
-            .pickerStyle(.segmented)
+            SegmentSlider(
+                titles: ShareMode.allCases.map { L10n.tr($0 == .games ? "share.byGames" : "share.byGroups", lang: language) },
+                selection: Binding(
+                    get: { ShareMode.allCases.firstIndex(of: mode) ?? 0 },
+                    set: { mode = ShareMode.allCases[$0] }
+                )
+            )
             .padding(10)
 
             BorderedTextField(text: $searchText, placeholder: L10n.tr("library.search", lang: language))
@@ -242,11 +244,13 @@ struct SharePanelView: View {
         Group {
             #if os(macOS)
             HStack(spacing: 20) {
-                Picker(L10n.tr("share.size", lang: language), selection: $size) {
-                    Text(verbatim: L10n.tr("share.phone", lang: language)).tag(ShareSize.phone)
-                    Text(verbatim: L10n.tr("share.desktop", lang: language)).tag(ShareSize.desktop)
-                }
-                .pickerStyle(.segmented)
+                SegmentSlider(
+                    titles: ShareSize.allCases.map { L10n.tr($0 == .phone ? "share.phone" : "share.desktop", lang: language) },
+                    selection: Binding(
+                        get: { ShareSize.allCases.firstIndex(of: size) ?? 0 },
+                        set: { size = ShareSize.allCases[$0] }
+                    )
+                )
                 .frame(width: 260)
 
                 if mode == .groups {
@@ -262,11 +266,13 @@ struct SharePanelView: View {
             }
             #else
             VStack(alignment: .leading, spacing: 12) {
-                Picker(L10n.tr("share.size", lang: language), selection: $size) {
-                    Text(verbatim: L10n.tr("share.phone", lang: language)).tag(ShareSize.phone)
-                    Text(verbatim: L10n.tr("share.desktop", lang: language)).tag(ShareSize.desktop)
-                }
-                .pickerStyle(.segmented)
+                SegmentSlider(
+                    titles: ShareSize.allCases.map { L10n.tr($0 == .phone ? "share.phone" : "share.desktop", lang: language) },
+                    selection: Binding(
+                        get: { ShareSize.allCases.firstIndex(of: size) ?? 0 },
+                        set: { size = ShareSize.allCases[$0] }
+                    )
+                )
 
                 if mode == .groups {
                     BorderedTextField(text: groupTitleBinding, placeholder: L10n.tr("share.groupTitle", lang: language))
