@@ -916,11 +916,12 @@ macOS/iOS Debug 构建、ScoreMath 15/15、DataSmoke（含 §29.11 迁移断言�
 - **行为定案**：开关默认开；防抖 3s；冲突 = 启动弹窗一次 + 设置页常驻全局面板（逐项裁决默认本地）；墓碑永久保留；孤儿图片按缓存语义保留；实验版设三区控制中心（状态/操作/诊断），诊断区放宽显示内部术语（修正案⑥）。
 - **里程碑**：M0 = Phase -1 capability 判定（硬停点）→ M1 = Phase 0 全项目审计（硬停点）→ M2 = 最小垂直切片（评估点）。NOT SUPPORTED = 项目整体停止。
 
-### 31.3 Phase -1 现状（2026-08-22）
+### 31.3 M0 判定（2026-08-23）：NOT SUPPORTED——项目已停止
 
-- 独立复现工程已建于 `~/Documents/GameLogCloudRepro/`（iOS 单 target，bundle id 已用最终值 `com.abcleg.GameLog.cloudexp`，含 iCloud Documents entitlements 与 container 读写最小 UI），模拟器构建验证通过。
-- 待用户执行：Xcode GUI 选 Personal Team 签名 → iPhone/iPad 装机 → 按 SYNC_SPEC 附录 §0.4 清单跨设备验证 → 回报结果出 M0 报告。
-- 环境事实：免费 Personal Team、pbxproj 无 DEVELOPMENT_TEAM、零 entitlements（历史状态）；Mac+iPhone+iPad 三设备同 iCloud 账号，配额 ≥10GB 可用。
+- **终审证据**：Xcode 自动签名拒绝「Personal development teams, including "vallintine jill", do not support the iCloud capability」——免费 Personal Team 被苹果硬性排除在 iCloud capability 之外；eSign 免费签名链路 iPhone 实测 Container/写入/读取全 nil（结构性无 iCloud）；借用付费证书无法取得带 iCloud 的描述文件。
+- **状态**：按 SYNC_SPEC §五条款整体停止（未写任何同步功能代码）。实验分支/目录/双 app/`dist` 产物全部保留未删，等用户在「清零 / 冻结封存 / 自购付费开发者账号后重跑」三选一。
+- **过程产物**（若复活可复用）：复现工程 `~/Documents/GameLogCloudRepro/`；实验版身份接线 commit `16aac02`（深红图标/bundle id `.cloudexp`/store 重定向）；版本序列 exp 0.1.0（tag `cloudexp-v0.1.0`）；dist 双包。
+- **教训**：Phase -1 门禁再次证明价值——半天确认不可行，未浪费任何同步开发；「文档说可行」与「实测能签出权限」是两回事（规范 §208）。
 
 ### 31.4 流程纪律（实验期间）
 
