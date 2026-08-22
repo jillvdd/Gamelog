@@ -176,7 +176,7 @@ struct HoldingsView: View {
                 Button {
                     showingAddVersion = true
                 } label: {
-                    Label(L10n.tr("copy.addArchive", lang: language), systemImage: "plus.circle")
+                    Label(L10n.tr("copy.addShort", lang: language), systemImage: "plus.circle")
                 }
             }
 

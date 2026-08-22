@@ -241,6 +241,7 @@
 "copy.acquisition.other" = "その他";
 "copy.editArchive" = "アーカイブを編集";
 "copy.addArchive" = "所持を追加";
+"copy.addShort" = "追加";
 "copy.media" = "エディション";
 "copy.regional" = "地域";
 "copy.condition" = "状態";

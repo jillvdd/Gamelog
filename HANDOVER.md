@@ -715,6 +715,192 @@ canonical 存储值也改 + 启动一次性迁移 + 保留旧名展示兜底。
 
 **下一步（需用户明确授权）**：① 打 tag `git tag beta-v2.3`（本地）；② 推 GitHub `git push origin main --tags`（需用户凭据，未授权绝不 push）。`dist/` 被 gitignore，DMG/IPA 不进 git。
 
+### 29.17 iOS 真机「导入备份 / 从文件导入」点选文件无反馈（2026-08-22 ✅ 已解决）
+
+> **✅ 最终结论（2026-08-22 夜，用户真机实测确认「终于能用了」）**
+> - **根因 = H5：SwiftUI `.fileImporter` 封装层在 iOS 27 真机上的异常**（present 正常、取消回调正常、唯独点选文件的 `didPickDocumentsAt` 不触发）。**不是**系统 UIDocumentPicker regression（最小 App 真机四 UTI 全成功）、**不是**安全作用域授权、**不是** Info.plist 声明、**不是**分发形态（H7：用户确认两个 App「打包→签名→安装」流程完全相同，变量不在安装方式；此前「最小 App=Xcode Dev 构建」的记录有误）。
+> - **修复 = 方向 1 落地**：新建共享组件 `GameLog/Support/DocumentPicker.swift`（iOS-only，全文件 `#if !os(macOS)`）：`DocumentPicker.present(types:onPicked:onCancel:)` —— 从 keyWindow rootVC 递归找 topMost VC 直接 present 裸 `UIDocumentPickerViewController(forOpeningContentTypes:asCopy:)`，delegate 用静态数组强持有防 ARC 释放，didPick 后 async 把 URL 丢回 SwiftUI 层。两处调用点全部换掉：`SettingsView.importBackup()` iOS 分支（`[.json]`，逻辑收进共享 `importBackupData(from:requestAccess:)`，macOS NSOpenPanel 分支等价复用同一方法）+ `ImageSourcePickerModifier` 的「文件」入口（`[.image]`）。导入读取链路（startAccessing/Data/decodeAndReplace/save）一行未动。
+> - **随附改动（beta 2.3.2，双平台对齐）**：版本号 4 处 → `beta 2.3.2`；AboutView 去 macOS 化（macOS 固定宽 340 不变、iOS 设置页底部新增「关于我的游戏簿」入口 sheet 呈现）；持有页新增按钮文案 `copy.addArchive`→新短 key `copy.addShort`（zh 新增/ja 追加/en Add，sheet 标题仍用原 key）；iOS 导出备份文件名带时间戳 `GameLog-backup-yyyy-MM-dd-HH-mm.json`（与 macOS 同格式）。
+> - **产物**：`dist/GameLog-beta-2.3.2.dmg`（卷名 GameLog beta 2.3.2，挂载验证过）+ `dist/GameLog-beta-2.3.2.ipa`（用户重签装机实测通过）。三语 key 覆盖 0 缺失。
+
+> **本节能让 new chat 直接接手，且不要重蹈覆辙。** 本会话（2026-08-22）针对此问题做了多轮尝试，全部真机实测失败，最终把代码**回退到 HEAD 干净状态**（未提交改动已 `git checkout` 丢弃）。下面把每一轮尝试、现象、排除项、当前推断都记清楚，new chat 不要重复走已否证的路。
+
+================================================================
+【零、本会话最重要的元结论：诊断纪律】
+================================================================
+- 本会话后半段接到了一份非常严格的诊断任务：在把"系统 Bug"当结论前，必须先用**最小复现 App** 隔离变量，且**禁止逻辑跳跃**（例如"模拟器行 + 真机不行 → 苹果 bug"是不成立的）。
+- 执行结果：建立了一个独立的"最小复现 App"（仓库之外），在**模拟器 + 真机**都验证：**Apple 标准 `UIDocumentPickerViewController` 机制本身完全健康（四 UTI 全 DID PICK 成功）**。
+- 因此，**上一会话（及本会话上半段）写的"根因 = iOS 真机 UIDocumentPicker 点文件死"的推断，已被推翻、降级为「已否证」**。最小 App 在真机成功 = 任务要求的 **Case B** → 系统级 regression 假设（H1）被排除，根因必然在 **GameLog 自身环境**。
+- **当前唯一没被干净排除的格子（见 §四 假设树 H7）**：所有 GameLog 的失败都是在 **Adhoc 分发形态（用户自签 IPA）** 下测的，而最小 App 的成功是在 **Xcode Development 构建**下测的。（注：用户能正常安装自签 IPA，变量是"安装/分发形态"而非"能否安装"。）还没人把"GameLog 代码本身"和"Adhoc 分发形态"干净分开。这一步叫"签名对照测试"，是下一步最该做的。
+
+================================================================
+【一、现象（用户真机实测 + app 内诊断日志双重确认）】
+================================================================
+- 【入口 1：设置页「导入备份」`SettingsView.swift:282`】iOS 真机点「导入备份」→ 系统文件选择器打开 → 点 json 备份文件（图标亮、可选中）→ **完全无反馈**：不导入、不关闭选择器、不弹提示、不显示 statusMessage。用户手动取消时才会触发取消回调。
+- 【入口 2：编辑游戏 / 封面 / 收藏照片的「从文件导入」`ImageSourcePicker.swift:105`】真机同样：文件选择器打开 → 点图片文件 → 无反馈、无响应。
+- 【入口 3（对照，正常）：图片来源菜单「从相册导入」「拍照」】真机完全正常，点选/拍摄后正常回调。
+- 【入口 4（对照，正常）：AirDrop /「文件」App 打开方式把 json 发给 GameLog】经 `onOpenURL`（`iOSRootView.importIncomingBackup`，`iOSRootView.swift:55`）真机正常导入。**这条非常关键**：它和失败的入口**共用同一套** `startAccessing` + `Data(contentsOf:)` + `decodeAndReplace` + `context.save` 读取/解码逻辑，却正常工作 → 证明"文件读取/解码"这条链路在真机没问题，真正坏的**只有"应用内 document picker 的点选→回调"这一步**。
+- 【模拟器 iPhone 16 Pro iOS 27.0】入口 1/2 在模拟器全部正常（选 json / 选图片都触发回调并导入成功）。**模拟器不复现真机静默问题。**
+- 【诊断日志（用户从 app 内「导入诊断(调试)」复制，决定性证据）】节选：
+  ```
+  [01:43:07] BUTTON TAPPED import
+  [01:43:07] presentBackupImporter called
+  [01:43:07] top VC class = UIHostingController<...AutoBackupContainer<...iOSRootView...>>
+  [01:43:07] picker presented
+  [01:43:11] delegate WAS CANCELLED
+  ```
+  解读：按钮触发了、方法进了、picker 被 present 了（无抛错）、**点 json 那几秒之间没有任何 delegate 行**、4 秒后用户手动取消才出现 `WAS CANCELLED`（证明 delegate 是活着的、正常的）。→ 选文件回调在真机点文件时不触发，只有「取消」能触发。
+
+================================================================
+【二、已排除 / 已否证的方向（全部试过且真机实测无效，new chat 不要重复走）】
+================================================================
+1. ❌ 安全作用域授权（`fileImporter` 回调加 `startAccessing`/`stopAccessing`，已 commit 为 `251b350`）→ 真机仍静默。不是读盘权限问题（且入口 4 同源代码正常，进一步佐证）。
+2. ❌ 解码/save 抛错被静默吞：模拟器导入同一 json 正常，证明 `BackupManager.decodeAndReplace` + `context.save` 逻辑 OK；且真机日志显示连 `didPick` 都没触发，根本没走到解码。
+3. ❌ json 类型不支持：用户确认 json 图标亮（可选中），排除 `allowedContentTypes` 不匹配。
+4. ❌ SwiftUI `fileImporter` 封装层回调丢失：换成直接 `UIDocumentPickerViewController` + 自建 `UIDocumentPickerDelegate`（强持有 coordinator 到静态数组防 weak 释放）仍静默；取消能触发证明 delegate 存活。（⚠️ 见 §四 H7：此"直接 UIKit 也失败"的尝试是在 Adhoc 构建下测的，未与 Development 签名干净隔离。）
+5. ❌ delegate 随方法退出被释放（weak）：已强持有到静态 `holders` 数组直到回调，仍静默；取消能触发证明 delegate 存活。
+6. ❌ Info.plist 声明 app 是 `public.json` 的 `Owner` + `LSSupportsOpeningDocumentsInPlace=true` 导致真机「原地打开自有文件」语义：已改为 `LSHandlerRank=Alternate`、`LSSupportsOpeningDocumentsInPlace=false`，并解包真机 IPA 用 PlistBuddy 确认改动确实进了 app 的 Info.plist，真机仍静默。否证此假设。
+7. ❌ UTI 选错（`[.json]` / `[.data]` / 想试的 `[.item]`）：`[.json]` 原版静默、`[.data]` 静默；且「从文件导入图片」用 `[.image]` 也静默 → 与具体 UTI 无关。
+8. ❌ 改用 `PHPickerViewController` 选文件：已实装但 iOS 26/27 SDK（`PhotosUI.framework/PHPicker.h`）的 `PHPickerFilter` 只有 `imagesFilter`/`videosFilter`/`livePhotosFilter`/各类视频滤镜，**没有 `.other` / 任意文件筛选**。PHPicker 在 SDK 层面无法选 json。编译失败，已回退。
+
+================================================================
+【三、本会话对代码做过的尝试（均已回退，当前工作树 == HEAD 251b350 干净状态）】
+================================================================
+- 改动 A：删除 iOS 的 `fileImporter` 修饰符，改 `presentBackupImporter()` 用 `UIDocumentPickerViewController(forOpeningContentTypes: [.data])` UIKit 直接 present + 自建 `BackupImportCoordinator`（`UIDocumentPickerDelegate`，静态 `holders` 强持有）+ `BackupImportTrace` 诊断 enum（写 `Documents/backup-import-trace.log`）+ 设置页「导入诊断(调试)」section/sheet（app 内查看/复制日志，不依赖 Files）。→ 真机仍静默 → 回退。（⚠️ Adhoc 构建下测。）
+- 改动 B：Info-iOS.plist `LSHandlerRank` Owner→Alternate、`LSSupportsOpeningDocumentsInPlace` true→false。→ 真机仍静默（且解包确认改动进了 plist）→ 回退。
+- 改动 C：UTI `[.data]`→`[.json]`（回退 A 的 UTI），构建通过但真机未单独验证（已知 `.json` 原版也静默）→ 随整体回退。
+- 改动 D：尝试 `PHPickerViewController`（`PHPickerConfiguration` + `config.filter = .other`）。→ 编译失败（iOS 26 SDK 无 `.other`）→ 回退。
+- 版本号：`MARKETING_VERSION` 4 处曾改 `beta 2.3.1`/`beta 2.3.2`，均已回退回 `beta 2.3`。
+- 临时打过 `dist/GameLog-beta-2.3.1.ipa`（带诊断 UI）、`dist/GameLog-beta-2.3.2.ipa` 半成品（未成功 zip，可忽略）；旧 `dist/GameLog-beta-2.3.ipa` 原封未动。
+- **重要：以上所有"失败"尝试都在 Adhoc 分发形态（用户自签 IPA）下真机实测，从未在 Xcode Development 构建真机下测过 GameLog 自身代码。**（注：用户有自签能力、能正常安装 IPA，这里指的是「Adhoc 分发 vs Development 构建」这个安装形态变量，不是"能否安装"。）
+
+================================================================
+【四、假设树（当前真实状态，2026-08-22 末）】
+================================================================
+H1 = Apple iOS UIDocumentPicker regression            ❌ **已排除**（最小 App 模拟器+真机都成功 = Case B）
+H2 = File Provider / Files.app problem               ⚠️ 未直接相关（入口4 onOpenURL 正常，基本排除）
+H3 = GameLog picker configuration problem            ⬆ 主要怀疑（SettingsView/ImageSourcePicker 的 fileImporter 配置）
+H4 = GameLog presentation hierarchy problem          ⬆ 主要怀疑（picker 挂在 TabView/AutoBackupContainer 的 UIHostingController 下；最小 App 是裸 VC `presentingViewController=nil`）
+H5 = GameLog SwiftUI/UIKit integration problem       ⬆ 主要怀疑（全程 SwiftUI `.fileImporter` 封装层；最小 App 是裸 `present`）
+H6 = Info.plist / document registration problem      ⬆ 待查（GameLog 声明了 `CFBundleDocumentTypes public.json LSHandlerRank=Owner`；最小 App 完全无 document registration）
+H7 = Signing / distribution-specific problem          ⚠️ **唯一未干净排除的格子**：所有 GameLog 失败都在 **Adhoc 分发形态（用户自签 IPA）**下测，最小 App 成功在 **Xcode Development 构建**下测。未在「真机 + Development 构建」下测过 GameLog、也未在「Adhoc 分发」下测过最小 App → "GameLog 代码坏"与"Adhoc 分发形态坏"未分离。（注：用户能正常安装自签 IPA，这里指的是安装/分发形态变量，不是"能否安装"。）机制上签名/分发形态影响 picker 交互很反常（H7 偏弱），但纪律上必须排除。
+
+================================================================
+【五、证据矩阵（务必看这张表，它定义了"已知正常边界"）】
+================================================================
+| 环境 | 构建方式 | 入口 | .json | .image | .data | .item | 取消 |
+|------|---------|------|-------|--------|-------|-------|------|
+| 模拟器 iOS27 | GameLog 自身 | fileImporter | ✅ | ✅ | n/a | n/a | ✅ |
+| 模拟器 iOS27 | 最小 App | 裸 VC present | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 真机 iOS27 | GameLog (Adhoc IPA) | fileImporter | ❌静默 | ❌静默 | ❌静默 | ❌静默 | ✅ |
+| 真机 iOS27 | GameLog (Adhoc IPA) | 上轮裸 UIDocPicker (改动A) | ❌静默 | — | ❌静默 | — | ✅ |
+| 真机 iOS27 | 最小 App (Xcode Dev) | 裸 VC present | ✅ | ✅ | ✅ | ✅ | ✅ |
+| 真机 iOS27 | GameLog (Adhoc IPA) | onOpenURL→importIncomingBackup | ✅(AirDrop) | — | — | — | — |
+
+结论边界：
+- 已知正常 = 模拟器 + 真机最小 App + 全部 4 UTI + 裸 VC present（presentingViewController=nil）。
+- 已知失败 = 真机 GameLog（SwiftUI fileImporter & 上轮裸 UIKit 包装，挂在 `UIHostingController<...AutoBackupContainer<...iOSRootView...>>` 下，Adhoc 分发）。
+- **唯一未填格 = 真机 + GameLog + Xcode Development 签名**（这是下一步该做的"签名对照测试"）。
+
+================================================================
+【六、代码精读：GameLog vs 最小 App 的差异点（逐项列出，供 new chat 隔离）】
+================================================================
+GameLog(iOS) 两处导入入口，全部走 **SwiftUI `.fileImporter`**：
+- `GameLog/Views/SettingsView.swift:282`：`SettingsView`（被放进 `iOSRootView` 的 `TabView` 一个 tab）的 `body` 上挂 `.fileImporter(isPresented: $showingBackupImporter, allowedContentTypes: [.json])`；回调里 `startAccessing` + `Data(contentsOf:)` + `AutoBackup.writeSnapshot` + `decodeAndReplace` + `context.save` + `statusMessage`。
+- `GameLog/Support/ImageSourcePicker.swift:105`：`ImageSourcePickerModifier.body` 链上挂 `.fileImporter(isPresented: $showFileImporter, allowedContentTypes: [.image])`。调用处：设置页头像、编辑游戏封面、持有页照片等（经 `#if !os(macOS)` 守卫）。
+- `GameLog/Views/GameEditView.swift:604`：iOS 分支注释说"用 PhotosPicker / fileImporter"，实际图片导入经 `ImageSourcePicker`（同上）。
+
+iOS 视图层级（自上而下）：
+`GameLogApp`(@main, `GameLogApp.swift:4`) → `WindowGroup` → `AutoBackupContainer { ... iOSRootView() ... }`（`GameLogApp.swift:27-40`）→ `iOSRootView`（`iOSRootView.swift:8`，`TabView` 三 tab：库/统计/设置）→ `SettingsView`。诊断日志里 picker 正是挂在 `UIHostingController<...AutoBackupContainer<...iOSRootView...>>` 下。
+
+最小 App（真机可用，`/Users/abc/Documents/UIDocPickerRepro/`）：`AppDelegate`(@main) + `SceneDelegate`(显式 `cfg.delegateClass`) + `ViewController`(裸 `UIViewController`)，按钮直接 `present(UIDocumentPickerViewController(forOpeningContentTypes:asCopy:))`，self 作 `UIDocumentPickerDelegate`。日志里 `presentingViewController = nil`。
+
+差异清单（任一都可能是 H3/H4/H5 根因）：
+1. **present 方式**：最小 App = 裸 `VC.present`；GameLog = SwiftUI `.fileImporter` 封装（内部如何 present 未知，闭源 SwiftUI）。
+2. **presentation 上下文**：最小 App 无 nav/sheet/tab 嵌套；GameLog 是 `TabView` → `SettingsView` → fileImporter（以及 `ImageSourcePicker` 常出现在 `NavigationStack` 内）。
+3. **document registration**：GameLog `Info-iOS.plist` 声明 `CFBundleDocumentTypes public.json LSHandlerRank=Owner` + `LSSupportsOpeningDocumentsInPlace=true`；最小 App 完全没有。
+4. **分发/签名形态**：最小 App = Xcode Development 构建（用户自签安装）；GameLog 失败都在 Adhoc 分发形态（用户自签 IPA）。变量是安装/分发形态，非"能否安装"（用户能正常装自签 IPA）。
+5. **API 形式上二者一致**：都是 `UIDocumentPickerViewController(forOpeningContentTypes:asCopy:)`，`allowsMultipleSelection=false`，`modalPresentationStyle=2`。
+
+================================================================
+【七、模拟器对照实验（独立最小复现 App，结论 = 对照基线，非根因）】
+================================================================
+- 工程位置：`/Users/abc/Documents/UIDocPickerRepro/GameLogRepro.xcodeproj`（仓库之外，纯 UIKit，无 SwiftUI/SwiftData/GameLog）。四按钮 `.image`/`.json`/`.data`/`.item` + `Clear log` + `Copy log`。
+- **脚手架坑（已修，与导入无关）**：初版 Info.plist 用 `UISceneConfigurations` + `UISceneDelegateClassName="SceneDelegate"` 字符串匹配，iOS 27 下字符串匹配失败 → `SceneDelegate.scene(willConnectTo:)` 不被调用 → scene 不连接 → window 不创建 → **黑屏**；系统日志 `Deactivation reason 10`、`lifecycle.log` 一行没写印证。改为 `AppDelegate.configurationForConnecting` 里 `cfg.delegateClass = SceneDelegate.self` 显式指定后修复（用 sandbox `lifecycle.log` + 纯数值 PNG 像素分析确认：蓝色背景时 1588/2501 蓝像素、还原 UI 后黑色占比<50%，确证已渲染）。
+- 模拟器结果（`iPhone 16 Pro` iOS 27.0，`generic/platform=iOS Simulator`）：**四 UTI 全部 `PICKER PRESENTED` → `DID PICK count=1`**，取消 `DID CANCEL` 也正常。
+- 含义：确认模拟器不是复现环境；把"iOS 27 系统性 regression"嫌疑收窄到仅真机；但不能证明/否证真机根因。
+
+================================================================
+【八、真机最小 App 实测（用户真机 iPhone iOS 27.0，Xcode Development 构建 = Case B 确立）】
+================================================================
+- 用户在**真机**（iPhone, iOS 27.0, 真机 Development 签名）跑同一最小 App：`viewDidLoad OK; device=iPhone iOS=27.0`。结果：**四 UTI 全部 `PICKER PRESENTED` → `DID PICK count=1`**（`.item`→`...-Inbox/GameLogRepro-1.0.ipa`、`.data`→同、`.json`→`...-Inbox/GameLog-backup-2026-08-21-14-47.json`、`.image`→`...-Inbox/pixel_art_large%202.png`），后四组取消 `DID CANCEL` 正常。
+- **Case B 确立 → H1 系统 regression 排除**：Apple 标准 `UIDocumentPickerViewController(forOpeningContentTypes:asCopy:)` + 裸 VC `present` + self 作 delegate，在模拟器**和**真机 iOS 27 都健康。
+- **翻转**：推翻上一会话"根因=UIDocumentPicker 真机点文件死"推断（已否证）。根因必然在 **GameLog 自身环境**。
+- ⚠️ **但 H7 未排除**：此最小 App 成功是在 Xcode Dev 签名下；GameLog 全部失败在 Adhoc 下。二者签名变量未隔离。
+
+================================================================
+【九、候选修复方向（new chat 评估，均未实装/未验证；注意原"方向A最站得住"已失据）】
+================================================================
+- ⚠️ **原 §29.17 把"方向 A = 放弃 UIDocumentPicker、改引导走 onOpenURL"列为最站得住的推荐修复；在 Case B 证据下，该方案的根基（"UIDocumentPicker 真机死"）已被推翻，故降级为"兜底选项"，不应再优先实施。** 最小 App 证明 UIDocumentPicker 在真机能用，应优先在 GameLog 内复现"能用"的最小形态，再定位 GameLog 哪一层把它搞死，而非绕开它。
+- **方向 1（推荐，针对性）**：把 GameLog 两处 `.fileImporter` 换成"与最小 App 同构"的纯 UIKit 调用——从最上层 VC `present(UIDocumentPickerViewController(forOpeningContentTypes:asCopy:true))`，delegate 强持有（静态数组），回调把 URL 经 closure 丢回 SwiftUI。这一招若让真机成功 → 确认是 H5（SwiftUI fileImporter 封装层）。设计骨架已备：
+  ```swift
+  func presentDocumentPicker(types: [UTType], onPicked: @escaping (URL) -> Void) {
+      guard let root = UIApplication.shared.connectedScenes
+              .compactMap({ $0 as? UIWindowScene }).first?.windows.first?.rootViewController?
+              .topMostViewController() else { return }
+      let picker = UIDocumentPickerViewController(forOpeningContentTypes: types, asCopy: true)
+      let coordinator = PickerCoordinator(picker: picker, onPicked: onPicked)
+      picker.delegate = coordinator
+      PresentHolders.add(coordinator)            // 静态强持有，防 ARC 释放
+      root.present(picker, animated: true)
+  }
+  ```
+- **方向 2（签名对照，优先于改代码）**：先用 Xcode Development 签名在真机跑**当前 GameLog 自身**（不改一行代码）测「导入备份」点 json。若成功 → 根因 H7（Adhoc 分发），修分发/entitlements 即可，导入代码不动；若仍失败 → 落实 H3/H4/H5，走方向 1。
+- **方向 3（兜底，仅当 H1 被重新证实才考虑）**：引导走 `onOpenURL`（onOpenURL 已验证真机正常）。代价：导入变"两步"（出 app 去文件 App 共享）。
+- **已被堵死的方案（不要走）**：`importsUnorganizedFileTypes:true`（beta27 SDK 不存在，导致 `Result<URL>`→`Result<[URL]>` 编译失败）；`PHPickerViewController` 选文件（iOS 26 SDK 的 `PHPickerFilter` 无 `.other`，无法筛 json）。
+
+================================================================
+【十、下一步（未做，等 new chat/用户决策）】
+================================================================
+**优先级最高（1 分钟，决定性）**：用户用 Xcode 打开 `GameLog.xcodeproj` → 选真机 → **Run（GameLog 自身，Xcode Development 签名）** → 测设置页「导入备份」点 json。
+- 成功 → H7（签名/分发）确诊，修分发，导入代码不动。
+- 失败 → H3/H4/H5，落实"方向 1"把两处 `.fileImporter` 换成与最小 App 同构的裸 `UIDocumentPickerViewController` present。
+（可选补刀：把最小 App 用用户 team 证书重签成 Adhoc 装一次测，能彻底关掉 H7；但 GameLog 经 Xcode Dev 测这一条已足够分叉。）
+
+**次优先级（若 GameLog Dev 测仍失败）**：在 GameLog 内加"同构 diagnostic screen"（纯 UIKit、裸 VC、只打日志不读 JSON），直接从 `SettingsView`/`iOSRootView` present（不经 SwiftUI sheet）。成功→H5；失败→H4/H6/H7。
+
+================================================================
+【十一、相关文件与行号（入手点）】
+================================================================
+- `GameLog/Views/SettingsView.swift`：iOS「导入备份」按钮（~行 207，设 `showingBackupImporter = true`）→ `.fileImporter(isPresented: $showingBackupImporter, allowedContentTypes: [.json])`（~行 282，当前 HEAD 原始 SwiftUI fileImporter）→ 回调 `startAccessing`/`Data(contentsOf:)`/`AutoBackup.writeSnapshot`/`decodeAndReplace`/`context.save`/`statusMessage`。「从自动备份恢复」按钮（~行 196）→ `restoreFromAutoBackup()`（读沙盒 `Documents/Backups`，不涉及真机问题）。
+- `GameLog/Views/iOSRootView.swift`：`onOpenURL` → `importIncomingBackup()`（~行 55，**真机工作正常** —— 对标参照，证明 `startAccessing` 写法没错，问题在 document picker 的呈现/交互）；整个 iOS 入口是 `TabView` 三 tab（~行 19）。
+- `GameLog/GameLogApp.swift`：`@main`（~行 4）→ `WindowGroup` → `AutoBackupContainer { iOSRootView() }`（~行 27-40）。诊断日志里 picker 挂的 `UIHostingController<...AutoBackupContainer<...iOSRootView...>>` 即源于此。
+- `GameLog/Support/AutoBackup.swift`：`AutoBackupContainer`（~行 279，包在 WindowGroup 最外层）、`restoreFromAutoBackup()`、`writeSnapshot()`、`backupDir`/`backupFileURL`（iOS=`Documents/Backups`）。
+- `GameLog/Support/ExportImport.swift`：`decodeAndReplace()`（逻辑已验证 OK）、`encode()`。
+- `GameLog/Support/ImageSourcePicker.swift`：图片 `fileImporter`（`[.image]`，~行 105，真机同样静默）、`PhotosPicker`（相册，正常）、`UIImagePickerController`（拍照，正常）。
+- `GameLog/Resources/Info-iOS.plist`：`CFBundleDocumentTypes` 声明 `public.json`（`LSHandlerRank` 当前 HEAD 是 `Owner`，排查时曾被改 `Alternate`，已回退）；`LSSupportsOpeningDocumentsInPlace`（HEAD 是 `true`，排查时曾被改 `false`，已回退）；`UIFileSharingEnabled=true`（已验证进真机 plist，但 adhoc 安装下 Files 不显示文件夹）。
+- 封面/照片「从文件导入」入口散落于 `GameEditView.swift` / `HoldingsView.swift` / `GameDetailView.swift` 的 `fileImporter`（同样走 document picker，真机死；若走方向 1，这些入口也要一并换）。
+
+================================================================
+【十二、最小复现工程（独立，不在 GameLog 仓库）】
+================================================================
+- 路径：`/Users/abc/Documents/UIDocPickerRepro/GameLogRepro.xcodeproj`（及 `GameLogRepro/` 源、`dist/GameLogRepro-1.0.ipa`）。
+- 签名：工程已设 `CODE_SIGN_STYLE = Automatic`，用户 Xcode Run 选 team 即可。⚠️ **注意区分**：本「终端构建机」本身 `security find-identity` 显示 0 有效签名身份，所以**我（终端/Claude）从命令行打的** `dist/GameLogRepro-1.0.ipa` 是 `TeamIdentifier=not set` 的纯自签，**只有这台构建机自己信任、用户手机装不上**——这是构建机的限制，不是用户的限制。用户**自己有自签能力**（repro 真机就是用户自行装好测的，之前打不开纯粹是 scene 黑屏代码 bug，已修）。所以：终端打的 IPA 仅供存档/对照；真机实测请用**用户自己的 Xcode Run（Development 签名）/或用户用自己的证书重签后的 IPA**——这完全能装。
+- ⚠️ dist IPA 曾旧（含黑屏 bug），已于 2026-08-22 15:31 用修复后源码重打包，内嵌 Info.plist 已无 `UISceneConfigurations`（黑屏修复已进包）。
+
+================================================================
+【十三、验证闭环（铁律）】
+================================================================
+- 改完 iOS 构建 → 真机实测。模拟器只验证编译能跑，**真机 document picker 问题模拟器复现不了，必须以真机实测为准**。
+- 真机构建命令见 §三（iOS 真机 device 构建 + Payload zip 打包）。
+- 真机读日志：可用 Xcode console；或最小 App 的屏幕日志 + `Copy log` 按钮（纯文字，不需连 Xcode、不需 Files）。GameLog 自身的「导入诊断(调试)」section 已随回退移除，要再看需重新加。
+
+================================================================
+【十四、收尾状态（2026-08-22 ✅ 问题已解决）】
+================================================================
+- **已解决**：根因 H5（SwiftUI fileImporter 封装层真机异常），修复=DocumentPicker.swift 组件替换两处调用，用户真机实测通过。详见本节顶部「最终结论」。
+- 历史排查记录（本节【零】~【十三】）保留作档案：最小复现工程 `/Users/abc/Documents/UIDocPickerRepro/` 留存；「改动 A~D 已回退」指更早一轮的尝试（251b350 之前），本轮最终落地的 DocumentPicker 方案是全新实现并已随 beta 2.3.2 提交。
+- beta 2.3.2 产物：`dist/GameLog-beta-2.3.2.dmg` + `dist/GameLog-beta-2.3.2.ipa`（dist 被 gitignore 不进 git）。
 ### 29.1 总体意图
 
 把详情页「持有」页签从「版本名 + 数量 + 照片」的简单列表，升级成**藏品档案（collection archive）**：记录每一份实体的介质、版本区分、品相、来源、地区、价格与估值，并支持网格/列表双视图、顶部总览、统计收藏价值。

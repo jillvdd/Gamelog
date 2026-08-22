@@ -31,7 +31,7 @@ extension View {
 }
 
 #if !os(macOS)
-/// iOS 图片来源选择实现：底部菜单 + 相册（PhotosPicker）/ 文件（fileImporter）/ 拍照（相机）。
+/// iOS 图片来源选择实现：底部菜单 + 相册（PhotosPicker）/ 文件（DocumentPicker）/ 拍照（相机）。
 private struct ImageSourcePickerModifier: ViewModifier {
     @Binding var isPresented: Bool
     var maxSelectionCount: Int
@@ -46,7 +46,6 @@ private struct ImageSourcePickerModifier: ViewModifier {
     @State private var pendingSource: Source?
     @State private var pickerItems: [PhotosPickerItem] = []
     @State private var showPhotosPicker = false
-    @State private var showFileImporter = false
     @State private var showCamera = false
     /// 相机不可用时点「拍照」的提示开关。
     @State private var showingNoCamera = false
@@ -69,7 +68,13 @@ private struct ImageSourcePickerModifier: ViewModifier {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
                     switch source {
                     case .photos: showPhotosPicker = true
-                    case .file: showFileImporter = true
+                    case .file:
+                        // 裸 UIDocumentPickerViewController（DocumentPicker），不走 SwiftUI fileImporter。
+                        DocumentPicker.present(types: [.image]) { url in
+                            if let data = try? Data(contentsOf: url) {
+                                self.onImages([data])
+                            }
+                        }
                     case .camera:
                         if cameraAvailable {
                             showCamera = true
@@ -100,11 +105,6 @@ private struct ImageSourcePickerModifier: ViewModifier {
                     if !datas.isEmpty {
                         onImages(datas)
                     }
-                }
-            }
-            .fileImporter(isPresented: $showFileImporter, allowedContentTypes: [.image]) { result in
-                if case .success(let url) = result, let data = try? Data(contentsOf: url) {
-                    onImages([data])
                 }
             }
             .fullScreenCover(isPresented: $showCamera) {

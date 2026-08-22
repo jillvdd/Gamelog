@@ -241,6 +241,7 @@
 "copy.acquisition.other" = "其他";
 "copy.editArchive" = "编辑藏品档案";
 "copy.addArchive" = "新增持有档案";
+"copy.addShort" = "新增";
 "copy.media" = "版本";
 "copy.regional" = "地区";
 "copy.condition" = "状态";
