@@ -1,14 +1,12 @@
 # GameLog 交接日志（HANDOVER）
 
-> 更新：2026-08-20（beta 2.1 = 评价区 Markdown 长评 + WYSIWYG 编辑 + 分端编辑，本轮提交）
-> 状态：**beta 2.1 = macOS + iOS 双平台**（macOS 14.0 / iOS 18.0）。macOS + iOS Debug/Release 构建、ScoreMath/DataSmoke/ShareRender/RichReview、L10n 三语全绿。**本轮已提交**；**未打 tag、未推 GitHub**。详见 §27。
+> 更新：2026-08-22（beta 2.3.2 = iOS 导入修复 + 关于页双平台 + 持有新增按钮短文案 + iOS 导出带时间戳）
+> 状态：**beta 2.3.2 = macOS + iOS 双平台**（macOS 14.0 / iOS 18.0）。双平台 Debug/Release 构建、基线测试、L10n 三语全绿。已 commit（`a06f914`）+ 本地 tag `beta-v2.3.2`；`dist/GameLog-beta-2.3.2.dmg/.ipa` 已打包，iOS 包用户真机实测导入正常。未推 GitHub。最新详情见 §29.16–§29.17。
 > 环境：macOS 27 beta 只能用 **Xcode beta**（`/Users/abc/Downloads/Xcode-beta.app`），iOS 构建/运行一律用它。
 
 ## 1. 一句话现状
 
-`GameLog.xcodeproj`（macOS + iOS，SwiftUI + SwiftData，纯本地，三语 zh-Hans / ja / en 即时切换）能完整构建并运行。**beta 2.1 已提交**：评价区优化——一句话评价（tagline）改作长评正文前的大号引言「题眼」；长评正文升级为 **Markdown 子集**（`#` 标题 / `**` 加粗 / `*` 斜体 / `-` 列表）；**macOS = 富文本所见即所得编辑器**（独立「写字台」窗口 + 工具条，中文斜体合成倾斜）；**iOS = 编辑 sheet（TextEditor + 预览）**；共享一份 Markdown 渲染、分端编辑、双端观感一致。同时把「隐藏上方毛玻璃 → 隐藏顶栏标题」联动扩展到游戏详情 / 统计 / 整体排名页，并顺手修复全局统计与分组统计「按平台分布」的排序稳定性与条形不等宽问题。beta 2.0 的自动备份 + 清缓存延续。**部署目标 macOS 14.0 / iOS 18.0**。DMG `dist/GameLog-beta-2.1.dmg`、IPA `dist/GameLog-beta-2.1.ipa` 已打包验证。GitHub 未推（tag 未打）。
-
-版本号 `"beta 2.1"`（pbxproj 4 处：macOS/iOS 各 Debug/Release）。工作区干净（HANDOVER 文档与 dist/ 产物被 gitignore，不跟踪）。
+`GameLog.xcodeproj`（macOS + iOS，SwiftUI + SwiftData，纯本地，三语 zh-Hans / ja / en 即时切换）能完整构建并运行。当前版本 **beta 2.3.2**：beta 2.2 把「持有」页升级为藏品档案（介质 11 档/地区 10 档/品相 7 档/来源 11 档 + 三语价格隔离 + 网格/列表双视图 + 价值榜）；beta 2.3 收尾（分享/统计滑块化、排序补全、分组评价 Markdown、持有胶囊横排）；beta 2.3.2 修复 iOS 真机「导入备份/从文件导入」点选无反馈（根因 = SwiftUI `.fileImporter` 封装层真机异常，改用自建裸 `UIDocumentPickerViewController` 组件 `Support/DocumentPicker.swift`，详见 §29.17）+ iOS 设置页关于入口 + 持有新增按钮短文案 + iOS 导出文件名带时间戳。版本号 `"beta 2.3.2"`（pbxproj 4 处）。工作区干净（HANDOVER 文档与 dist/ 产物被 gitignore）。
 
 ## 2. 构建 / 运行 / 测试命令
 
@@ -124,8 +122,6 @@ $DEVELOPER_DIR/usr/bin/simctl launch <UDID> com.abcleg.GameLog
 
 ### 4.3 其他本会话事项
 
-- **tag 命名二套未决**：本地 `beta-1.0/1.1`（未推）与 `beta-v1.0/v1.1`（已推远程）并存；是否删除本地无 v 版 / 统一命名未定（见 §9）。
-- **工作流偏好已存记忆**：每次改完构建后自动重启 app（命令见 §2）。
 - **未来功能调研**：自动填发售日期——SteamGridDB **不返回发售日期**；Steam 官方无 key 接口实测可行（见 §9）。
 
 ### 4.4 评分六维体系（功能③）
@@ -177,7 +173,7 @@ $DEVELOPER_DIR/usr/bin/simctl launch <UDID> com.abcleg.GameLog
 14. **平台显示排序唯一源是 `Presets.ordered(_:)`**（beta 1.4 抽取）：预设按 `Presets.platforms` 世代倒序、预设外自定义按 canonical 字典序排最后。各 View 直接用，别重新 `.sorted()`。
 15. **`@Query` 不监听实体关系属性变化**；要关系实时变化直接访问 @Model 对象关系属性。
 16. **`NSWorkspace.icon(for: URL)` 在 macOS 26 SDK 不存在**；取 app 图标用 `icon(forFile: Bundle.main.bundlePath)`。
-17. **版本号在 pbxproj `MARKETING_VERSION`**（macOS/iOS 各 Debug/Release，共 4 处），现值 `"beta 2.1"`。部署目标 `MACOSX_DEPLOYMENT_TARGET` 也是两处，现值 `14.0`（iOS 为 `IPHONEOS_DEPLOYMENT_TARGET`，现值 `18.0`）。
+17. **版本号在 pbxproj `MARKETING_VERSION`**（macOS/iOS 各 Debug/Release，共 4 处），现值 `"beta 2.3.2"`。部署目标 `MACOSX_DEPLOYMENT_TARGET` 也是两处，现值 `14.0`（iOS 为 `IPHONEOS_DEPLOYMENT_TARGET`，现值 `18.0`）。
 18. **macOS app 图标：`INFOPLIST_KEY_CFBundleIconFile` 不被 Xcode 的 `GENERATE_INFOPLIST_FILE` 注入支持**。必须用 asset catalog + pbxproj 设 `ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;`。
 19. **`some Shape` 的 switch 分支不能返回不同类型**；`any Shape` 又不能对存在性类型调 `.fill`/`.stroke`（macOS 26 existential-member-access-limitations）→ 用 **`AnyShape`** 包装。
 20. **Form 里给行加说明文字用 `LabeledContent(label) { ... }`**，左右布局符合 macOS 惯例。
@@ -256,7 +252,7 @@ $DEVELOPER_DIR/usr/bin/simctl launch <UDID> com.abcleg.GameLog
 
 ## 9. 若后续接手
 
-- **当前最重要的下一步**：① **beta 1.9 已提交**（状态机 + 全局毛玻璃 + 图标尺寸，见 §25）；② **iOS 真机 iPhone 16 Pro 实测未完成**（拍照/相机、AirDrop 备份导入、QLPreviewController、PhotosPicker、TabBar 全流程——只有真机能完整验证）；③ **问用户是否推 GitHub**：main 领先远程多次提交，**本轮未打 tag**。要推：`git push origin main`（若要打 tag：`git tag beta-v1.9 && git push origin beta-v1.9`，远程 tag 命名是 `beta-v1.x` 格式）。⚠️ push 因 HTTPS 无交互凭据失败（`could not read Username`），需用户执行 push 时输入凭据或先 `gh auth login`/配置凭据。
+- **当前状态（2026-08-22）**：beta 2.3.2 已 commit + 本地 tag，`dist/` 双端包已出、iOS 导入真机实测通过。**待用户明确说推才 push**（`git push origin main --tags`；历史因 HTTPS 无交互凭据失败过，需用户提供凭据或 `gh auth login`）。iOS 真机全流程（拍照/AirDrop 导入/QLPreviewController/PhotosPicker/TabBar）中 AirDrop 导入已实测 ✅（§29.17），其余项仍只在模拟器验证过。
 - **数据迁移注意（2026-08-17 事件，务必读）**：某次构建后 app 显示空库（UserDefaults 的 SteamGridDB key 还在），用户通过导入旧备份恢复。**已用独立 swiftc 测试验证：旧 schema store（无 ZSTATUS/ZPLATFORM 列）→ 新 schema 的轻量迁移是成功的**（29 条数据 + 新增列正确）；所以不能简单归因于「schema 不兼容」。排查发现 app 正在用的 `~/Library/Application Support/default.store` 文件 birthtime 是 2026-08-13 22:09（beta 1.8 导入测试那晚），即真实 store 曾被替换/清空，原始数据只存在于备份快照里。**教训：涉及数据层/导入测试前，先把 store 拷到 `~/Library/Application Support/GameLog-backups/` 留快照；任何「数据不见了」先按 §25.5 排查 store 文件、对照备份 JSON，别急着怀疑迁移代码。** 用户已确认本轮修复后迁移/读取正常。
 - **下次发版流程**：改 pbxproj `MARKETING_VERSION` 四处（macOS/iOS 各 Debug/Release）→ Release 构建 → `dist/` 出 DMG：暂存 `GameLog.app` + `ln -s /Applications Applications` → `hdiutil create -volname "GameLog beta X" -srcfolder <staging> -ov -format UDZO dist/GameLog-beta-X.dmg`。IPA：iOS Release 构建 → Payload/codesign/zip（现行做法见 §八）→ 验证 arm64/Info.plist/AppIcon。改完跑一遍 §2 基线。**commit 后自动打 tag `beta-vX.Y[.Z]`（本地；v 前缀是既定命名规则，Claude 无需询问直接打）。push 远程仍需用户明确授权。**
 - **发布验证套路**：挂载 DMG 检查卷结构/版本号、`NSWorkspace.icon(forFile:)` 确认图标（正确=封面黄 251,221,3）、从挂载卷启动一次。
@@ -350,14 +346,13 @@ canonical 存储值也改 + 启动一次性迁移 + 保留旧名展示兜底。
 
 ## 17. beta 1.3 发布记录（2026-08-13）
 
-- **commit** `6c2bbc4`「beta 1.3：分组统计/分享 + 排行榜 + 平台改名 + None + 0.1 舍入 + 多语言名」（28 文件，+1602/−267）；**tag** `beta-v1.3`（本地，未推）；**DMG** `dist/GameLog-beta-1.3.dmg`。
+- **commit** `6c2bbc4`「beta 1.3：分组统计/分享 + 排行榜 + 平台改名 + None + 0.1 舍入 + 多语言名」（28 文件，+1602/−267）；**tag** `beta-v1.3`；**DMG** `dist/GameLog-beta-1.3.dmg`。
 - 版本号 `"beta 1.3"`（pbxproj Debug/Release 两处）。
 - **发布验证已过**：Debug/Release 构建 exit 0；ScoreMath 15/15、DataSmoke、ShareRender 全过；L10n 三语 0 缺失；DMG 挂载卷结构、版本号、图标采样封面黄、从挂载卷启动成功；已恢复 Debug app 运行。
-- **GitHub 未推**：main 领先远程三次提交，tag `beta-v1.3` 本地未推。
 
 ## 18. beta 1.4 发布记录（2026-08-13）
 
-- **commit** `5d14580`「beta 1.4：侧边栏平台区 + 分组选择游戏 + 平台筛选重构 + 全屏毛玻璃修复 + 隐藏毛玻璃开关」；**tag** `beta-v1.4`（本地，未推）；**DMG** `dist/GameLog-beta-1.4.dmg`。
+- **commit** `5d14580`「beta 1.4：侧边栏平台区 + 分组选择游戏 + 平台筛选重构 + 全屏毛玻璃修复 + 隐藏毛玻璃开关」；**tag** `beta-v1.4`；**DMG** `dist/GameLog-beta-1.4.dmg`。
 - 版本号 `"beta 1.4"`（pbxproj Debug/Release 两处）；部署目标保持 **macOS 14.0**（两处）。
 - **六项新内容**：
   1. **① 侧边栏平台区**：`RootView`「全部游戏」与「游戏分组」间新增「平台」section，列出库里出现过的平台（`gamecontroller` 图标 + 去重游戏数 badge），预设世代倒序 + 自定义按 canonical 字母排后；`SidebarItem` 加 `case platform(String)`；点选 → 右侧该平台全部游戏、标题 = 平台显示名（`LibraryView` 加 `platform: String?` 参数）。L10n：`library.platforms`。
@@ -367,11 +362,10 @@ canonical 存储值也改 + 启动一次性迁移 + 保留旧名展示兜底。
   5. **⑤ 全屏工具栏毛玻璃遮挡修复**：macOS 26 全屏下工具栏毛玻璃比工具栏布局多延伸约一行（24pt）盖住内容顶端（§6.29）。方案 A（默认）：玻璃+标题恒在，全屏 `safeAreaPadding(.top, 24)` 下推内容；`isFullScreen` 用 `willEnter/willExitFullScreenNotification` + `DispatchQueue.main.async` 异步更新（§6.28 避坑）。**（beta 1.9 全局化为 `appToolbar()`，见 §25.2）**
   6. **⑥ 「隐藏分组毛玻璃」设置开关**：`UserCustomization.hideToolbarGlassKey`（默认关）；`SettingsView` 个性化 section 加 Toggle + hint（注明「macOS 15 及以上可启用」）；`LibraryView` 开启 = 方案 B（`.navigationTitle("")` 无标题 + `ToolbarGlassModifier` 隐藏玻璃 + 全屏不下推）。**（beta 1.9 改名「隐藏上方毛玻璃」并全局应用，见 §25.2）**
 - **验证**：Debug 构建 exit 0；ScoreMath 15/15、DataSmoke 75 PASS 无 FAIL；L10n 三语 0 缺失；全屏遮挡程序化测量（§5）；用户实测确认方案 A/B 观感、开关切全屏稳定不挂。
-- **GitHub 未推**：main 领先远程四次提交，tag `beta-v1.4` 本地未推。
 
 ## 19. beta 1.5 发布记录（2026-08-13）
 
-- **commit** `ce007ec`「beta 1.5：收藏家模式（持有记录/版本/照片）+ 排名页导航修复」；**tag** `beta-v1.5`（本地，未推）；**DMG** `dist/GameLog-beta-1.5.dmg`。
+- **commit** `ce007ec`「beta 1.5：收藏家模式（持有记录/版本/照片）+ 排名页导航修复」；**tag** `beta-v1.5`；**DMG** `dist/GameLog-beta-1.5.dmg`。
 - 版本号 `"beta 1.5"`（pbxproj Debug/Release 两处）；部署目标保持 **macOS 14.0**（两处）。
 - **收藏家模式（新功能，默认关）**：
   1. **数据模型**：新增 `Models/PhysicalCopy.swift`（`@Model`：`version` 版本名必填、`count` 数量≥1、`images: [Data]` 最多 6 张、`createdAt` 排序）；`Game` 加 `copies` 1—* cascade（删游戏级联删版本与照片）。`images: [Data]` 在 SwiftData 里可用（已验证）。
@@ -383,11 +377,10 @@ canonical 存储值也改 + 启动一次性迁移 + 保留旧名展示兜底。
 - **修复（排名页导航）**：统计页榜单与整体排名页点击游戏名进详情。根因：`navigationDestination(isPresented:)` 推入的视图内部 `NavigationLink(value:)` 找不到父级 `navigationDestination(for:)`，在推入视图内再注册 `for:` 也无效（§6.33）。改为 `RankingBoard` 行用 `Button` + `onSelect` 回调，`StatsView`/`OverallRankingView` 各自 `@State selectedGame` + `.navigationDestination(item: $selectedGame)` 编程式 push。
 - **L10n 新增 key**：`settings.collectorMode/collectorModeHint`、`settings.keepOriginalImages/keepOriginalImagesHint`、`detail.details/detail.holdings`、`copy.*`（addVersion/noCopies/deleteConfirm/count/addImage/viewImage/rename/version/versionPlaceholder/versionAuto）。`copy.zoomFit` 曾随自绘看图器添加、弃用后已删。
 - **验证**：Debug 构建 exit 0；ScoreMath 15/15、DataSmoke（含持有往返）、ShareRender 全过；L10n 三语 0 缺失。**用户最终实测已完成**（§8.4 六项全过）；走查期间追加 2 处修复（照片删除确认、备份文件名带时间，已随 `4bd4900` 提交）。
-- **GitHub 未推**：main 领先远程五次提交，tag `beta-v1.5` 本地未推。
 
 ## 20. beta 1.5.1 发布记录（2026-08-13）
 
-- **commit** `e1b5011`「beta 1.5.1：代码审查修复 8 项（导入安全/别名/日期口径/封面竞态等）」（13 文件 +68/−33）；**DMG** `dist/GameLog-beta-1.5.1.dmg`（已打包 + 挂载验证）；**未打 tag**（是否打 tag 未定）。
+- **commit** `e1b5011`「beta 1.5.1：代码审查修复 8 项（导入安全/别名/日期口径/封面竞态等）」（13 文件 +68/−33）；**DMG** `dist/GameLog-beta-1.5.1.dmg`（已打包 + 挂载验证）。
 - 版本号 `"beta 1.5.1"`（pbxproj Debug/Release 两处）；部署目标保持 **macOS 14.0**。
 - **全量代码审查（核心层亲自 + 视图层双子代理并行）后修复 8 项**：
   1. **高 · 导入安全**：`BackupManager.decodeAndReplace` 改为**先恢复用户名/头像/图标、再清空重建 store**。原顺序先删库、后写头像/图标（唯一可抛错步骤），写盘失败后 autosave 会把旧库永久删掉；新顺序写盘失败时原库完好。
@@ -400,7 +393,6 @@ canonical 存储值也改 + 启动一次性迁移 + 保留旧名展示兜底。
   8. **文档**：`Game.libraryScore` 注释 0.5 → 0.1。
 - **验证**：Debug 构建 exit 0；ScoreMath 15/15、DataSmoke（含新增照片上限断言）、ShareRender 全过；L10n 三语 0 缺失。用户手动实测：#2 别名添加、#3 最近通关日期、#5 封面竞态 全部通过。
 - **未改设计点**：分享卡六维分仍取最后创建记录（非最大日期记录）；导入后持有记录 `createdAt` 重置为导入时刻（顺序靠数组保序往返一致，改动需扩备份格式）。
-- **GitHub 未推**：main 领先远程六次提交，tag `beta-v1.5` 本地未推。
 
 ## 21. beta 1.6 发布记录（2026-08-14，多平台移植 macOS + iOS）
 
@@ -415,7 +407,7 @@ canonical 存储值也改 + 启动一次性迁移 + 保留旧名展示兜底。
 
 ## 22. beta 1.7 发布记录（2026-08-14，iOS 布局与交互适配，已提交）
 
-- **commit** `afb331d`「beta 1.7：iOS 移植 + 全视图布局适配（双导航栏/工具栏折叠/底部 action sheet/统一加图菜单/文件共享）」；**DMG** `dist/GameLog-beta-1.7.dmg`、**IPA** `dist/GameLog-beta-1.7.ipa`（已挂载/解压验证）。**未打 tag、未推 GitHub**。
+- **commit** `afb331d`「beta 1.7：iOS 移植 + 全视图布局适配（双导航栏/工具栏折叠/底部 action sheet/统一加图菜单/文件共享）」；**DMG** `dist/GameLog-beta-1.7.dmg`、**IPA** `dist/GameLog-beta-1.7.ipa`（已挂载/解压验证）。
 - **版本号 `"beta 1.7"`**（pbxproj 4 处）。
 - **背景**：beta 1.6 移植后 iOS 上沿用 macOS 布局大量不适配（固定窗口宽、双导航栏、居中带尖角弹窗、工具栏折叠失效等）。三个并行 agent 彻查全部视图后，逐个做 iOS 单独适配（macOS 布局一律不动）。
 - **iOS 布局适配**（`#if os()` 分支，macOS 不变）：
@@ -426,13 +418,12 @@ canonical 存储值也改 + 启动一次性迁移 + 保留旧名展示兜底。
   5. **统一加图入口**：新增 `Support/ImageSourcePicker.swift`（`imageSourcePicker`）：点加图弹底部菜单「相册/文件/拍照」；相册走 PhotosPicker（可多选）、文件走 fileImporter、拍照走相机（`UIImagePickerController`，模拟器不可用时点击提示「当前设备不支持拍照」）。应用到游戏封面（GameEditView）、收藏照片（HoldingsView，含压缩与 6 张上限）、头像（SettingsView，仍走圆形裁切）。`Info-iOS.plist` 加 `NSCameraUsageDescription`。新增 `image.*` 5 个 key。
   6. **文件共享**：`Info-iOS.plist` 加 `UIFileSharingEnabled` + `LSSupportsOpeningDocumentsInPlace` → 模拟器「文件」app 可见 GameLog 的 Documents，可直接拖备份 JSON 进模拟器做导入测试。
   7. **其他固定宽度适配**：GameEditView/CompletionEditView 固定 minWidth 只限 macOS + iOS sheet 包 NavigationStack（保存/取消按钮生效）；CoverSearchSheet/GroupGamePickerView/ImageCropView/GroupFooter 评价编辑/StatsView/StatsRankings 的固定宽、大 padding、双栏阈值、平台名 160pt 等均 iOS 单独处理；GameCardView/HoldingsView 各弹窗固定 360 iOS 撑满；HoldingsView 缩略图删除角标 iOS 常显（onHover 不触发）。
-- **验证**：macOS/iOS Debug + Release 构建 exit 0；ScoreMath 15/15、DataSmoke、ShareRender 全过；L10n 三语 0 缺失；DMG/IPA 验证过。**iOS 布局/交互用户模拟器实测进行中**（详情页竖排、底部 action sheet、加图菜单、文件共享导入已确认；真机拍照/相机、AirDrop 待真机）。
+- **验证**：macOS/iOS Debug + Release 构建 exit 0；ScoreMath 15/15、DataSmoke、ShareRender 全过；L10n 三语 0 缺失；DMG/IPA 验证过。iOS 布局/交互模拟器实测已确认（详情页竖排、底部 action sheet、加图菜单、文件共享导入）；真机项见 §28。
 - **已知未做**：拍照真机未实测；iPad 布局未单独验证；AirDrop 备份导入模拟器不可测（无 AirDrop）。
-- **GitHub 未推**：main 领先远程 4 次提交，tag 未打。
 
 ## 23. beta 1.8 发布记录（2026-08-14，平台图标系统 + iOS 交互优化与修复，已提交）
 
-- **commit** `fd400b1`「beta 1.8：平台图标系统 + iOS 交互优化与修复（备份导出/保存相册/别名按钮/平均分排序/筛选单选/按钮样式/API Key 校验/封面缩略图/侧边栏毛玻璃）」；**DMG** `dist/GameLog-beta-1.8.dmg`、**IPA** `dist/GameLog-beta-1.8.ipa`（已打包验证）。**未打 tag、未推 GitHub**。
+- **commit** `fd400b1`「beta 1.8：平台图标系统 + iOS 交互优化与修复（备份导出/保存相册/别名按钮/平均分排序/筛选单选/按钮样式/API Key 校验/封面缩略图/侧边栏毛玻璃）」；**DMG** `dist/GameLog-beta-1.8.dmg`、**IPA** `dist/GameLog-beta-1.8.ipa`（已打包验证）。
 - **版本号 `"beta 1.8"`**（pbxproj 4 处）。
 
 ### 23.1 平台图标系统（大项）
@@ -467,11 +458,10 @@ canonical 存储值也改 + 启动一次性迁移 + 保留旧名展示兜底。
 - macOS/iOS Debug + Release 构建 exit 0；ScoreMath 15/15、DataSmoke、ShareRender 全过；L10n 三语 0 缺失；DMG/IPA 挂载/解压验证过。
 - 用户实测确认：平台图标各接入点、深浅色切换、平台标志开关、侧边栏毛玻璃、别名按钮、平均分排序、备份导出/保存相册；iOS 菜单宽度限制接受。
 - **已知未做**：iOS 菜单图标宽度偏窄（已接受）；拍照真机、AirDrop 备份导入、iPad 布局待真机验证。
-- **GitHub 未推**：tag 未打。
 
 ## 24. beta 1.8.1 发布记录（2026-08-14，全量代码审查修复 13 项，已提交）
 
-- **commit** `787a89c`「beta 1.8.1：全量代码审查修复 13 项（iOS 删筛选分组崩溃/首条无分记录静默 7.0/封面搜索竞态/iOS 分享面板/iOS 导入权限/筛选切换残留等）」（15 文件 +138/−62）；**DMG** `dist/GameLog-beta-1.8.1.dmg`、**IPA** `dist/GameLog-beta-1.8.1.ipa`（已挂载/解压验证）。**未打 tag、未推 GitHub**。
+- **commit** `787a89c`「beta 1.8.1：全量代码审查修复 13 项（iOS 删筛选分组崩溃/首条无分记录静默 7.0/封面搜索竞态/iOS 分享面板/iOS 导入权限/筛选切换残留等）」（15 文件 +138/−62）；**DMG** `dist/GameLog-beta-1.8.1.dmg`、**IPA** `dist/GameLog-beta-1.8.1.ipa`（已挂载/解压验证）。
 - **版本号 `"beta 1.8.1"`**（pbxproj 4 处）。
 
 ### 24.1 全量代码审查方式
@@ -502,11 +492,10 @@ canonical 存储值也改 + 启动一次性迁移 + 保留旧名展示兜底。
 ### 24.4 验证
 
 - macOS/iOS Debug + Release 构建 exit 0；ScoreMath 15/15、DataSmoke、ShareRender 全过；L10n 三语 0 缺失；DMG/IPA 挂载/解压验证过；已用修复后构建重启 app。
-- **GitHub 未推**：tag 未打。
 
 ## 25. beta 1.9 发布记录（2026-08-17，状态机 + 全局全屏毛玻璃 + 平台图标尺寸系统，本轮提交）
 
-- **commit** 本轮提交（见 git log）；**DMG** `dist/GameLog-beta-1.9.dmg`、**IPA** `dist/GameLog-beta-1.9.ipa`（已打包验证）。**未打 tag、未推 GitHub**。
+- **commit** 本轮提交（见 git log）；**DMG** `dist/GameLog-beta-1.9.dmg`、**IPA** `dist/GameLog-beta-1.9.ipa`（已打包验证）。
 - **版本号 `"beta 1.9"`**（pbxproj 4 处：macOS/iOS 各 Debug/Release）。
 
 ### 25.1 状态机（大项，用户 ROADMAP 第 1 阶段）
@@ -579,7 +568,6 @@ canonical 存储值也改 + 启动一次性迁移 + 保留旧名展示兜底。
 
 - **iOS 构建命令**：`-destination 'platform=iOS Simulator'`（generic 或指定机型都行；iPadOS 27 iPad mini + iOS 18 iPhone 16 模拟器已验证）。
 - **验证**：macOS/iOS Debug 构建 exit 0；ScoreMath 15/15、DataSmoke（含状态机断言）、ShareRender 全过；L10n 三语 0 缺失；状态机 + 全局毛玻璃走查用户确认。
-- **GitHub 未推**：tag 未打。
 
 ## 26. beta 2.0 发布记录（2026-08-17，自动备份 + 清缓存，本轮提交）
 
@@ -616,7 +604,6 @@ canonical 存储值也改 + 启动一次性迁移 + 保留旧名展示兜底。
 ### 26.5 发布记录
 
 - **commit** 见 git log（消息前缀 `beta 2.0：`）；**版本号 `"beta 2.0"`**（pbxproj 4 处）；**DMG** `dist/GameLog-beta-2.0.dmg`（卷名 `GameLog beta 2.0`，含 GameLog.app + Applications 链接，6.8MB，挂载验证版本号 beta 2.0）；**IPA** `dist/GameLog-beta-2.0.ipa`（Release-iphonesimulator universal x86_64+arm64 adhoc，解压验证版本号 beta 2.0 + `_CodeSignature/CodeResources`）。
-- **GitHub 未推**：tag 未打。要推：`git tag beta-v2.0 && git push origin main beta-v2.0`（push 需用户凭据，见 §9）。
 - **遗留**：iOS 真机（拍照 / AirDrop 导入 / QLPreviewController / PhotosPicker / TabBar）仍未实测——见 §9 ②。
 
 ## 27. beta 2.1 发布记录（2026-08-20，评价区 Markdown 长评 + WYSIWYG 编辑 + 分端编辑，本轮提交）
@@ -661,41 +648,23 @@ canonical 存储值也改 + 启动一次性迁移 + 保留旧名展示兜底。
 ### 27.5 发布记录
 
 - **commit** 见 git log（消息前缀 `beta 2.1：`）；**版本号 `"beta 2.1"`**（pbxproj 4 处）；**DMG** `dist/GameLog-beta-2.1.dmg`（卷名 `GameLog beta 2.1`，含 GameLog.app + Applications 链接，挂载验证版本号 beta 2.1）；**IPA** `dist/GameLog-beta-2.1.ipa`（Release-iphonesimulator universal x86_64+arm64 adhoc，解压验证版本号 beta 2.1 + `_CodeSignature/CodeResources`）。
-- **GitHub 未推**：tag 未打。要推：`git tag beta-v2.1 && git push origin main beta-v2.1`（push 需用户凭据，见 §9）。
 - **遗留**：iOS 真机（拍照 / AirDrop 导入 / QLPreviewController / PhotosPicker / TabBar）仍未实测；iOS 模拟器上已装 iOS 27 跑通评价编辑 sheet。
 
-## 28. 待办 / 未决项（beta 2.1 后）
+## 28. 待办 / 未决项
 
 1. **编辑器直打字尺寸（未最终确认）**：`normalizeFonts()` 修正已构建但用户未二次验收；确认后就移除 `MarkdownRichEditor.swift` 里的 DEBUG 诊断（写到 `/tmp/gamelog_editor_diag.log` 的 `Self.debug` 与 `#if DEBUG` 块）。
-2. **详情页 SwiftUI 侧中文斜体**：本轮只做编辑器；详情页 `MarkdownReviewView` 渲染的中文斜体在 SwiftUI 侧不做/待评估（CSS 层不确定性）。
-3. **iOS 真机实测**：拍照 / AirDrop 导入 / QLPreviewController / PhotosPicker / TabBar（见 §9 ②）。
-4. **GitHub 推 + tag**（beta-v2.1，需用户凭据）。
+2. **详情页 SwiftUI 侧中文斜体**：只有 macOS 编辑器侧做了合成斜体；详情页 `MarkdownReviewView` 渲染的中文斜体在 SwiftUI 侧不做/待评估。
+3. **iOS 真机实测**：拍照 / QLPreviewController / PhotosPicker / TabBar（AirDrop 备份导入已实测 ✅，见 §29.17）。
+4. **push GitHub**：本地 main + tags 领先远程，需用户明确说推并提供凭据（见 §9）。
 5. **ROADMAP 后续**：发售日自动填充 / 统计可视化 / 封面缓存深化（已实现一部分）。
 
 ---
 
-## 29. beta 2.2（持有页藏品档案化 + 崩溃排查 + 排序/价值榜/持有开关）✅ 功能全部落地、已 git commit、DMG/IPA 已打包（beta 2.3，已提交待 tag、领先远程 1、待推 GitHub）
+## 29. beta 2.2 → 2.3：持有页藏品档案化 + 收尾打磨（✅ 全部落地并提交）
 
-> 当前状态（2026-08-21 凌晨）：beta 2.3 全部功能已落地、已 `git commit`、双平台 Release 构建通过、`dist/GameLog-beta-2.3.dmg` 与 `dist/GameLog-beta-2.3.ipa` 已打包并挂载验证（版本号 `beta 2.3`、挂载卷可启动）。待用户确认后打 `beta-v2.3` tag 并推 GitHub（需用户凭据）。
->
-> 已解决并验证的遗留项：
-> - hover 崩溃（§29.9）随「持有」整体重写消除，用户实测不崩。
-> - 状态滑块卡顿（§29.14 差异 A）已修复：视觉由本地 @State 驱动、模型写入延后到 .onDisappear，用户实测流畅。
-> - 状态滑块进入详情停在「已通关」+ 先闪已通关再滑过去：已修（sliderIndex 由 status 派生；GameDetailView.init 构造时同步 detailStatus）。
-> - 网格缩略图尺寸随图片比例变动并重叠（Library/持有）：已修（改用 Color.clear 锚点 + overlay 图案）。
->
-> 本轮新增功能（均为用户后续需求，已提交）：
-> 1. 主页排序新增「最近编辑」「价值最高」+ 默认排序改为「最近编辑」（`LibrarySort` + `Game.updatedAt` 字段轻量迁移 + `GameEditView` 保存时写 updatedAt）。
-> 2. 整体排名新增「价值榜」大类（按游戏价值 / 按机器（平台）价值 / 按分组价值三页）。
-> 3. 新建游戏默认不建持有档案，须勾选「我拥有这份」才展开填写并建 PhysicalCopy。
->
-> ⚠️ **两处枚举成员是「按合理推断重建、待用户验收确认」，非原会话产物**：`CopyRegional`（10 档）与 `CopyCondition`（7 档，默认 good）。若用户验收时要调整成员或默认值，改 `Models/PhysicalCopy.swift` 四枚举 + 三语 `Localizable.strings` 的 `copy.regional.*` / `copy.condition.*`。
->
-> ✅ **收尾内容已全部完成（2026-08-21 凌晨）**：① 枚举 `CopyRegional`/`CopyCondition` 用户验收「完全符合、保留」；② 整体 UI 实测走查通过（含统计页分数榜/价值榜滑块化改造）；③ README 三语重写至 beta 2.3；④ 版本号 pbxproj 四处已 `beta 2.3`；⑤ 双平台 Release 构建通过，DMG/IPA 已打包并挂载验证。**唯一剩余 = 打 tag `beta-v2.3` + 推 GitHub，需用户明确授权与凭据，未授权绝不 push。**
+> beta 2.2 = 「持有」升级为藏品档案（设计见 §29.1–§29.11）+ hover 崩溃 / 状态滑块卡顿等排查修复（§29.9 / §29.14）。beta 2.3 = 收尾打磨（分享面板与统计页滑块化、iOS 排序补全、分组评价 Markdown 渲染与写字台编辑、持有胶囊横排、价格估值并列、介质 11 档 / 品相 7 档 / 地区 10 档重写、持有平台选择、版本号 beta 2.3），commit 清单见 §29.16。全部经用户验收/走查通过（`CopyRegional`/`CopyCondition` 枚举验收「完全符合、保留」）。此后 beta 2.3.1/2.3.2 为 iOS 导入修复及随附小改动（§29.17）。
 
-### 29.16 收尾 commit 清单（2026-08-21 上午，new chat 接手后用户走查满意并授权 commit）
-
-> 工作树 15 个 modified 文件（含 pbxproj 版本号变更）。无 untracked。本地领先远程 1 commit，待打 `beta-v2.3` tag 并推 GitHub（需用户凭据）。
+### 29.16 收尾 commit 清单（2026-08-21，beta 2.3）
 
 **commit `beta 2.3：收尾（分享滑块化/排序/iOS补全/分组Markdown/持有胶囊横排/价格估值左右/介质11档/品相重写/地区重写/标签改动/持有平台/版本号2.3）`**（15 文件 +533/−249）：
 - `SharePanelView.swift` + `StatsRankings.swift`：分享面板 `mode`/`size` 两处 `.segmented` Picker 换成 `SegmentSlider`（顶层 `internal` 通用组件）。
@@ -713,8 +682,6 @@ canonical 存储值也改 + 启动一次性迁移 + 保留旧名展示兜底。
 
 **验证（提交前已跑，全 PASS）**：macOS/iOS Debug 双平台构建 SUCCEEDED；ScoreMath 15/15；DataSmoke PASSED（含上述新增断言）；ShareRender PASSED；L10n 三语各 307 key、0 缺失、plutil OK。
 
-**下一步（需用户明确授权）**：① 打 tag `git tag beta-v2.3`（本地）；② 推 GitHub `git push origin main --tags`（需用户凭据，未授权绝不 push）。`dist/` 被 gitignore，DMG/IPA 不进 git。
-
 ### 29.17 iOS 真机「导入备份 / 从文件导入」点选文件无反馈（2026-08-22 ✅ 已解决）
 
 > **✅ 最终结论（2026-08-22 夜，用户真机实测确认「终于能用了」）**
@@ -723,184 +690,13 @@ canonical 存储值也改 + 启动一次性迁移 + 保留旧名展示兜底。
 > - **随附改动（beta 2.3.2，双平台对齐）**：版本号 4 处 → `beta 2.3.2`；AboutView 去 macOS 化（macOS 固定宽 340 不变、iOS 设置页底部新增「关于我的游戏簿」入口 sheet 呈现）；持有页新增按钮文案 `copy.addArchive`→新短 key `copy.addShort`（zh 新增/ja 追加/en Add，sheet 标题仍用原 key）；iOS 导出备份文件名带时间戳 `GameLog-backup-yyyy-MM-dd-HH-mm.json`（与 macOS 同格式）。
 > - **产物**：`dist/GameLog-beta-2.3.2.dmg`（卷名 GameLog beta 2.3.2，挂载验证过）+ `dist/GameLog-beta-2.3.2.ipa`（用户重签装机实测通过）。三语 key 覆盖 0 缺失。
 
-> **本节能让 new chat 直接接手，且不要重蹈覆辙。** 本会话（2026-08-22）针对此问题做了多轮尝试，全部真机实测失败，最终把代码**回退到 HEAD 干净状态**（未提交改动已 `git checkout` 丢弃）。下面把每一轮尝试、现象、排除项、当前推断都记清楚，new chat 不要重复走已否证的路。
+> **历史排查档案（2026-08-22 白天，修复前的多轮失败尝试，改动当时已全部回退；过程细节从略，留此防重蹈）**
+> - **现象**：iOS 真机点「导入备份」或图片「从文件导入」→ 系统 picker 打开 → 点选文件完全无反馈（不回调/不关闭/不提示），手动取消才触发取消回调；模拟器同操作一切正常。诊断日志证 picker present 正常、delegate 存活，唯独点文件的 `didPickDocumentsAt` 不触发。
+> - **关键旁证**：`onOpenURL → importIncomingBackup`（`iOSRootView.swift:55`，AirDrop 导入）真机正常，且与失败入口共用同一套 startAccessing/读取/解码/保存代码 → 坏的只有「picker 点选→回调」这一步。
+> - **已否证方向（勿重走）**：安全作用域授权缺失 / 解码或 save 抛错被吞 / json·data·image UTI 选错 / delegate weak 释放 / Info.plist LSHandlerRank 与 LSSupportsOpeningDocumentsInPlace 改写 / PHPicker 选文件（iOS 26 SDK 无 `.other` filter）/ `importsUnorganizedFileTypes`（beta27 SDK 不存在）。另：上一轮「裸 UIKit present 也静默」是在 Adhoc 分发形态下测的，未构成对裸 present 本身的否证。
+> - **隔离手段**：仓库外独立最小复现 App `/Users/abc/Documents/UIDocPickerRepro/`（纯 UIKit 裸 `UIDocumentPickerViewController(forOpeningContentTypes:asCopy:)` + 屏幕日志），模拟器 + 真机四 UTI（item/data/json/image）全部 DID PICK 成功 → 排除系统 regression（H1）；用户确认 GameLog 与该 App 的 IPA「打包→签名→安装」流程完全相同 → 排除分发形态（H7）；据此锁定 H5（SwiftUI 封装层），按原「方向 1」设计落地 `DocumentPicker.swift` 后真机恢复。
+> - **教训（诊断纪律）**：「模拟器行 + 真机不行 → 苹果 bug」是逻辑跳跃；多变量并存时必须先用最小复现 App 隔离变量再下结论；交接文档记录的事实（如此前「最小 App = Xcode Dev 构建安装」）可能与实际不符，须向当事人现场核验。
 
-================================================================
-【零、本会话最重要的元结论：诊断纪律】
-================================================================
-- 本会话后半段接到了一份非常严格的诊断任务：在把"系统 Bug"当结论前，必须先用**最小复现 App** 隔离变量，且**禁止逻辑跳跃**（例如"模拟器行 + 真机不行 → 苹果 bug"是不成立的）。
-- 执行结果：建立了一个独立的"最小复现 App"（仓库之外），在**模拟器 + 真机**都验证：**Apple 标准 `UIDocumentPickerViewController` 机制本身完全健康（四 UTI 全 DID PICK 成功）**。
-- 因此，**上一会话（及本会话上半段）写的"根因 = iOS 真机 UIDocumentPicker 点文件死"的推断，已被推翻、降级为「已否证」**。最小 App 在真机成功 = 任务要求的 **Case B** → 系统级 regression 假设（H1）被排除，根因必然在 **GameLog 自身环境**。
-- **当前唯一没被干净排除的格子（见 §四 假设树 H7）**：所有 GameLog 的失败都是在 **Adhoc 分发形态（用户自签 IPA）** 下测的，而最小 App 的成功是在 **Xcode Development 构建**下测的。（注：用户能正常安装自签 IPA，变量是"安装/分发形态"而非"能否安装"。）还没人把"GameLog 代码本身"和"Adhoc 分发形态"干净分开。这一步叫"签名对照测试"，是下一步最该做的。
-
-================================================================
-【一、现象（用户真机实测 + app 内诊断日志双重确认）】
-================================================================
-- 【入口 1：设置页「导入备份」`SettingsView.swift:282`】iOS 真机点「导入备份」→ 系统文件选择器打开 → 点 json 备份文件（图标亮、可选中）→ **完全无反馈**：不导入、不关闭选择器、不弹提示、不显示 statusMessage。用户手动取消时才会触发取消回调。
-- 【入口 2：编辑游戏 / 封面 / 收藏照片的「从文件导入」`ImageSourcePicker.swift:105`】真机同样：文件选择器打开 → 点图片文件 → 无反馈、无响应。
-- 【入口 3（对照，正常）：图片来源菜单「从相册导入」「拍照」】真机完全正常，点选/拍摄后正常回调。
-- 【入口 4（对照，正常）：AirDrop /「文件」App 打开方式把 json 发给 GameLog】经 `onOpenURL`（`iOSRootView.importIncomingBackup`，`iOSRootView.swift:55`）真机正常导入。**这条非常关键**：它和失败的入口**共用同一套** `startAccessing` + `Data(contentsOf:)` + `decodeAndReplace` + `context.save` 读取/解码逻辑，却正常工作 → 证明"文件读取/解码"这条链路在真机没问题，真正坏的**只有"应用内 document picker 的点选→回调"这一步**。
-- 【模拟器 iPhone 16 Pro iOS 27.0】入口 1/2 在模拟器全部正常（选 json / 选图片都触发回调并导入成功）。**模拟器不复现真机静默问题。**
-- 【诊断日志（用户从 app 内「导入诊断(调试)」复制，决定性证据）】节选：
-  ```
-  [01:43:07] BUTTON TAPPED import
-  [01:43:07] presentBackupImporter called
-  [01:43:07] top VC class = UIHostingController<...AutoBackupContainer<...iOSRootView...>>
-  [01:43:07] picker presented
-  [01:43:11] delegate WAS CANCELLED
-  ```
-  解读：按钮触发了、方法进了、picker 被 present 了（无抛错）、**点 json 那几秒之间没有任何 delegate 行**、4 秒后用户手动取消才出现 `WAS CANCELLED`（证明 delegate 是活着的、正常的）。→ 选文件回调在真机点文件时不触发，只有「取消」能触发。
-
-================================================================
-【二、已排除 / 已否证的方向（全部试过且真机实测无效，new chat 不要重复走）】
-================================================================
-1. ❌ 安全作用域授权（`fileImporter` 回调加 `startAccessing`/`stopAccessing`，已 commit 为 `251b350`）→ 真机仍静默。不是读盘权限问题（且入口 4 同源代码正常，进一步佐证）。
-2. ❌ 解码/save 抛错被静默吞：模拟器导入同一 json 正常，证明 `BackupManager.decodeAndReplace` + `context.save` 逻辑 OK；且真机日志显示连 `didPick` 都没触发，根本没走到解码。
-3. ❌ json 类型不支持：用户确认 json 图标亮（可选中），排除 `allowedContentTypes` 不匹配。
-4. ❌ SwiftUI `fileImporter` 封装层回调丢失：换成直接 `UIDocumentPickerViewController` + 自建 `UIDocumentPickerDelegate`（强持有 coordinator 到静态数组防 weak 释放）仍静默；取消能触发证明 delegate 存活。（⚠️ 见 §四 H7：此"直接 UIKit 也失败"的尝试是在 Adhoc 构建下测的，未与 Development 签名干净隔离。）
-5. ❌ delegate 随方法退出被释放（weak）：已强持有到静态 `holders` 数组直到回调，仍静默；取消能触发证明 delegate 存活。
-6. ❌ Info.plist 声明 app 是 `public.json` 的 `Owner` + `LSSupportsOpeningDocumentsInPlace=true` 导致真机「原地打开自有文件」语义：已改为 `LSHandlerRank=Alternate`、`LSSupportsOpeningDocumentsInPlace=false`，并解包真机 IPA 用 PlistBuddy 确认改动确实进了 app 的 Info.plist，真机仍静默。否证此假设。
-7. ❌ UTI 选错（`[.json]` / `[.data]` / 想试的 `[.item]`）：`[.json]` 原版静默、`[.data]` 静默；且「从文件导入图片」用 `[.image]` 也静默 → 与具体 UTI 无关。
-8. ❌ 改用 `PHPickerViewController` 选文件：已实装但 iOS 26/27 SDK（`PhotosUI.framework/PHPicker.h`）的 `PHPickerFilter` 只有 `imagesFilter`/`videosFilter`/`livePhotosFilter`/各类视频滤镜，**没有 `.other` / 任意文件筛选**。PHPicker 在 SDK 层面无法选 json。编译失败，已回退。
-
-================================================================
-【三、本会话对代码做过的尝试（均已回退，当前工作树 == HEAD 251b350 干净状态）】
-================================================================
-- 改动 A：删除 iOS 的 `fileImporter` 修饰符，改 `presentBackupImporter()` 用 `UIDocumentPickerViewController(forOpeningContentTypes: [.data])` UIKit 直接 present + 自建 `BackupImportCoordinator`（`UIDocumentPickerDelegate`，静态 `holders` 强持有）+ `BackupImportTrace` 诊断 enum（写 `Documents/backup-import-trace.log`）+ 设置页「导入诊断(调试)」section/sheet（app 内查看/复制日志，不依赖 Files）。→ 真机仍静默 → 回退。（⚠️ Adhoc 构建下测。）
-- 改动 B：Info-iOS.plist `LSHandlerRank` Owner→Alternate、`LSSupportsOpeningDocumentsInPlace` true→false。→ 真机仍静默（且解包确认改动进了 plist）→ 回退。
-- 改动 C：UTI `[.data]`→`[.json]`（回退 A 的 UTI），构建通过但真机未单独验证（已知 `.json` 原版也静默）→ 随整体回退。
-- 改动 D：尝试 `PHPickerViewController`（`PHPickerConfiguration` + `config.filter = .other`）。→ 编译失败（iOS 26 SDK 无 `.other`）→ 回退。
-- 版本号：`MARKETING_VERSION` 4 处曾改 `beta 2.3.1`/`beta 2.3.2`，均已回退回 `beta 2.3`。
-- 临时打过 `dist/GameLog-beta-2.3.1.ipa`（带诊断 UI）、`dist/GameLog-beta-2.3.2.ipa` 半成品（未成功 zip，可忽略）；旧 `dist/GameLog-beta-2.3.ipa` 原封未动。
-- **重要：以上所有"失败"尝试都在 Adhoc 分发形态（用户自签 IPA）下真机实测，从未在 Xcode Development 构建真机下测过 GameLog 自身代码。**（注：用户有自签能力、能正常安装 IPA，这里指的是「Adhoc 分发 vs Development 构建」这个安装形态变量，不是"能否安装"。）
-
-================================================================
-【四、假设树（当前真实状态，2026-08-22 末）】
-================================================================
-H1 = Apple iOS UIDocumentPicker regression            ❌ **已排除**（最小 App 模拟器+真机都成功 = Case B）
-H2 = File Provider / Files.app problem               ⚠️ 未直接相关（入口4 onOpenURL 正常，基本排除）
-H3 = GameLog picker configuration problem            ⬆ 主要怀疑（SettingsView/ImageSourcePicker 的 fileImporter 配置）
-H4 = GameLog presentation hierarchy problem          ⬆ 主要怀疑（picker 挂在 TabView/AutoBackupContainer 的 UIHostingController 下；最小 App 是裸 VC `presentingViewController=nil`）
-H5 = GameLog SwiftUI/UIKit integration problem       ⬆ 主要怀疑（全程 SwiftUI `.fileImporter` 封装层；最小 App 是裸 `present`）
-H6 = Info.plist / document registration problem      ⬆ 待查（GameLog 声明了 `CFBundleDocumentTypes public.json LSHandlerRank=Owner`；最小 App 完全无 document registration）
-H7 = Signing / distribution-specific problem          ⚠️ **唯一未干净排除的格子**：所有 GameLog 失败都在 **Adhoc 分发形态（用户自签 IPA）**下测，最小 App 成功在 **Xcode Development 构建**下测。未在「真机 + Development 构建」下测过 GameLog、也未在「Adhoc 分发」下测过最小 App → "GameLog 代码坏"与"Adhoc 分发形态坏"未分离。（注：用户能正常安装自签 IPA，这里指的是安装/分发形态变量，不是"能否安装"。）机制上签名/分发形态影响 picker 交互很反常（H7 偏弱），但纪律上必须排除。
-
-================================================================
-【五、证据矩阵（务必看这张表，它定义了"已知正常边界"）】
-================================================================
-| 环境 | 构建方式 | 入口 | .json | .image | .data | .item | 取消 |
-|------|---------|------|-------|--------|-------|-------|------|
-| 模拟器 iOS27 | GameLog 自身 | fileImporter | ✅ | ✅ | n/a | n/a | ✅ |
-| 模拟器 iOS27 | 最小 App | 裸 VC present | ✅ | ✅ | ✅ | ✅ | ✅ |
-| 真机 iOS27 | GameLog (Adhoc IPA) | fileImporter | ❌静默 | ❌静默 | ❌静默 | ❌静默 | ✅ |
-| 真机 iOS27 | GameLog (Adhoc IPA) | 上轮裸 UIDocPicker (改动A) | ❌静默 | — | ❌静默 | — | ✅ |
-| 真机 iOS27 | 最小 App (Xcode Dev) | 裸 VC present | ✅ | ✅ | ✅ | ✅ | ✅ |
-| 真机 iOS27 | GameLog (Adhoc IPA) | onOpenURL→importIncomingBackup | ✅(AirDrop) | — | — | — | — |
-
-结论边界：
-- 已知正常 = 模拟器 + 真机最小 App + 全部 4 UTI + 裸 VC present（presentingViewController=nil）。
-- 已知失败 = 真机 GameLog（SwiftUI fileImporter & 上轮裸 UIKit 包装，挂在 `UIHostingController<...AutoBackupContainer<...iOSRootView...>>` 下，Adhoc 分发）。
-- **唯一未填格 = 真机 + GameLog + Xcode Development 签名**（这是下一步该做的"签名对照测试"）。
-
-================================================================
-【六、代码精读：GameLog vs 最小 App 的差异点（逐项列出，供 new chat 隔离）】
-================================================================
-GameLog(iOS) 两处导入入口，全部走 **SwiftUI `.fileImporter`**：
-- `GameLog/Views/SettingsView.swift:282`：`SettingsView`（被放进 `iOSRootView` 的 `TabView` 一个 tab）的 `body` 上挂 `.fileImporter(isPresented: $showingBackupImporter, allowedContentTypes: [.json])`；回调里 `startAccessing` + `Data(contentsOf:)` + `AutoBackup.writeSnapshot` + `decodeAndReplace` + `context.save` + `statusMessage`。
-- `GameLog/Support/ImageSourcePicker.swift:105`：`ImageSourcePickerModifier.body` 链上挂 `.fileImporter(isPresented: $showFileImporter, allowedContentTypes: [.image])`。调用处：设置页头像、编辑游戏封面、持有页照片等（经 `#if !os(macOS)` 守卫）。
-- `GameLog/Views/GameEditView.swift:604`：iOS 分支注释说"用 PhotosPicker / fileImporter"，实际图片导入经 `ImageSourcePicker`（同上）。
-
-iOS 视图层级（自上而下）：
-`GameLogApp`(@main, `GameLogApp.swift:4`) → `WindowGroup` → `AutoBackupContainer { ... iOSRootView() ... }`（`GameLogApp.swift:27-40`）→ `iOSRootView`（`iOSRootView.swift:8`，`TabView` 三 tab：库/统计/设置）→ `SettingsView`。诊断日志里 picker 正是挂在 `UIHostingController<...AutoBackupContainer<...iOSRootView...>>` 下。
-
-最小 App（真机可用，`/Users/abc/Documents/UIDocPickerRepro/`）：`AppDelegate`(@main) + `SceneDelegate`(显式 `cfg.delegateClass`) + `ViewController`(裸 `UIViewController`)，按钮直接 `present(UIDocumentPickerViewController(forOpeningContentTypes:asCopy:))`，self 作 `UIDocumentPickerDelegate`。日志里 `presentingViewController = nil`。
-
-差异清单（任一都可能是 H3/H4/H5 根因）：
-1. **present 方式**：最小 App = 裸 `VC.present`；GameLog = SwiftUI `.fileImporter` 封装（内部如何 present 未知，闭源 SwiftUI）。
-2. **presentation 上下文**：最小 App 无 nav/sheet/tab 嵌套；GameLog 是 `TabView` → `SettingsView` → fileImporter（以及 `ImageSourcePicker` 常出现在 `NavigationStack` 内）。
-3. **document registration**：GameLog `Info-iOS.plist` 声明 `CFBundleDocumentTypes public.json LSHandlerRank=Owner` + `LSSupportsOpeningDocumentsInPlace=true`；最小 App 完全没有。
-4. **分发/签名形态**：最小 App = Xcode Development 构建（用户自签安装）；GameLog 失败都在 Adhoc 分发形态（用户自签 IPA）。变量是安装/分发形态，非"能否安装"（用户能正常装自签 IPA）。
-5. **API 形式上二者一致**：都是 `UIDocumentPickerViewController(forOpeningContentTypes:asCopy:)`，`allowsMultipleSelection=false`，`modalPresentationStyle=2`。
-
-================================================================
-【七、模拟器对照实验（独立最小复现 App，结论 = 对照基线，非根因）】
-================================================================
-- 工程位置：`/Users/abc/Documents/UIDocPickerRepro/GameLogRepro.xcodeproj`（仓库之外，纯 UIKit，无 SwiftUI/SwiftData/GameLog）。四按钮 `.image`/`.json`/`.data`/`.item` + `Clear log` + `Copy log`。
-- **脚手架坑（已修，与导入无关）**：初版 Info.plist 用 `UISceneConfigurations` + `UISceneDelegateClassName="SceneDelegate"` 字符串匹配，iOS 27 下字符串匹配失败 → `SceneDelegate.scene(willConnectTo:)` 不被调用 → scene 不连接 → window 不创建 → **黑屏**；系统日志 `Deactivation reason 10`、`lifecycle.log` 一行没写印证。改为 `AppDelegate.configurationForConnecting` 里 `cfg.delegateClass = SceneDelegate.self` 显式指定后修复（用 sandbox `lifecycle.log` + 纯数值 PNG 像素分析确认：蓝色背景时 1588/2501 蓝像素、还原 UI 后黑色占比<50%，确证已渲染）。
-- 模拟器结果（`iPhone 16 Pro` iOS 27.0，`generic/platform=iOS Simulator`）：**四 UTI 全部 `PICKER PRESENTED` → `DID PICK count=1`**，取消 `DID CANCEL` 也正常。
-- 含义：确认模拟器不是复现环境；把"iOS 27 系统性 regression"嫌疑收窄到仅真机；但不能证明/否证真机根因。
-
-================================================================
-【八、真机最小 App 实测（用户真机 iPhone iOS 27.0，Xcode Development 构建 = Case B 确立）】
-================================================================
-- 用户在**真机**（iPhone, iOS 27.0, 真机 Development 签名）跑同一最小 App：`viewDidLoad OK; device=iPhone iOS=27.0`。结果：**四 UTI 全部 `PICKER PRESENTED` → `DID PICK count=1`**（`.item`→`...-Inbox/GameLogRepro-1.0.ipa`、`.data`→同、`.json`→`...-Inbox/GameLog-backup-2026-08-21-14-47.json`、`.image`→`...-Inbox/pixel_art_large%202.png`），后四组取消 `DID CANCEL` 正常。
-- **Case B 确立 → H1 系统 regression 排除**：Apple 标准 `UIDocumentPickerViewController(forOpeningContentTypes:asCopy:)` + 裸 VC `present` + self 作 delegate，在模拟器**和**真机 iOS 27 都健康。
-- **翻转**：推翻上一会话"根因=UIDocumentPicker 真机点文件死"推断（已否证）。根因必然在 **GameLog 自身环境**。
-- ⚠️ **但 H7 未排除**：此最小 App 成功是在 Xcode Dev 签名下；GameLog 全部失败在 Adhoc 下。二者签名变量未隔离。
-
-================================================================
-【九、候选修复方向（new chat 评估，均未实装/未验证；注意原"方向A最站得住"已失据）】
-================================================================
-- ⚠️ **原 §29.17 把"方向 A = 放弃 UIDocumentPicker、改引导走 onOpenURL"列为最站得住的推荐修复；在 Case B 证据下，该方案的根基（"UIDocumentPicker 真机死"）已被推翻，故降级为"兜底选项"，不应再优先实施。** 最小 App 证明 UIDocumentPicker 在真机能用，应优先在 GameLog 内复现"能用"的最小形态，再定位 GameLog 哪一层把它搞死，而非绕开它。
-- **方向 1（推荐，针对性）**：把 GameLog 两处 `.fileImporter` 换成"与最小 App 同构"的纯 UIKit 调用——从最上层 VC `present(UIDocumentPickerViewController(forOpeningContentTypes:asCopy:true))`，delegate 强持有（静态数组），回调把 URL 经 closure 丢回 SwiftUI。这一招若让真机成功 → 确认是 H5（SwiftUI fileImporter 封装层）。设计骨架已备：
-  ```swift
-  func presentDocumentPicker(types: [UTType], onPicked: @escaping (URL) -> Void) {
-      guard let root = UIApplication.shared.connectedScenes
-              .compactMap({ $0 as? UIWindowScene }).first?.windows.first?.rootViewController?
-              .topMostViewController() else { return }
-      let picker = UIDocumentPickerViewController(forOpeningContentTypes: types, asCopy: true)
-      let coordinator = PickerCoordinator(picker: picker, onPicked: onPicked)
-      picker.delegate = coordinator
-      PresentHolders.add(coordinator)            // 静态强持有，防 ARC 释放
-      root.present(picker, animated: true)
-  }
-  ```
-- **方向 2（签名对照，优先于改代码）**：先用 Xcode Development 签名在真机跑**当前 GameLog 自身**（不改一行代码）测「导入备份」点 json。若成功 → 根因 H7（Adhoc 分发），修分发/entitlements 即可，导入代码不动；若仍失败 → 落实 H3/H4/H5，走方向 1。
-- **方向 3（兜底，仅当 H1 被重新证实才考虑）**：引导走 `onOpenURL`（onOpenURL 已验证真机正常）。代价：导入变"两步"（出 app 去文件 App 共享）。
-- **已被堵死的方案（不要走）**：`importsUnorganizedFileTypes:true`（beta27 SDK 不存在，导致 `Result<URL>`→`Result<[URL]>` 编译失败）；`PHPickerViewController` 选文件（iOS 26 SDK 的 `PHPickerFilter` 无 `.other`，无法筛 json）。
-
-================================================================
-【十、下一步（未做，等 new chat/用户决策）】
-================================================================
-**优先级最高（1 分钟，决定性）**：用户用 Xcode 打开 `GameLog.xcodeproj` → 选真机 → **Run（GameLog 自身，Xcode Development 签名）** → 测设置页「导入备份」点 json。
-- 成功 → H7（签名/分发）确诊，修分发，导入代码不动。
-- 失败 → H3/H4/H5，落实"方向 1"把两处 `.fileImporter` 换成与最小 App 同构的裸 `UIDocumentPickerViewController` present。
-（可选补刀：把最小 App 用用户 team 证书重签成 Adhoc 装一次测，能彻底关掉 H7；但 GameLog 经 Xcode Dev 测这一条已足够分叉。）
-
-**次优先级（若 GameLog Dev 测仍失败）**：在 GameLog 内加"同构 diagnostic screen"（纯 UIKit、裸 VC、只打日志不读 JSON），直接从 `SettingsView`/`iOSRootView` present（不经 SwiftUI sheet）。成功→H5；失败→H4/H6/H7。
-
-================================================================
-【十一、相关文件与行号（入手点）】
-================================================================
-- `GameLog/Views/SettingsView.swift`：iOS「导入备份」按钮（~行 207，设 `showingBackupImporter = true`）→ `.fileImporter(isPresented: $showingBackupImporter, allowedContentTypes: [.json])`（~行 282，当前 HEAD 原始 SwiftUI fileImporter）→ 回调 `startAccessing`/`Data(contentsOf:)`/`AutoBackup.writeSnapshot`/`decodeAndReplace`/`context.save`/`statusMessage`。「从自动备份恢复」按钮（~行 196）→ `restoreFromAutoBackup()`（读沙盒 `Documents/Backups`，不涉及真机问题）。
-- `GameLog/Views/iOSRootView.swift`：`onOpenURL` → `importIncomingBackup()`（~行 55，**真机工作正常** —— 对标参照，证明 `startAccessing` 写法没错，问题在 document picker 的呈现/交互）；整个 iOS 入口是 `TabView` 三 tab（~行 19）。
-- `GameLog/GameLogApp.swift`：`@main`（~行 4）→ `WindowGroup` → `AutoBackupContainer { iOSRootView() }`（~行 27-40）。诊断日志里 picker 挂的 `UIHostingController<...AutoBackupContainer<...iOSRootView...>>` 即源于此。
-- `GameLog/Support/AutoBackup.swift`：`AutoBackupContainer`（~行 279，包在 WindowGroup 最外层）、`restoreFromAutoBackup()`、`writeSnapshot()`、`backupDir`/`backupFileURL`（iOS=`Documents/Backups`）。
-- `GameLog/Support/ExportImport.swift`：`decodeAndReplace()`（逻辑已验证 OK）、`encode()`。
-- `GameLog/Support/ImageSourcePicker.swift`：图片 `fileImporter`（`[.image]`，~行 105，真机同样静默）、`PhotosPicker`（相册，正常）、`UIImagePickerController`（拍照，正常）。
-- `GameLog/Resources/Info-iOS.plist`：`CFBundleDocumentTypes` 声明 `public.json`（`LSHandlerRank` 当前 HEAD 是 `Owner`，排查时曾被改 `Alternate`，已回退）；`LSSupportsOpeningDocumentsInPlace`（HEAD 是 `true`，排查时曾被改 `false`，已回退）；`UIFileSharingEnabled=true`（已验证进真机 plist，但 adhoc 安装下 Files 不显示文件夹）。
-- 封面/照片「从文件导入」入口散落于 `GameEditView.swift` / `HoldingsView.swift` / `GameDetailView.swift` 的 `fileImporter`（同样走 document picker，真机死；若走方向 1，这些入口也要一并换）。
-
-================================================================
-【十二、最小复现工程（独立，不在 GameLog 仓库）】
-================================================================
-- 路径：`/Users/abc/Documents/UIDocPickerRepro/GameLogRepro.xcodeproj`（及 `GameLogRepro/` 源、`dist/GameLogRepro-1.0.ipa`）。
-- 签名：工程已设 `CODE_SIGN_STYLE = Automatic`，用户 Xcode Run 选 team 即可。⚠️ **注意区分**：本「终端构建机」本身 `security find-identity` 显示 0 有效签名身份，所以**我（终端/Claude）从命令行打的** `dist/GameLogRepro-1.0.ipa` 是 `TeamIdentifier=not set` 的纯自签，**只有这台构建机自己信任、用户手机装不上**——这是构建机的限制，不是用户的限制。用户**自己有自签能力**（repro 真机就是用户自行装好测的，之前打不开纯粹是 scene 黑屏代码 bug，已修）。所以：终端打的 IPA 仅供存档/对照；真机实测请用**用户自己的 Xcode Run（Development 签名）/或用户用自己的证书重签后的 IPA**——这完全能装。
-- ⚠️ dist IPA 曾旧（含黑屏 bug），已于 2026-08-22 15:31 用修复后源码重打包，内嵌 Info.plist 已无 `UISceneConfigurations`（黑屏修复已进包）。
-
-================================================================
-【十三、验证闭环（铁律）】
-================================================================
-- 改完 iOS 构建 → 真机实测。模拟器只验证编译能跑，**真机 document picker 问题模拟器复现不了，必须以真机实测为准**。
-- 真机构建命令见 §三（iOS 真机 device 构建 + Payload zip 打包）。
-- 真机读日志：可用 Xcode console；或最小 App 的屏幕日志 + `Copy log` 按钮（纯文字，不需连 Xcode、不需 Files）。GameLog 自身的「导入诊断(调试)」section 已随回退移除，要再看需重新加。
-
-================================================================
-【十四、收尾状态（2026-08-22 ✅ 问题已解决）】
-================================================================
-- **已解决**：根因 H5（SwiftUI fileImporter 封装层真机异常），修复=DocumentPicker.swift 组件替换两处调用，用户真机实测通过。详见本节顶部「最终结论」。
-- 历史排查记录（本节【零】~【十三】）保留作档案：最小复现工程 `/Users/abc/Documents/UIDocPickerRepro/` 留存；「改动 A~D 已回退」指更早一轮的尝试（251b350 之前），本轮最终落地的 DocumentPicker 方案是全新实现并已随 beta 2.3.2 提交。
-- beta 2.3.2 产物：`dist/GameLog-beta-2.3.2.dmg` + `dist/GameLog-beta-2.3.2.ipa`（dist 被 gitignore 不进 git）。
 ### 29.1 总体意图
 
 把详情页「持有」页签从「版本名 + 数量 + 照片」的简单列表，升级成**藏品档案（collection archive）**：记录每一份实体的介质、版本区分、品相、来源、地区、价格与估值，并支持网格/列表双视图、顶部总览、统计收藏价值。
@@ -992,7 +788,7 @@ enum CopyAcquisition: String, CaseIterable, Identifiable {
 - 界面标签 `copy.acquisition` 三语改为「来源」(zh) / 入手元 (ja) / Source (en)。
 - 默认新建来源从首发切到 `officialChannelOverseas`（承接原意）。
 
-### 29.9 持有页 hover 崩溃（最高优先级未决 ❌ 已随 beta 2.2 重写消除，用户实测不崩）
+### 29.9 hover 崩溃（✅ 已随 beta 2.2 重写消除，用户实测不崩；保留根因分析作档案）
 
 - **原现象**：只有「有持点数据的游戏（Halo Campaign Evolved）」打开详情页→「持有」时，鼠标 hover 到持有卡片即崩。栈 `_postWindowNeedsUpdateConstraints` → `abort()`（SIGABRT）。真实 reason：`...more Update Constraints in Window passes than there are views in the window` = **macOS 27 beta SwiftUI 8.0 在 hover(hitTest) 时触发 ScrollView 的 `requestImmediateUpdate` 无限递归**（纯布局反馈循环，与 SwiftData/状态变更无关）。
 - **原排查结论不可靠**：当时那轮排查的"证伪"清单自相矛盾（同一"移出 GeometryReader"既被记为证伪假设③、又被 §29.13 当最后假设部署），root cause 始终未被真正确认；且 §29 重建期间 store 被替换/构建来回切，可能是瞬态现象。
@@ -1017,17 +813,9 @@ enum CopyAcquisition: String, CaseIterable, Identifiable {
 17. **`DataSmokeTest`** 覆盖：介质/来源 `migrate`（physical/digital/code/firstHand/secondHand/未知兜底/新值原样）、`isPhysical` 联动、`hasCondition` 联动、三语价格严格隔离（zh=399/en=60/ja=nil）、版本区分/品相 migrate 兜底、旧备份持有（physical/firstHand）导入落对枚举。2026-08-20 实测全 PASS。
 18. **测试脚手架命令已修**：`Scripts/DataSmokeTest/main.swift` 与 `ShareRenderTest` 头注释的 `swiftc` 命令已补 `EnumPickerRow.swift` / `L10n.swift` / `AppLanguage.swift`（beta 1.6 后 `LabelKeyed`/`L10n`/`AppLanguage` 跨文件，旧命令编译不过）。
 
-### 29.12 验证清单（重建后实测，2026-08-20）
+### 29.12 验证状态（2026-08-20 重建后全量实测）
 
-- [x] macOS Debug 构建 BUILD SUCCEEDED（beta Xcode，`/tmp/GameLogDD-mac`；bin mtime 20:50:14；已 `cp -R` 到 `/Applications` 并 `pkill -x GameLog && open` 重启套用）
-- [x] iOS Simulator Debug 构建 BUILD SUCCEEDED（`generic/platform=iOS Simulator`，`/tmp/GameLogDD-ios`；指定具体机型会落到 My Mac 报错，用 generic 目标）
-- [x] ScoreMath 15/15
-- [x] DataSmoke 全过（含 §29.11 迁移断言，23 项 PASS）
-- [x] ShareRender 全过
-- [x] RichReview（Markdown 富文本往返）全过（仅 `showCGGlyphs` deprecated 警告，非错误）
-- [x] L10n 三语 295 key 一致、plutil 三语 OK、0 缺失
-- [x] **hover 崩溃实测不崩**（2026-08-20 深夜，用户实测 Halo→持有 hover 不崩；§29.9 已随 beta 2.2 重写消除，未决项关闭）
-- [ ] 用户实测（UI 走查）：网格/列表双视图、总览四格、编辑弹窗 7 档介质/11 档来源、新建默认不建持有（勾选才建）、统计收藏价值区块、整体排名价值榜三页、主页排序新增两项与默认、⚠️ 确认 `CopyRegional`/`CopyCondition` 成员是否符合预期（见 §29 头注）
+macOS/iOS Debug 构建、ScoreMath 15/15、DataSmoke（含 §29.11 迁移断言）、ShareRender、RichReview 往返、L10n 三语一致 0 缺失——全部通过；hover 崩溃与滑块卡顿用户实测确认解决。UI 走查（双视图/总览/编辑弹窗/统计区块/价值榜/排序）用户已通过。
 
 ### 29.13 本会话（2026-08-20 晚）交付物与文件清单
 
@@ -1045,96 +833,11 @@ enum CopyAcquisition: String, CaseIterable, Identifiable {
 - `Scripts/DataSmokeTest/main.swift` — 加 §29.11 迁移断言 + 头注释命令补 `EnumPickerRow.swift`/`L10n.swift`/`AppLanguage.swift`。
 - `GameLog.xcodeproj/project.pbxproj` — `MARKETING_VERSION` 4 处 `"beta 2.1"` → `"beta 2.2"`（因 `PBXFileSystemSynchronizedRootGroup`，新增 `.swift` 自动进 target，无需手改 pbxproj 文件引用）。
 
-**后续增量 commit（2026-08-20 深夜 ~ 2026-08-21 凌晨，均为用户后续需求，已提交）：**
-- `e26269d` fix: 进入详情页状态滑块先闪「已通关」再滑到正确状态（sliderIndex 由 status 派生 + GameDetailView.init 构造时同步 detailStatus）。
-- `1571cb9` fix: 状态滑块进入详情一律停在「已通关」（sliderIndex 不再独立 @State，改由 status 派生）。
-- `90bdb08` fix: 网格缩略图调高（Library 2:3、持有首图 3:4）。
-- `fa5edc6` fix: 网格缩略图尺寸随图片比例变动并重叠（Library/持有网格，改用 Color.clear 锚点 + overlay 安全图案）。
-- `0222b97` feat: 主页排序新增「最近编辑」与「价值最高」（Game.updatedAt 字段轻量迁移 + GameEditView 保存写 updatedAt + Game.totalEstimate(for:)）。
-- `8eba5e0` chore: 主页默认排序改为「最近编辑」。
-- `bd00f16` feat: 整体排名新增价值榜（按游戏价值 / 按机器（平台）价值 / 按分组价值三页；ValueRankingEntry/ValueRankings/ValueRankingBoard 三件套 + 顶部分数榜/价值榜大类切换）。
-- `2835fb7` fix: 新建游戏默认不建持有档案，须勾选「我拥有这份（建持有档案）」才展开填写并建 PhysicalCopy（建档案守卫 `isCreating && collectorMode && createHolding`）。
-- `65e6efd` docs: 更新 §29 beta 2.2 收尾状态（价值榜/排序/持有开关已落地、卡顿与 hover 已解决）。
-- 统计页整体排名「分数榜/价值榜 + 子切换」改为与详情页同款 liquid glass 滑块（`SegmentSlider` 通用组件，mac/iOS 统一，未单独 commit，随本轮收尾一并提交）。
-- Release 构建 + 打包：`dist/GameLog-beta-2.2.dmg`（挂载验证通过）、`dist/GameLog-beta-2.2.ipa`（未签名，含 Payload/GameLog.app），版本号 `beta 2.2`。
+**后续增量 commit（2026-08-20 深夜 ~ 08-21，均为用户后续需求）**：状态滑块初始化错位两连修、网格缩略图两连修、主页排序「最近编辑/价值最高」+ 默认最近编辑、整体排名价值榜三页、新建游戏默认不建持有档案、统计页滑块化（`SegmentSlider`）、beta 2.2 打包。逐条 hash 见 git log。
 
-**本会话未做 / 留给新 chat：**
-1. ~~hover 崩溃实测（§29.9）~~ — ✅ 已解决：随 beta 2.2 重写消除，用户实测不崩。
-2. ~~状态滑块卡顿（§29.14）~~ — ✅ 已解决：本地 @State 驱动视觉、模型写入延后 .onDisappear，用户实测流畅。
-3. ~~状态滑块初始化错位（停在已通关 / 先闪再滑）~~ — ✅ 已解决。
-4. ~~网格缩略图尺寸随比例变动并重叠~~ — ✅ 已解决。
-5. 用户验收 `CopyRegional`/`CopyCondition` 成员（见 §29 头注）。
-6. 用户整体 UI 实测（双视图/总览/编辑弹窗/统计区块/价值榜/排序）。
-7. ✅ 收尾内容已全部完成（枚举验收通过、UI 走查、统计页滑块改造、README 三语重写、版本号 beta 2.2、DMG/IPA 打包并挂载验证）。**唯一剩余 = 打 tag `beta-v2.2` + 推 GitHub，需用户明确授权与凭据，未授权绝不 push。** 本仓库 dist/ 被 gitignore，DMG/IPA 不进 git，分发直接用 dist/ 下打包产物即可。
+### 29.14 状态滑块卡顿（2026-08-20 ✅ 已解决）
 
-### 29.14 滑块卡顿排查（2026-08-20 深夜，本会话新增，✅ 已解决）
+**现象**：详情页六列状态滑块点击顿挫、滑动动画掉帧（仅 macOS 明显）；「详情/持有」「网格/列表」两个滑块不卡。
+**根因（差异 A，已证实）**：点击回调里同步写 `game.statusValue` + `context.save()`，触发整个 `GameDetailView` body 重算；另两个滑块只改本地 `@State` 不碰模型。曾试过换背景材质、去 tooltip、抽子视图均无效（已回退）。
+**修法（现行实现，勿回退）**：`DetailStatusPicker` 删掉 onChanged 写模型闭包，点击只改本地 `@State`（`status`/`sliderIndex` 由 status 派生），**完全不碰模型**；模型写入延后到 `.onDisappear` 的 `persistStatusIfChanged()`（仅变化才写 + save）；页内依赖状态的显隐判断改用本地 `detailStatus.isCompletedOrLongRunning` 而非模型属性，保证即时反馈且不触发整页重算。初始化错位（停在「已通关」/先闪再滑）同批修复（init 同步 detailStatus）。用户实测流畅。
 
-> 用户反馈：详情页「状态滑块」（想玩/在玩/搁置/弃坑/长线游玩/已通关，6 列）点击卡顿、mac 版滑动动画期间持续掉帧；而「详情/持有」滑块、「持有中网格/列表」滑块**不卡**。本轮已多次尝试均无效，已回退到最初基准状态，待新 chat 继续。
-
-**现象细分（用户实测口径）：**
-- 状态滑块：① 本身无 hover 效果；② 点击后停顿一下才滑动，且比另两个滑块"久很多"；③ 滑动动画很卡（仅 macOS，iOS 仅点击顿一下即 A 类、不持续卡）。
-- 对照：详情/持有滑块、网格/列表滑块点击顺、滑动顺（mac 也不卡）。
-
-**已排除的错误选项（均试过、卡顿无变化、已回退）：**
-1. ❌ 背景 `.thinMaterial` → 换成 `Color.semantic(.controlBackground)`：无变化（注：`.thinMaterial` 仍保留在三个滑块，回退后状态栏/详情持有/网格列表背景都是 `.thinMaterial`；另两个不卡滑块也是 `.thinMaterial`，故非材质问题）。
-2. ❌ 去掉 6 列 `.help()` tooltip：无变化（已回退，状态栏现仍带 `.help(L10n.tr(s.labelKey,...))`）。
-3. ❌ 把每列抽成稳定子视图 `StatusCell` + 缓存 `cellWidth` 到 `@State`：无变化（已回退删掉 `StatusCell`，状态栏现仍是 ForEach 内联列）。
-
-**仍待查的真因方向（未动过，是状态滑块 vs 不卡滑块的剩余差异）：**
-- **差异 A（最可能）：模型写入引发的整页重算。** 状态滑块点击 → `onChanged` 回调 → `game.statusValue = newValue` + `context.save()`（见 `GameDetailView.swift` ~531 行 `DetailStatusPicker(status: $detailStatus) { newValue in guard newValue != game.statusValue else { return }; game.statusValue = newValue; try? context.save() }`）。这会触发整个 `GameDetailView` body 重算（状态变化驱动记录区显隐、卡片状态等）。另两个滑块只改本地 `@State`（`detailTab` / `useGridView`），**不碰 SwiftData 模型、不触发父级 body 重算**。"点击停顿比另两个久很多"极符合此——同步写模型 + 整页重算的开销。
-- **差异 B：状态栏在 `GeometryReader` 内 + 6 列 `ForEach(all)`** 每次 body 重算重建（但内联重构后 HoldingsView 也是类似结构，需对比）。
-- **差异 C：动画参数**——三个滑块都用 `.spring(response:0.3, dampingFraction:0.78)`，一致，非差异。
-
-**建议的下一步验证（最小代价定位真因）：** 临时把状态滑块的 `onChanged` 回调改成**空操作**（不写 `game`、不 `save()`），构建实测点击是否瞬间变流畅。若变流畅 → 真因是差异 A（模型写入/整页重算），解决方案方向：① 状态变更用 `withTransaction(.init(animation:nil))` 或包 `DispatchQueue.main.async` 隔离；② 或从 `@Binding status` 解耦，本地先动画、退出详情页时才批量持久化；③ 把 `GameDetailView` 里依赖 `game.statusValue` 的子视图用 `@ViewBuilder` 隔离、避免整页 body 重算。**注意 §4.17/§6.28 铁律：SwiftUI 里状态变更包 `DispatchQueue.main.async` 是已确立写法，但本会话试过的 async 延后（在 Button 闭包里 `DispatchQueue.main.async { status = s; onChanged(s) }`）回退时已删，且当时仍卡，说明单纯延后写入不够——根因更可能是整页 body 因 `game` 模型变化而重算，而非写入时机。**
-
-**当前代码基准状态（回退后，可直接在此基础上改）：**
-- `GameLog/Views/GameDetailView.swift` 的 `DetailStatusPicker`：`.thinMaterial` 背景、内联 `ForEach(all) { s in ... }` 列、每列 `.help()`、点击同步 `status = s; onChanged(s)`、`sliderIndex` 本地 `@State` 驱动 offset 动画。
-- `detailTabPicker`（详情/持有）：2 列液态玻璃滑块，点击只改 `detailTab`/`tabSliderIndex` 本地 `@State`，不写模型。
-- `HoldingsView` 网格/列表切换：2 列液态玻璃滑块，点击只改 `useGridView`/`gridSliderIndex`（后者 `.onAppear` 同步），不写模型。
-
-**✅ 已修复（2026-08-20 深夜）：** 真因确为差异 A（点击即写 SwiftData 模型触发整页 body 重算）。
-- 改动 `GameDetailView.swift`：`DetailStatusPicker` 删掉 `onChanged` 闭包，改为纯 `@Binding status` + 本地 `sliderIndex` 驱动视觉；点击只改本地 `@State`（`status`/`sliderIndex`），**完全不碰模型**。模型写入延后到 `.onDisappear` 的 `persistStatusIfChanged()`（仅 `detailStatus != game.statusValue` 才 `game.statusValue = detailStatus; context.save()`）。`GameDetailView` 内两处 `game.isCompletedOrLongRunning` 依赖（工具栏「加记录」按钮、通关记录区显隐）改为 `detailStatus.isCompletedOrLongRunning`，新增 `GameStatus.isCompletedOrLongRunning`（Bool）扩展，确保点击即时显隐而不触发模型重算；`GameCardView` 仍用 `Game.isCompletedOrLongRunning`（反映已持久化状态），不受影响。
-- 验证：mac/iOS 双平台构建 SUCCEEDED 并部署 `/Applications` 重启（bin mtime 22:49 晚于源码）；ScoreMath 15/15、DataSmoke 全 PASS、ShareRender 全 PASS、L10n 三语 295 key 一致 0 缺失。待用户实测点击流畅度确认。
-
-## 29.15 beta 2.2 收尾增量（2026-08-21 上午，本会话，全部已落地但**未提交**）
-
-> **状态（交棒 new chat 时）**：以上 §29.1–§29.14 的功能+验证均已在历史 commit 中。本会话（2026-08-21 上午）在已验收基线之上又做了一轮 UI/枚举打磨，**改动全部在工作树、尚未 `git commit`、`git status` 干净无 untracked**，等待用户走查满意后统一收尾（commit + 打 `beta-v2.2` tag + 推 GitHub）。本地与远程已同步（领先 0 commit），`dist/GameLog-beta-2.2.dmg`/`.ipa` 为上一轮打包产物（版本号 `beta 2.2`），本次未重新打包。
->
-> **为何未提交**：用户明确要"先走查、再一起收尾"。所有改动已通过双平台构建 + 基线测试，可安全提交。
-
-### 29.15.1 改动清单（12 个文件，343+/188-）
-
-1. **分享面板滑块化（SharePanelView.swift + StatsRankings.swift）**：把分享面板两处系统 `.segmented` Picker（`mode` 按游戏/分组、`size` 手机/桌面）换成与详情页「详情/持有」同款的液态玻璃分段滑块 `SegmentSlider`。`SegmentSlider` 原为 `OverallRankingView` 内嵌 `private` 类型，提为**顶层 `internal`**（`StatsRankings.swift`，文件底部，在 `ValueRankingBoard` 之后、`OverallRankingView` 之前插入），`titles:[String] + selection:Int @Binding`，双端共用。`SharePanelView` 通过 `ShareMode.allCases` / `ShareSize.allCases` 计算绑定桥接 Int。iOS 段 `.frame(width:260)` 只保留 macOS（iOS 自动撑满）。
-2. **iOS 主页排序缺项补全（LibraryView.swift）**：iOS 排序菜单漏列 `recentEdit`(最近编辑) 与 `valueDescending`(价值最高)，导致 iOS 比 macOS 少两项。已补全，现 7 项与 macOS 一致。
-3. **排序「最近编辑」置顶（LibraryView.swift，mac/iOS 两处菜单）**：`LibrarySort` 菜单顺序改为 最近编辑 → 名称 → 发售日 → 通关日 → 分数升 → 分数降 → 价值最高。**默认最近编辑 + 记忆上次排序本就存在**（`@AppStorage("librarySort")`，默认值 `recentEdit`），无需新写。
-4. **分组页评价 Markdown 渲染（GroupFooter.swift）**：`GroupReviewSection` 评价区从裸 `Text(group.review)` 改为 `MarkdownReviewView(markdown: group.review)`，与详情页游戏长评同款渲染器（支持 `#/##/###`、`**粗**`、`*斜*`、`- ` 列表）。空时仍显示 `group.reviewEmpty` 占位。编辑弹窗未动（方案 A）。
-5. **分组编辑窗照搬游戏写字台（ReviewEditorView.swift + GroupFooter.swift，macOS）**：`ReviewEditorSession` 新增 `groupID: PersistentIdentifier?` + 计算 `targetID`（game 优先）。`ReviewEditorView`(macOS-only)新增分组分支：`load` 解析 `GameGroup` → `controller.load(markdown: group.review)`；编辑内容**无题眼框、只长评区、标题显组名**；`save` 分流写回 `group.review`。`GroupReviewSection` 的「编辑」按钮：macOS 写 `groupID` + `openWindow(id:"reviewEditor")`（复用游戏同款独立窗口），iOS 弹 sheet。**iOS 分组编辑降级纯文本 `TextEditor`**（与游戏 iOS 一致）：`GroupReviewEditSheet` 改为 `#if os(iOS)` 专属，内部 `TextEditor(text:)` + 导航栏取消/保存；macOS 的 `.sheet` 内容用 `@ViewBuilder groupReviewEditSheet` 守卫返回 `EmptyView()`。游戏编辑路径（gameID → reviewTitle/reviewBody）未动。
-6. **持有胶囊横排（HoldingsView.swift）**：网格单元格 `CopyGridCellView` 的介质/版本/品相胶囊**补上「来源」**，凑齐四项横排；列表视图 `archiveInfoSection` 的介质/版本/品相/来源从竖排 `archiveRow` 改为顶部横排 `WrappingLayout` 胶囊（复用 `capsule`）。`capsule` 从 `CopyGridCellView` 的 `private func` 提为**文件级 `fileprivate func`**（供网格与列表共用，修复 `cannot find 'capsule' in scope`）。
-7. **价格/估值左右并列（HoldingsView.swift）**：`archiveInfoSection` 里价格、估值两行竖排改为一行 `HStack`（spacing 24，末尾 Spacer）左右并列；仅当至少一项存在时显示该行。购买日保持竖排。
-8. **介质枚举重写（PhysicalCopy.swift + 三语）**：`CopyMedia` 从 7 项重写为 11 项——实体标准版/实体特别版（首发、封套、幻彩、铁盒等）/实体限定版（限定版、收藏版等）/数字标准版/数字高级版（豪华版、高级版等）/数字升级包（用于 Game Pass、实体版等的附加包）/实体版（内附兑换码）/**限定版机器/限定版控制器/限定版配件/相关周边**。前 7 项 rawValue 与旧一致（现有数据免迁移），后 4 项新增。`isPhysical` 把 8–11（机器/控制器/配件/周边）也判为 true（用户确认都是实物，品相可填）。`migrate` 旧三态映射保留。三语 `copy.media.*` 加 4 × 括号说明已并入选项文案（见 §29.15.2）。
-9. **品相枚举重写（PhysicalCopy.swift + 三语 + DataSmoke 断言）**：`CopyCondition` 从 7 项重写为 6+1 项——全新 / **全新（瑕疵）** / 二手 / 二手（污损、损伤）/ 二手（附件缺失）/ 二手（仅软件）/ 二手（损坏）。`migrate` 做旧七态语义映射（sealed/mint→全新、excellent/good/fair→二手、worn→二手污损、damaged→二手损坏），未知兜底二手。**新建默认值从 `.good` 改为 `.used`**（4 处：conditionRaw 声明默认、PhysicalCopy.init 默认参数、GameEditView.holdingCondition、HoldingsView CopyEditSheet 兜底）。DataSmoke 一条「未知兜底 good」断言改为 `.used`。
-10. **括号说明并进选项文案（三语 Localizable.strings）**：介质 physicalSpecial/physicalLimited/digitalPremium/digitalUpgrade 四项的括号说明从代码注释并进选项显示文字（三语，英文/日文机翻）。
-
-### 29.15.2 数据层快照（已按铁律备份）
-
-- `~/Library/Application Support/GameLog-backups/snapshot-before-copymedia-rewrite-20260821-111827`
-- `~/Library/Application Support/GameLog-backups/snapshot-before-copycondition-rewrite-20260821-112651`
-
-### 29.15.3 收尾步骤（new chat 接手后）
-
-1. 用户走查满意后：`git add` 上述 12 文件 → `git commit`（中文 message，前缀 `beta 2.2：`；可合并或按改动分多条）。
-2. 更新本文件：§29 头注「待打 tag」改为「已提交待 tag」；新增 §29.16 收尾 commit 清单。
-3. 更新 `HANDOVER_PROMPT.md` 顶部块：状态改为「已提交、领先远程 1 commit、仍待打 tag + 推」；补本会话改动摘要。
-4. 打 tag：`git tag beta-v2.2`（本地，用户说打即可）。
-5. 推 GitHub：`git push origin main --tags`（**需用户明确说「推」并提供凭据，未授权绝不 push**）。
-6. 如需重新打包 DMG/IPA：版本号已 `beta 2.2`（pbxproj 4 处），用 HANDOVER §27.5/§26.5 命令；`dist/` 被 gitignore 不进 git。
-7. README 三语已于历史 commit 重写至 beta 2.2，**本次未改 README**。
-
-### 29.15.4 验证状态（本会话每次改动后均跑过，全 PASS）
-
-- 双平台 Debug 构建 SUCCEEDED（Xcode beta 27.0）。
-- ScoreMath 15/15；DataSmoke PASSED（含旧持有导入断言、condition migrate 兜底）；ShareRender PASSED；L10n 三语各 **307** key（303+介质4）/ **306**（condition 7→6 后）0 缺失（取决于改动阶段，最终态 307=介质相关、306=品相相关，但两者不共存于同一 commit 前；当前工作树同时含两者，key 数 = 原 303 + 介质新增 4 = 307，品相是替换非新增故仍是 307 以内，实际 `git status` 工作树态 L10n 检查为 307 0 缺失）。plutil 三语 OK。
-
-### 29.15.5 当前工作树未提交文件（12 个，无 untracked）
-
-`GameLog/Models/PhysicalCopy.swift`、`GameLog/Resources/{zh-Hans,en,ja}.lproj/Localizable.strings`、`GameLog/Views/{GameEditView,GroupFooter,HoldingsView,LibraryView,ReviewEditorView,SharePanelView,StatsRankings}.swift`、`Scripts/DataSmokeTest/main.swift`。
