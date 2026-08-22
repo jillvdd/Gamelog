@@ -652,7 +652,7 @@ canonical 存储值也改 + 启动一次性迁移 + 保留旧名展示兜底。
 
 ## 28. 待办 / 未决项
 
-1. **iCloud 同步方案（当前最高优先级）**：调研分析已完成（现状审查 + 架构推荐全文见 **§30**），**尚未获用户拍板、未写任何代码**。new chat 第一步应与用户确认 §30.4 架构与 §30.5 实施顺序（尤其：先过渡版「纯 data.json+images/」还是直接分片）。
+1. **iCloud 同步实验（已拍板开工，移至独立分支/目录）**：方案经 grilling 三轮定案（2026-08-22），规范全文与全部决策见 **§31**；实施在 `~/Documents/gamelog_cloudexp`（分支 `gamelog_cloudexp`），main 冻结同步工作。当前进度：Phase -1 capability 验证进行中，M0 报告待出。
 2. **详情页 SwiftUI 侧中文斜体**：只有 macOS 编辑器侧做了合成斜体；详情页 `MarkdownReviewView` 渲染的中文斜体在 SwiftUI 侧不做/待评估。
 3. **iOS 真机实测**：QLPreviewController / PhotosPicker / TabBar（拍照相机已实测 ✅ 2026-08-22；AirDrop 备份导入已实测 ✅，见 §29.17）。
 4. **push GitHub**：本地 main 领先远程多 commits + tag `beta-v2.3.2` 未推。**push 由用户自己执行（分工定案），Claude 只在合适时机提醒。**
@@ -897,3 +897,32 @@ macOS/iOS Debug 构建、ScoreMath 15/15、DataSmoke（含 §29.11 迁移断言�
 ### 30.6 本轮附带确认的事实（用户回复，2026-08-22）
 
 编辑器直打字尺寸 ✅ 正常（诊断已清理）；拍照真机实测 ✅；详情页 SwiftUI 侧中文斜体维持待办。
+
+---
+
+## 31. iCloud 同步实验定案与隔离契约（2026-08-22，grilling 三轮收敛，用户逐项批准）
+
+> **实施位置：`~/Documents/gamelog_cloudexp/`（本地克隆、分支 `gamelog_cloudexp`）；主目录永停 main。规范全文 + 修正案 + 契约 = 实验分支上的 `SYNC_SPEC.md`（commit `6024abe`），本节只是指针与摘要——细节冲突以 SYNC_SPEC 为准。**
+
+### 31.1 铁律（最高优先级）
+
+实验内容与 main **全量隔离、随时可彻底清零**。清零程序五步见 SYNC_SPEC §三（删分支/删 app/删 `GameLog-cloudexp` 目录/删 defaults domain/删 iCloud 容器数据）。
+
+### 31.2 关键决策
+
+- **双 app 并存**：Bundle ID `com.abcleg.GameLog.cloudexp`，显示名「我的游戏簿·云实验」，容器 `iCloud.com.abcleg.GameLog.cloudexp`。
+- **生产库绝不碰**：实验版 store 显式指向 `~/Library/Application Support/GameLog-cloudexp/default.store`，support 目录同步重定向（判定 = bundle id 后缀）。⚠️ 已核实现状：`GameLogApp.swift:15` 的 `ModelContainer(for:)` 无显式配置、`UserCustomization.swift:45` support 目录写死——若不重定向，UUID 轻量迁移会毁掉生产库的向后兼容。
+- **架构**：外部 AI 规范定位为框架性宪法；合并粒度 v1 = 实体级三方合并（Base/Local/Cloud + 整实体裁决），字段级后置（修正案①）。分组已是正规多对多关系（§30.1「groupNames 字符串」说法有误，现场核验为 `GameGroup.games` 关系），只需补 Game/GameGroup UUID；Completion/Copy 不加独立 UUID（修正案②③）。
+- **行为定案**：开关默认开；防抖 3s；冲突 = 启动弹窗一次 + 设置页常驻全局面板（逐项裁决默认本地）；墓碑永久保留；孤儿图片按缓存语义保留；实验版设三区控制中心（状态/操作/诊断），诊断区放宽显示内部术语（修正案⑥）。
+- **里程碑**：M0 = Phase -1 capability 判定（硬停点）→ M1 = Phase 0 全项目审计（硬停点）→ M2 = 最小垂直切片（评估点）。NOT SUPPORTED = 项目整体停止。
+
+### 31.3 Phase -1 现状（2026-08-22）
+
+- 独立复现工程已建于 `~/Documents/GameLogCloudRepro/`（iOS 单 target，bundle id 已用最终值 `com.abcleg.GameLog.cloudexp`，含 iCloud Documents entitlements 与 container 读写最小 UI），模拟器构建验证通过。
+- 待用户执行：Xcode GUI 选 Personal Team 签名 → iPhone/iPad 装机 → 按 SYNC_SPEC 附录 §0.4 清单跨设备验证 → 回报结果出 M0 报告。
+- 环境事实：免费 Personal Team、pbxproj 无 DEVELOPMENT_TEAM、零 entitlements（历史状态）；Mac+iPhone+iPad 三设备同 iCloud 账号，配额 ≥10GB 可用。
+
+### 31.4 流程纪律（实验期间）
+
+- main 冻结同步工作；实验构建派生目录 `/tmp/GameLogDD-exp-*`；两 app 进程同名，实验会话禁用 `pkill -x GameLog`（双杀风险），一律按完整产物路径重启。
+- push 分工不变（用户自推）；实验分支 commit 在实验目录进行，主目录 HANDOVER 只更新本节进度行。
