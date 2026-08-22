@@ -1,7 +1,7 @@
 # GameLog 交接日志（HANDOVER）
 
-> 更新：2026-08-22（beta 2.3.2 = iOS 导入修复 + 关于页双平台 + 持有新增按钮短文案 + iOS 导出带时间戳）
-> 状态：**beta 2.3.2 = macOS + iOS 双平台**（macOS 14.0 / iOS 18.0）。双平台 Debug/Release 构建、基线测试、L10n 三语全绿。已 commit（`a06f914`）+ 本地 tag `beta-v2.3.2`；`dist/GameLog-beta-2.3.2.dmg/.ipa` 已打包，iOS 包用户真机实测导入正常。未推 GitHub。最新详情见 §29.16–§29.17。
+> 更新：2026-08-22（beta 2.3.2 已发布；**进行中：iCloud 同步方案调研已完成待拍板，见 §30**）
+> 状态：**beta 2.3.2 = macOS + iOS 双平台**（macOS 14.0 / iOS 18.0）。双平台 Debug/Release 构建、基线测试（本会话七项全绿复验过）、L10n 三语全绿。功能 commit `a06f914` + 本地 tag `beta-v2.3.2`；`dist/GameLog-beta-2.3.2.dmg/.ipa` 已打包，iOS 包用户真机实测导入正常。未推 GitHub。最新详情见 §29.16–§30。
 > 环境：macOS 27 beta 只能用 **Xcode beta**（`/Users/abc/Downloads/Xcode-beta.app`），iOS 构建/运行一律用它。
 
 ## 1. 一句话现状
@@ -652,11 +652,12 @@ canonical 存储值也改 + 启动一次性迁移 + 保留旧名展示兜底。
 
 ## 28. 待办 / 未决项
 
-1. **详情页 SwiftUI 侧中文斜体**：只有 macOS 编辑器侧做了合成斜体；详情页 `MarkdownReviewView` 渲染的中文斜体在 SwiftUI 侧不做/待评估。
-2. **iOS 真机实测**：QLPreviewController / PhotosPicker / TabBar（拍照相机已实测 ✅ 2026-08-22；AirDrop 备份导入已实测 ✅，见 §29.17）。
-3. **push GitHub**：本地 main 领先远程 4 commits + tag `beta-v2.3.2` 未推。**push 由用户自己执行（分工定案），Claude 只在合适时机提醒。**
-4. **ROADMAP 后续**：发售日自动填充 / 统计可视化 / 封面缓存深化（已实现一部分）。
-5. ~~编辑器直打字尺寸~~ — ✅ 用户已确认正常（2026-08-22），`MarkdownRichEditor.swift` 的 DEBUG 诊断（/tmp/gamelog_editor_diag.log 相关）已清理。
+1. **iCloud 同步方案（当前最高优先级）**：调研分析已完成（现状审查 + 架构推荐全文见 **§30**），**尚未获用户拍板、未写任何代码**。new chat 第一步应与用户确认 §30.4 架构与 §30.5 实施顺序（尤其：先过渡版「纯 data.json+images/」还是直接分片）。
+2. **详情页 SwiftUI 侧中文斜体**：只有 macOS 编辑器侧做了合成斜体；详情页 `MarkdownReviewView` 渲染的中文斜体在 SwiftUI 侧不做/待评估。
+3. **iOS 真机实测**：QLPreviewController / PhotosPicker / TabBar（拍照相机已实测 ✅ 2026-08-22；AirDrop 备份导入已实测 ✅，见 §29.17）。
+4. **push GitHub**：本地 main 领先远程多 commits + tag `beta-v2.3.2` 未推。**push 由用户自己执行（分工定案），Claude 只在合适时机提醒。**
+5. **ROADMAP 后续**：发售日自动填充 / 统计可视化 / 封面缓存深化（已实现一部分）。
+6. ~~编辑器直打字尺寸~~ — ✅ 用户已确认正常（2026-08-22），`MarkdownRichEditor.swift` 的 DEBUG 诊断（/tmp/gamelog_editor_diag.log 相关）已清理。
 
 ---
 
@@ -841,3 +842,58 @@ macOS/iOS Debug 构建、ScoreMath 15/15、DataSmoke（含 §29.11 迁移断言�
 **根因（差异 A，已证实）**：点击回调里同步写 `game.statusValue` + `context.save()`，触发整个 `GameDetailView` body 重算；另两个滑块只改本地 `@State` 不碰模型。曾试过换背景材质、去 tooltip、抽子视图均无效（已回退）。
 **修法（现行实现，勿回退）**：`DetailStatusPicker` 删掉 onChanged 写模型闭包，点击只改本地 `@State`（`status`/`sliderIndex` 由 status 派生），**完全不碰模型**；模型写入延后到 `.onDisappear` 的 `persistStatusIfChanged()`（仅变化才写 + save）；页内依赖状态的显隐判断改用本地 `detailStatus.isCompletedOrLongRunning` 而非模型属性，保证即时反馈且不触发整页重算。初始化错位（停在「已通关」/先闪再滑）同批修复（init 同步 detailStatus）。用户实测流畅。
 
+
+---
+
+## 30. iCloud 同步方案调研（2026-08-22，分析完成、**待用户拍板后开工**）
+
+> 背景：用户提出不再用「巨大完整 JSON」做云同步/备份，改为「数据文件 + 图片文件」的 iCloud Container。两轮深度分析（JSON 备份实现审查 + SwiftData 模型/保存机制研究）已完成，结论如下。**尚未写任何代码；开工前需用户确认方案与优先级。**
+
+### 30.1 现状结论（已核实的代码事实）
+
+- **图片存储**：`Game.coverData: Data?`（单封面 BLOB）、`PhysicalCopy.images: [Data]`（≤6 张 BLOB 数组）；头像/图标不在 SwiftData（磁盘 PNG）。入库时「保存原图」默认关 = 压缩 JPEG ≤1600px/q0.8。
+- **导出**：`BackupManager.encode` 把全部图片 Base64 内嵌单 JSON，`outputFormatting=[.prettyPrinted,.sortedKeys]` 再放大体积；Base64 +33%。实测 28 游戏（含照片）= 28.7MB。纯数据部分 <0.15MB。
+- **自动备份**：`AutoBackup.performWrite` 每次 `context.save()` 防抖 3s 后 **MainActor 上全量重序列化整库**（大库会卡 UI，改造时顺手挪后台 context）；滚动文件每次覆盖；`pre-<版本>` 快照保留 3 份；⚠️ **`snapshot-<时间>` 导入前快照无任何清理逻辑、无限累积**（现存磁盘隐患）。
+- **纯数据 JSON 现在不存在但门槛极低**：DTO 图片字段全 Optional 且解码有缺字段兜底——encode 加 `includeImages: Bool = true` 参数约 10 行即可生成，现有 `decodeAndReplace` 不改就能读（导入成无图库）。
+- **无稳定 ID（最大缺口）**：四个 @Model 均无 UUID 字段，分组关联靠 groupNames 字符串。`persistentModelID` 只在本机 store 内稳定，跨设备/导出导入重建后无效，不能当文件名。
+
+### 30.2 规模核算（纯数据，按几千游戏评估）
+
+平均 0.5–3KB/游戏（重度 5KB+）：1k 游戏 ≈ 1–3MB；5k ≈ 5–15MB；10k ≈ 10–30MB（pretty-printed）。
+
+### 30.3 变更侦测手段（三层梯度）
+
+1. save 前 读 `context.changedModelsArray / insertedModelsArray / deletedModelsArray`（didSave 时可能已清空）；
+2. **底层 `NSManagedObjectContext.didSave` 通知 userInfo 的 inserted/updated/deleted 集合**（SwiftData 底层即 CoreData，零配置可靠；关系增删=两端 updated；级联删除=deleted 含全部子对象）；
+3. `NSPersistentHistoryTrackingKey` + HistoryChangeRequest 回放（多端双向同步的终极方案，可感知远端写入）。
+
+### 30.4 推荐架构（NSUbiquitousContainer 文件方案，不用 CloudKit record 层）
+
+```
+<container>/Documents/
+  index.json                 # schemaVersion、设备信息、统计
+  games/<gameUUID>.json      # 单游戏全数据（内嵌 completions + copies 元数据 + 图片哈希引用）
+  groups/<groupUUID>.json    # 分组（成员 gameUUID 列表，取代字符串匹配）
+  profile.json               # 用户名等；头像/图标走 images 引用
+  images/<sha256>.jpg        # 内容寻址：天然去重、同图免写、无冲突语义
+  deleted.jsonl              # 墓碑流 {kind,id,deletedAt}，多端删除收敛
+```
+
+管线：CoreData didSave 拿变更集 → 防抖 → **只写受影响分片** + 新图按 SHA-256 落 images/（已存在跳过）+ 删除记墓碑。冲突域=单文件；LWW（分片带 updatedAt）+ 墓碑收敛；孤儿图片定期 GC（比对引用集合，保守只删 N 天未引用）。
+
+过渡替代：若嫌分片复杂，先落「单 data.json（无图）+ images/ 目录」——本地生成完全可接受（5k 游戏编码 0.3–1s），但 iCloud 同步层是瓶颈（全量重传流量大、冲突粒度粗）；适合作为验证 iCloud 链路的第一里程碑。
+
+### 30.5 实施顺序（每步前置与风险）
+
+1. **数据层快照** → Game/GameGroup/PhysicalCopy 加 `id: UUID = UUID()`（声明处默认值轻量迁移；Completion 内嵌不需要）；
+2. 抽取 per-entity 序列化（复用 encode 现有字段映射）；
+3. 过渡版「纯数据 data.json + images/」验证 iCloud 链路（顺带编码挪后台）；
+4. 升级分片增量；
+5. entitlements 加 iCloud container（项目现零 entitlements，全新工程面）+ 无账号/容量满降级路径；
+6. **现有 JSON 备份体系原样保留**（手动导出/整体迁移格式不变量）。
+
+风险清单：UUID 轻量迁移（必须先快照）；iCloud 容器配置与测试矩阵（两台机、离线冲突、删除收敛）；打包方式选型仅影响手动导出分离包（zip 库 vs store-only 手写 vs AppleArchive），iCloud 文件方案不涉及。
+
+### 30.6 本轮附带确认的事实（用户回复，2026-08-22）
+
+编辑器直打字尺寸 ✅ 正常（诊断已清理）；拍照真机实测 ✅；详情页 SwiftUI 侧中文斜体维持待办。
