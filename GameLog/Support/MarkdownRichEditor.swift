@@ -406,18 +406,6 @@ final class ReviewRichTextController: NSObject, ObservableObject, NSTextViewDele
     @objc private func textChanged() {
         updateIsEmpty()
         normalizeFonts()
-        #if DEBUG
-        if let tv = textView {
-            let a = tv.attributedString()
-            let n = a.length
-            let sel = tv.selectedRange()
-            let at = min(max(sel.location - 1, 0), max(n - 1, 0))
-            if n > 0 {
-                let f = a.attribute(.font, at: at, effectiveRange: nil) as? NSFont
-                Self.debug("changed len=\(n) sel=\(sel) docFont@\(at)=\(f?.pointSize ?? -1) typing=\((tv.typingAttributes[.font] as? NSFont)?.pointSize ?? -1)")
-            }
-        }
-        #endif
     }
 
     /// 真实键盘输入落库后，NSTextView 用的是它内部固定默认字号（诊断显示 12pt），
@@ -512,21 +500,7 @@ final class ReviewRichTextController: NSObject, ObservableObject, NSTextViewDele
         }
         textView.typingAttributes[.paragraphStyle] = ReviewRichEditor.bodyParagraphStyle
         textView.typingAttributes[.foregroundColor] = NSColor.labelColor
-        #if DEBUG
-        Self.debug("shouldChange loc=\(loc) prev=\(String(describing: previousPointSize)) setTyping=\((textView.typingAttributes[.font] as? NSFont)?.pointSize ?? -1)")
-        #endif
         return true
-    }
-
-    /// 临时诊断（DEBUG 构建）：把真实输入路径的字号情况写到 /tmp/gamelog_editor_diag.log。
-    private static func debug(_ msg: String) {
-        let line = "[\(Date())] \(msg)\n"
-        if let h = FileHandle(forWritingAtPath: "/tmp/gamelog_editor_diag.log") {
-            h.seekToEndOfFile()
-            h.write(line.data(using: .utf8)!)
-        } else {
-            try? line.data(using: .utf8)?.write(to: URL(fileURLWithPath: "/tmp/gamelog_editor_diag.log"))
-        }
     }
 
     // MARK: 载入 / 读回

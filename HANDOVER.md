@@ -623,7 +623,7 @@ canonical 存储值也改 + 启动一次性迁移 + 保留旧名展示兜底。
   - 编辑窗口实例 `ReviewEditorView.swift` + `ReviewEditorSession`（`gameID` 共享编辑目标）：`GameLogApp` 新增 `Window(id: "reviewEditor")`（macOS，默认 760×520）。详情页 `reviewEditButton` 设 `session.gameID` + `openWindow(id:)`。**不保存关闭 = 放弃，保存才写回 reviewTitle/reviewBody**。
 - **iOS = 编辑 sheet（`ReviewEditSheet.swift`，无预览切换）**：tagline TextField + 正文 `TextEditor`。详情页「编辑评价」**只留编辑图标（`square.and.pencil`），不带文字**（用户明确要求）。
 - **工具条（`ReviewRichEditor` 五按钮）**：`大`（h1）/ `大小`（h2）/ `B`（粗体）/ `I`（斜体）/ `•`（列表，转正文尺寸）。
-- **⏳ 编辑器直打字偏小（未最终确认）**：NSTextView 真实键盘输入用内部 12pt 默认字体，忽略 `typingAttributes`；已加 `normalizeFonts()`（didChange 后扫描非规格字号 15/16/18/22 修正）+ `shouldChangeTextIn` 设置 typingAttributes。**已构建但用户尚未视觉确认**——下一会话如用户仍反馈「直打字尺寸与正文不一致」，先查 `normalizeFonts()` 是否被 `isNormalizing` 守卫短路或 size 未覆盖。`MarkdownRichEditor.swift` 里仍留有 DEBUG 诊断（写 `/tmp/gamelog_editor_diag.log`）待确认后清理（见 §28 待办）。
+- **✅ 编辑器直打字尺寸（已确认正常，2026-08-22 用户视觉确认）**：NSTextView 真实键盘输入用内部 12pt 默认字体，忽略 `typingAttributes`；修法 = `normalizeFonts()`（didChange 后扫描非规格字号 15/16/18/22 修正）+ `shouldChangeTextIn` 设置 typingAttributes。当时的 DEBUG 诊断（/tmp/gamelog_editor_diag.log）已随确认清理。
 
 ### 27.2 其他改动
 
@@ -652,11 +652,11 @@ canonical 存储值也改 + 启动一次性迁移 + 保留旧名展示兜底。
 
 ## 28. 待办 / 未决项
 
-1. **编辑器直打字尺寸（未最终确认）**：`normalizeFonts()` 修正已构建但用户未二次验收；确认后就移除 `MarkdownRichEditor.swift` 里的 DEBUG 诊断（写到 `/tmp/gamelog_editor_diag.log` 的 `Self.debug` 与 `#if DEBUG` 块）。
-2. **详情页 SwiftUI 侧中文斜体**：只有 macOS 编辑器侧做了合成斜体；详情页 `MarkdownReviewView` 渲染的中文斜体在 SwiftUI 侧不做/待评估。
-3. **iOS 真机实测**：拍照 / QLPreviewController / PhotosPicker / TabBar（AirDrop 备份导入已实测 ✅，见 §29.17）。
-4. **push GitHub**：本地 main 领先远程 4 commits + tag `beta-v2.3.2` 未推。**push 由用户自己执行（分工定案），Claude 只在合适时机提醒。**
-5. **ROADMAP 后续**：发售日自动填充 / 统计可视化 / 封面缓存深化（已实现一部分）。
+1. **详情页 SwiftUI 侧中文斜体**：只有 macOS 编辑器侧做了合成斜体；详情页 `MarkdownReviewView` 渲染的中文斜体在 SwiftUI 侧不做/待评估。
+2. **iOS 真机实测**：QLPreviewController / PhotosPicker / TabBar（拍照相机已实测 ✅ 2026-08-22；AirDrop 备份导入已实测 ✅，见 §29.17）。
+3. **push GitHub**：本地 main 领先远程 4 commits + tag `beta-v2.3.2` 未推。**push 由用户自己执行（分工定案），Claude 只在合适时机提醒。**
+4. **ROADMAP 后续**：发售日自动填充 / 统计可视化 / 封面缓存深化（已实现一部分）。
+5. ~~编辑器直打字尺寸~~ — ✅ 用户已确认正常（2026-08-22），`MarkdownRichEditor.swift` 的 DEBUG 诊断（/tmp/gamelog_editor_diag.log 相关）已清理。
 
 ---
 
