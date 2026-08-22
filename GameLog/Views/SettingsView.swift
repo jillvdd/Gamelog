@@ -62,7 +62,7 @@ struct SettingsView: View {
     @State private var cacheMessage: String?
     #if !os(macOS)
     @State private var showingAvatarPicker = false
-    @State private var showingBackupImporter = false
+    @State private var showingAbout = false
     #endif
 
     var body: some View {
@@ -204,7 +204,7 @@ struct SettingsView: View {
                 // 规避 sheet 首次弹出为空白、需先弹其他窗「预热」的问题）。
                 Button(L10n.tr("backup.export", lang: language)) { prepareBackupShare() }
                     .appStandardButton()
-                Button(L10n.tr("backup.import", lang: language)) { showingBackupImporter = true }
+                Button(L10n.tr("backup.import", lang: language)) { importBackup() }
                     .appStandardButton()
                 #endif
                 if let statusMessage {
@@ -226,6 +226,17 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+
+            #if !os(macOS)
+            // iOS 无 app 菜单，「关于」入口放设置页底部（macOS 走 App 名菜单 → 关于）。
+            Section {
+                Button(L10n.tr("about.menu", lang: language)) { showingAbout = true }
+                    .appStandardButton()
+            }
+            .sheet(isPresented: $showingAbout) {
+                AboutView()
+            }
+            #endif
         }
         .formStyle(.grouped)
         .onAppear { validateKey(); refreshCacheSize() }
@@ -279,23 +290,6 @@ struct SettingsView: View {
                 cropSession = CropSession(kind: .avatar, image: image)
             }
         })
-        .fileImporter(isPresented: $showingBackupImporter, allowedContentTypes: [.json]) { result in
-            if case .success(let url) = result {
-                // 「文件」App 返回的 URL 在安全沙盒作用域外，需先取得安全作用域授权才能读取，
-                // 否则 Data(contentsOf:) 抛权限错误被静默吞掉（与 onOpenURL 路径一致）。
-                let didStart = url.startAccessingSecurityScopedResource()
-                defer { if didStart { url.stopAccessingSecurityScopedResource() } }
-                do {
-                    let data = try Data(contentsOf: url)
-                    AutoBackup.shared.writeSnapshot(context: context)
-                    try BackupManager.decodeAndReplace(data, into: context)
-                    try context.save()
-                    statusMessage = L10n.tr("backup.importDone", lang: language)
-                } catch {
-                    statusMessage = L10n.tr("backup.importFailed", lang: language)
-                }
-            }
-        }
         #endif
     }
 
@@ -456,7 +450,11 @@ struct SettingsView: View {
             statusMessage = L10n.tr("backup.exportFailed", lang: language)
             return
         }
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("GameLog-backup.json")
+        // 文件名带时间，与 macOS 导出（NSSavePanel 预填名）同一格式。
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd-HH-mm"
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("GameLog-backup-\(formatter.string(from: Date())).json")
         guard (try? data.write(to: url)) != nil else {
             statusMessage = L10n.tr("backup.exportFailed", lang: language)
             return
@@ -474,6 +472,20 @@ struct SettingsView: View {
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
         guard panel.runModal() == .OK, let url = panel.url else { return }
+        importBackupData(from: url, requestAccess: false)
+        #else
+        // iOS：裸 UIDocumentPickerViewController（DocumentPicker），不走 SwiftUI fileImporter。
+        DocumentPicker.present(types: [.json]) { url in
+            self.importBackupData(from: url, requestAccess: true)
+        }
+        #endif
+    }
+
+    /// 解码并整库替换。iOS 的「文件」App URL 在安全沙盒作用域外，需先取得安全作用域授权才能读取，
+    /// 否则 Data(contentsOf:) 抛权限错误被静默吞掉（与 onOpenURL 路径一致）。
+    private func importBackupData(from url: URL, requestAccess: Bool) {
+        let didStart = requestAccess ? url.startAccessingSecurityScopedResource() : false
+        defer { if didStart { url.stopAccessingSecurityScopedResource() } }
         do {
             let data = try Data(contentsOf: url)
             AutoBackup.shared.writeSnapshot(context: context)
@@ -483,9 +495,6 @@ struct SettingsView: View {
         } catch {
             statusMessage = L10n.tr("backup.importFailed", lang: language)
         }
-        #else
-        // iOS：阶段 3 用 fileImporter 实现备份导入。
-        #endif
     }
 
     // MARK: - 自动备份 + 缓存

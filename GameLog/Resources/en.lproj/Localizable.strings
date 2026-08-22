@@ -241,6 +241,7 @@
 "copy.acquisition.other" = "Other";
 "copy.editArchive" = "Edit Archive";
 "copy.addArchive" = "Add Holding";
+"copy.addShort" = "Add";
 "copy.media" = "Edition";
 "copy.regional" = "Region";
 "copy.condition" = "State";
