@@ -281,6 +281,10 @@ struct SettingsView: View {
         })
         .fileImporter(isPresented: $showingBackupImporter, allowedContentTypes: [.json]) { result in
             if case .success(let url) = result {
+                // 「文件」App 返回的 URL 在安全沙盒作用域外，需先取得安全作用域授权才能读取，
+                // 否则 Data(contentsOf:) 抛权限错误被静默吞掉（与 onOpenURL 路径一致）。
+                let didStart = url.startAccessingSecurityScopedResource()
+                defer { if didStart { url.stopAccessingSecurityScopedResource() } }
                 do {
                     let data = try Data(contentsOf: url)
                     AutoBackup.shared.writeSnapshot(context: context)
