@@ -258,9 +258,9 @@ $DEVELOPER_DIR/usr/bin/simctl launch <UDID> com.abcleg.GameLog
 
 - **当前最重要的下一步**：① **beta 1.9 已提交**（状态机 + 全局毛玻璃 + 图标尺寸，见 §25）；② **iOS 真机 iPhone 16 Pro 实测未完成**（拍照/相机、AirDrop 备份导入、QLPreviewController、PhotosPicker、TabBar 全流程——只有真机能完整验证）；③ **问用户是否推 GitHub**：main 领先远程多次提交，**本轮未打 tag**。要推：`git push origin main`（若要打 tag：`git tag beta-v1.9 && git push origin beta-v1.9`，远程 tag 命名是 `beta-v1.x` 格式）。⚠️ push 因 HTTPS 无交互凭据失败（`could not read Username`），需用户执行 push 时输入凭据或先 `gh auth login`/配置凭据。
 - **数据迁移注意（2026-08-17 事件，务必读）**：某次构建后 app 显示空库（UserDefaults 的 SteamGridDB key 还在），用户通过导入旧备份恢复。**已用独立 swiftc 测试验证：旧 schema store（无 ZSTATUS/ZPLATFORM 列）→ 新 schema 的轻量迁移是成功的**（29 条数据 + 新增列正确）；所以不能简单归因于「schema 不兼容」。排查发现 app 正在用的 `~/Library/Application Support/default.store` 文件 birthtime 是 2026-08-13 22:09（beta 1.8 导入测试那晚），即真实 store 曾被替换/清空，原始数据只存在于备份快照里。**教训：涉及数据层/导入测试前，先把 store 拷到 `~/Library/Application Support/GameLog-backups/` 留快照；任何「数据不见了」先按 §25.5 排查 store 文件、对照备份 JSON，别急着怀疑迁移代码。** 用户已确认本轮修复后迁移/读取正常。
-- **下次发版流程**：改 pbxproj `MARKETING_VERSION` 四处（macOS/iOS 各 Debug/Release）→ Release 构建 → `dist/` 出 DMG：暂存 `GameLog.app` + `ln -s /Applications Applications` → `hdiutil create -volname "GameLog beta X" -srcfolder <staging> -ov -format UDZO dist/GameLog-beta-X.dmg`。IPA：iOS Release 构建 → `xcrun --sdk iphoneos PackageApplication`（或 archive + export）→ 验证 arm64/Info.plist/AppIcon。改完跑一遍 §2 基线。
+- **下次发版流程**：改 pbxproj `MARKETING_VERSION` 四处（macOS/iOS 各 Debug/Release）→ Release 构建 → `dist/` 出 DMG：暂存 `GameLog.app` + `ln -s /Applications Applications` → `hdiutil create -volname "GameLog beta X" -srcfolder <staging> -ov -format UDZO dist/GameLog-beta-X.dmg`。IPA：iOS Release 构建 → Payload/codesign/zip（现行做法见 §八）→ 验证 arm64/Info.plist/AppIcon。改完跑一遍 §2 基线。**commit 后自动打 tag `beta-vX.Y[.Z]`（本地；v 前缀是既定命名规则，Claude 无需询问直接打）。push 远程仍需用户明确授权。**
 - **发布验证套路**：挂载 DMG 检查卷结构/版本号、`NSWorkspace.icon(forFile:)` 确认图标（正确=封面黄 251,221,3）、从挂载卷启动一次。
-- **tag 命名二套未决**：本地 `beta-1.0/1.1`（旧版无 v，未推）与 `beta-v1.0/v1.1`（已推远程）并存，内容相同；是否删除本地无 v 版或统一命名，用户未定。
+- **tag 命名已定案（2026-08-22 用户确认）**：一律 `beta-vX.Y[.Z]` 带 v 前缀，且 **Claude 在每次版本 commit 后自动打本地 tag、不必再问**（当前最新：`beta-v2.3.2`）。历史本地无 v 的 `beta-1.0/1.1` 不动；push tag 仍需用户明确说推。
 - **`appcover.PNG`（根目录，1254²）**：已作为图标源图提交进仓库，保留；删了也能从 Assets 里 1024px 取回。
 - **图标环境坑**：改图标后 Dock 不更新，先按 §6.22 排查。
 - **数据层/渲染管线改动后**重跑 §2 基线测试（含 DataSmoke / ShareRender）。
