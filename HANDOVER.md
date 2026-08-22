@@ -655,7 +655,7 @@ canonical 存储值也改 + 启动一次性迁移 + 保留旧名展示兜底。
 1. **编辑器直打字尺寸（未最终确认）**：`normalizeFonts()` 修正已构建但用户未二次验收；确认后就移除 `MarkdownRichEditor.swift` 里的 DEBUG 诊断（写到 `/tmp/gamelog_editor_diag.log` 的 `Self.debug` 与 `#if DEBUG` 块）。
 2. **详情页 SwiftUI 侧中文斜体**：只有 macOS 编辑器侧做了合成斜体；详情页 `MarkdownReviewView` 渲染的中文斜体在 SwiftUI 侧不做/待评估。
 3. **iOS 真机实测**：拍照 / QLPreviewController / PhotosPicker / TabBar（AirDrop 备份导入已实测 ✅，见 §29.17）。
-4. **push GitHub**：本地 main + tags 领先远程，需用户明确说推并提供凭据（见 §9）。
+4. **push GitHub**：本地 main 领先远程 4 commits + tag `beta-v2.3.2` 未推。**push 由用户自己执行（分工定案），Claude 只在合适时机提醒。**
 5. **ROADMAP 后续**：发售日自动填充 / 统计可视化 / 封面缓存深化（已实现一部分）。
 
 ---
