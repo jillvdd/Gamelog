@@ -1,15 +1,10 @@
 import SwiftUI
 
 extension View {
-    /// 跨平台按钮外观：
-    /// - iOS：系统标准 bordered 按钮（圆角胶囊、液态玻璃外观），避免 macOS 的文本/无边框按钮在 iOS 渲染成纯蓝字。
-    /// - macOS：保持调用处原有样式不变。
-    @ViewBuilder
+    /// 跨平台按钮外观：双平台统一系统标准 bordered 按钮（圆角胶囊/圆角矩形边框）。
+    /// 历史上 macOS 分支「保持原样」导致按钮渲染成可点文字（2026-08-24 按钮视觉审计后废弃该策略）。
+    /// 图标工具栏类按钮不要用本修饰器（继续用 .borderless/.plain，系统 chrome 已提供可供性）。
     func appStandardButton() -> some View {
-        #if os(iOS)
         buttonStyle(.bordered)
-        #else
-        self
-        #endif
     }
 }

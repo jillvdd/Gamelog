@@ -191,7 +191,8 @@ struct ReviewEditorView: View {
                 .padding(.horizontal, 8)
                 .frame(height: 22)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.bordered)
+        .controlSize(.small)
         .help(text)
     }
 
@@ -201,7 +202,8 @@ struct ReviewEditorView: View {
                 .font(.system(size: 13, weight: .medium))
                 .frame(width: 26, height: 22)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.bordered)
+        .controlSize(.small)
         .help(help)
     }
 
@@ -212,7 +214,8 @@ struct ReviewEditorView: View {
                 .italic()
                 .frame(width: 26, height: 22)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(.bordered)
+        .controlSize(.small)
         .help(help)
     }
 

@@ -61,11 +61,8 @@ struct PresetOrCustomPicker: View {
                 } label: {
                     Text(verbatim: L10n.tr("common.back", lang: language))
                 }
-                #if os(macOS)
-                .buttonStyle(.link)
-                #else
-                .buttonStyle(.plain)
-                #endif
+                .appStandardButton()
+                .controlSize(.small)
             }
         } else {
             LabeledContent(title) {
@@ -388,21 +385,12 @@ struct GameEditView: View {
                             showingCoverPicker = true
                             #endif
                         }
-                        #if os(macOS)
-                        .buttonStyle(.bordered)
-                        #endif
                         .appStandardButton()
                         Button(L10n.tr("game.searchCover", lang: language)) { showingCoverSearch = true }
-                            #if os(macOS)
-                            .buttonStyle(.bordered)
-                            #endif
                             .appStandardButton()
                             .disabled(steamGridDBKey.isEmpty)
                         if coverData != nil {
                             Button(L10n.tr("common.delete", lang: language), role: .destructive) { coverData = nil }
-                                #if os(macOS)
-                                .buttonStyle(.bordered)
-                                #endif
                                 .appStandardButton()
                         }
                     }

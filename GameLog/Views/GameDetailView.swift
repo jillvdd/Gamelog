@@ -626,7 +626,13 @@ struct GameDetailView: View {
             Image(systemName: "square.and.pencil")
             #endif
         }
+        #if os(macOS)
+        // macOS 分支带文字：必须是看得出来是按钮的形态（borderless 会渲染成可点文字）。
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+        #else
         .buttonStyle(.borderless)
+        #endif
         .foregroundStyle(.secondary)
     }
 

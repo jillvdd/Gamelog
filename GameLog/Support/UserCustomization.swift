@@ -32,6 +32,12 @@ enum UserCustomization {
     static let autoBackupKey = "customization.autoBackup"
     /// 持有页网格 / 列表视图切换（默认开启=网格），跨会话记忆，同 Library。
     static let useHoldingsGridViewKey = "customization.useHoldingsGridView"
+    /// 分组分享卡统计要素（已启用项的有序 JSON 数组；缺失 = 默认配置）。
+    static let shareGroupStatsKey = "share.groupStats"
+    /// 总览图头部汇总要素池（同上格式）。
+    static let shareOverviewStatsKey = "share.overviewStats"
+    /// 游戏格子字段池（总览格与分组卡格共用，同上格式）。
+    static let shareTileFieldsKey = "share.tileFields"
 
     /// 用户名长度上限（设置页输入与导入时统一截断）。
     static let usernameMaxLength = 20

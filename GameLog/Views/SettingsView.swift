@@ -158,9 +158,6 @@ struct SettingsView: View {
                     } label: {
                         Image(systemName: showKey ? "eye.slash" : "eye")
                     }
-                    #if os(macOS)
-                    .buttonStyle(.borderless)
-                    #endif
                     .appStandardButton()
                     .help(L10n.tr(showKey ? "settings.hideKey" : "settings.showKey", lang: language))
 
@@ -169,9 +166,6 @@ struct SettingsView: View {
                     } label: {
                         Image(systemName: "doc.on.doc")
                     }
-                    #if os(macOS)
-                    .buttonStyle(.borderless)
-                    #endif
                     .appStandardButton()
                     .help(L10n.tr("settings.copyKey", lang: language))
 

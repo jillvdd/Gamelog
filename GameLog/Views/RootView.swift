@@ -137,13 +137,15 @@ struct RootView: View {
                             .frame(width: 32, height: 32)
                             .clipShape(Circle())
                     }
+                    // 头像靠左，「新建分组」推到右端。
+                    Spacer(minLength: 0)
                     Button {
                         showingNewGroup = true
                     } label: {
                         Label(L10n.tr("group.newGroup", lang: language), systemImage: "plus")
                     }
-                    .buttonStyle(.plain)
-                    Spacer(minLength: 0)
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
