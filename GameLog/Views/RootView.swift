@@ -30,6 +30,7 @@ struct RootView: View {
     @Query(sort: \GameGroup.name) private var groups: [GameGroup]
     @Query(sort: \Game.createdAt) private var games: [Game]
     @AppStorage(UserCustomization.avatarFileKey) private var avatarFile = ""
+    @AppStorage(UserCustomization.usernameKey) private var username = ""
     @State private var selection: SidebarItem? = .all
     @State private var showingNewGroup = false
     @State private var renameGroup: GameGroup?
@@ -76,17 +77,13 @@ struct RootView: View {
                 if !platformsInUse.isEmpty {
                     Section(L10n.tr("library.platforms", lang: language)) {
                         ForEach(platformsInUse, id: \.self) { platform in
-                            // 图标 + 名字：一行放得下就并排；侧边栏窄时图标换到名字上方，名字不被截断。
-                            ViewThatFits(in: .horizontal) {
-                                HStack(spacing: 6) {
-                                    PlatformIcon(platform: platform, size: 16)
-                                    Text(verbatim: Presets.display(platform, category: .platform, language: language))
-                                }
-                                VStack(alignment: .leading, spacing: 2) {
-                                    PlatformIcon(platform: platform, size: 16)
-                                    Text(verbatim: Presets.display(platform, category: .platform, language: language))
-                                        .lineLimit(2)
-                                }
+                            // 统一图标槽位（等比 contain，品牌 logo 参差不再撑行）+ 名字单行:
+                            // 此前放大图标 + ViewThatFits 两行退化让平台区行高错乱、宽字标溢出。
+                            HStack(spacing: 8) {
+                                PlatformIcon(platform: platform, size: 16, slot: CGSize(width: 32, height: 20))
+                                Text(verbatim: Presets.display(platform, category: .platform, language: language))
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
                             }
                             .badge(platformCounts[platform] ?? 0)
                             .tag(SidebarItem.platform(platform))
@@ -127,9 +124,12 @@ struct RootView: View {
                 }
             }
             .listStyle(.sidebar)
-            .navigationSplitViewColumnWidth(min: 180, ideal: 210)
+            // 三参数全给:此前 min/ideal 两参形式在实测中被忽略,侧边栏被压到 ~127pt,
+            // 平台名单行放不下(平台区混乱的另一半根源)。
+            .navigationSplitViewColumnWidth(min: 220, ideal: 250, max: 320)
             .safeAreaInset(edge: .bottom) {
                 // 底部条加毛玻璃背景：内容滚动到下方时被半透明遮罩模糊，避免与头像/按钮重叠突兀。
+                // 头像右侧显示用户名（同 Apple Music 左下角形态）；未设置用户名时只显示头像。
                 HStack(spacing: 8) {
                     if !avatarFile.isEmpty, let avatar = UserCustomization.avatarImage() {
                         Image(appImage: avatar)
@@ -137,7 +137,13 @@ struct RootView: View {
                             .frame(width: 32, height: 32)
                             .clipShape(Circle())
                     }
-                    // 头像靠左，「新建分组」推到右端。
+                    let name = username.trimmingCharacters(in: .whitespaces)
+                    if !name.isEmpty {
+                        Text(verbatim: name)
+                            .font(.system(size: 13, weight: .medium))
+                            .lineLimit(1)
+                    }
+                    // 头像/用户名靠左，「新建分组」推到右端。
                     Spacer(minLength: 0)
                     Button {
                         showingNewGroup = true
@@ -167,7 +173,22 @@ struct RootView: View {
                 StatsView()
             }
         }
-        .frame(minWidth: 900, minHeight: 600)
+        // minWidth 须容得下侧边栏(min 180)+ 详情区:此前 900 会把侧边栏压到 180 以下,
+        // 平台名全部挤成多行(平台区观感混乱的历史根源)。
+        .frame(minWidth: 1150, minHeight: 600)
+        // 导入备份 / 从自动备份恢复会整体删除重建分组（设置页入口），侧边栏若正选中
+        // 被删分组，继续渲染会访问已删 SwiftData 模型——与 iOS 侧 iOSLibraryTab 的
+        // onChange 兜底同款机制（§24.2#1）。
+        .onChange(of: groups) { _, newGroups in
+            if case .group(let selected) = selection,
+               !newGroups.contains(where: { $0.persistentModelID == selected.persistentModelID }) {
+                selection = .all
+            }
+            if let picking = pickingGamesGroup,
+               !newGroups.contains(where: { $0.persistentModelID == picking.persistentModelID }) {
+                pickingGamesGroup = nil
+            }
+        }
         .sheet(isPresented: $showingNewGroup) {
             NewGroupSheet()
         }

@@ -602,7 +602,9 @@ final class ReviewRichTextController: NSObject, ObservableObject, NSTextViewDele
         updateIsEmpty()
     }
 
-    /// 找出选区涉及的完整段落 range（含段尾换行）。
+    /// 找出选区涉及的完整段落 range 列表（每段不含段尾换行）。
+    /// 跨多段选择时逐段返回——此前返回单一跨段 range，整段范围会被当一行重建，
+    /// 段落合并、bullet 只加在首行。
     private func paragraphRanges(in attr: NSAttributedString, around sel: NSRange) -> [NSRange] {
         let ns = attr.string as NSString
         var start = sel.location
@@ -612,7 +614,18 @@ final class ReviewRichTextController: NSObject, ObservableObject, NSTextViewDele
         if end < ns.length && ns.character(at: end) != 0x0A {
             while end < ns.length && ns.character(at: end) != 0x0A { end += 1 }
         }
-        return [NSRange(location: start, length: end - start)]
+        var ranges: [NSRange] = []
+        var lineStart = start
+        var i = start
+        while i < end {
+            if ns.character(at: i) == 0x0A {
+                ranges.append(NSRange(location: lineStart, length: i - lineStart))
+                lineStart = i + 1
+            }
+            i += 1
+        }
+        ranges.append(NSRange(location: lineStart, length: end - lineStart))
+        return ranges
     }
 }
 #endif

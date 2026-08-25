@@ -152,6 +152,11 @@ struct PresetOrCustomPicker: View {
 struct ScoreSliderRow: View {
     let titleKey: String
     @Binding var value: Double
+    /// 维度评分开关（nil = 无开关、恒可用）。关 = 该维度不评分：滑块禁用、数值显示 —。
+    /// 数据语义 = 该维分数为 nil（平均分/统计口径天然只算非 nil 维度）。
+    var isEnabled: Binding<Bool>? = nil
+
+    private var enabled: Bool { isEnabled?.wrappedValue ?? true }
 
     /// 去掉 step 以避免滑块下方的刻度点点，写入时仍取整到 0.1 保证数据步进。
     private var snapped: Binding<Double> {
@@ -167,10 +172,20 @@ struct ScoreSliderRow: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
                 .frame(width: 96, alignment: .leading)
+                .foregroundStyle(enabled ? AnyShapeStyle(.primary) : AnyShapeStyle(.tertiary))
+            if let isEnabled {
+                Toggle("", isOn: isEnabled)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .controlSize(.mini)
+            }
             Slider(value: snapped, in: 1...10)
-            Text(verbatim: String(format: "%.1f", value))
+                .disabled(!enabled)
+                .opacity(enabled ? 1 : 0.35)
+            Text(verbatim: enabled ? String(format: "%.1f", value) : "—")
                 .font(.system(.body, design: .monospaced))
                 .monospacedDigit()
+                .foregroundStyle(enabled ? AnyShapeStyle(.primary) : AnyShapeStyle(.tertiary))
                 .frame(width: 40, alignment: .trailing)
         }
     }
@@ -194,6 +209,22 @@ struct GameEditView: View {
     @State private var hasReleaseDate = false
     @State private var releaseDate = Date()
     @State private var coverData: Data?
+    // 三类附加图像（可选，展示位置待设计，先只做录入与存储）：开关关 = 不使用该图（保存时清空）。
+    @State private var hasLandscape = false
+    @State private var landscapeData: Data?
+    @State private var hasHero = false
+    @State private var heroData: Data?
+    @State private var hasLogo = false
+    @State private var logoData: Data?
+    // 各图像的搜索面板开关。
+    @State private var showingLandscapeSearch = false
+    #if !os(macOS)
+    @State private var showingLandscapePicker = false
+    @State private var showingHeroPicker = false
+    @State private var showingLogoPicker = false
+    #endif
+    @State private var showingHeroSearch = false
+    @State private var showingLogoSearch = false
     @State private var reviewTitle = ""
     @State private var reviewBody = ""
     @State private var groupIDs: Set<PersistentIdentifier> = []
@@ -214,6 +245,13 @@ struct GameEditView: View {
     @State private var sArt = 7.0
     @State private var sMusic = 7.0
     @State private var sPerformance = 7.0
+    /// 每维评分开关（新建首条记录默认全开；关 = 该维分数存 nil）。
+    @State private var eGameplay = true
+    @State private var eDesign = true
+    @State private var eStory = true
+    @State private var eArt = true
+    @State private var eMusic = true
+    @State private var ePerformance = true
 
     // 持有档案（仅新建 + 收藏家模式时随游戏一起建一份实体持有）
     @State private var holdingVersion = ""
@@ -349,51 +387,78 @@ struct GameEditView: View {
                     }
                 }
 
-                // 封面
-                HStack(alignment: .top, spacing: 12) {
-                    Group {
-                        if let data = coverData, let image = AppImage(data: data) {
-                            Image(appImage: image)
-                                .resizable()
-                                .scaledToFill()
-                        } else {
-                            ZStack {
-                                Rectangle().fill(Color.semantic(.quaternarySystemFill))
-                                Image(systemName: "photo")
-                                    .foregroundStyle(.tertiary)
-                            }
-                        }
-                    }
-                    .frame(width: 72, height: 96)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                    .overlay {
-                        if isAutoMatching {
-                            ZStack {
-                                Color.black.opacity(0.35)
-                                ProgressView()
-                                    .controlSize(.small)
-                            }
-                            .clipShape(RoundedRectangle(cornerRadius: 6))
-                        }
-                    }
+                // 封面（2:3 主格式，恒显示）
+                ArtworkRow(
+                    titleKey: "game.cover",
+                    data: coverData,
+                    aspect: 0.75,
+                    thumbWidth: 72,
+                    isAutoMatching: isAutoMatching,
+                    onPick: {
+                        #if os(macOS)
+                        pickImageFromPanel { coverData = $0 }
+                        #else
+                        showingCoverPicker = true
+                        #endif
+                    },
+                    onSearch: { showingCoverSearch = true },
+                    onDelete: { coverData = nil }
+                )
 
-                    VStack(alignment: .leading, spacing: 10) {
-                        Button(L10n.tr("game.chooseCover", lang: language)) {
+                // 三类附加图像：各自开关，默认关；开 = 展开预览与录入按钮。
+                Toggle(L10n.tr("game.landscape", lang: language), isOn: $hasLandscape)
+                if hasLandscape {
+                    ArtworkRow(
+                        titleKey: "game.landscape",
+                        data: landscapeData,
+                        aspect: 2.14,
+                        thumbWidth: 128,
+                        onPick: {
                             #if os(macOS)
-                            pickCover()
+                            pickImageFromPanel { landscapeData = $0 }
                             #else
-                            showingCoverPicker = true
+                            showingLandscapePicker = true
                             #endif
-                        }
-                        .appStandardButton()
-                        Button(L10n.tr("game.searchCover", lang: language)) { showingCoverSearch = true }
-                            .appStandardButton()
-                            .disabled(steamGridDBKey.isEmpty)
-                        if coverData != nil {
-                            Button(L10n.tr("common.delete", lang: language), role: .destructive) { coverData = nil }
-                                .appStandardButton()
-                        }
-                    }
+                        },
+                        onSearch: { showingLandscapeSearch = true },
+                        onDelete: { landscapeData = nil }
+                    )
+                }
+                Toggle(L10n.tr("game.hero", lang: language), isOn: $hasHero)
+                if hasHero {
+                    ArtworkRow(
+                        titleKey: "game.hero",
+                        data: heroData,
+                        aspect: 3.1,
+                        thumbWidth: 168,
+                        onPick: {
+                            #if os(macOS)
+                            pickImageFromPanel { heroData = $0 }
+                            #else
+                            showingHeroPicker = true
+                            #endif
+                        },
+                        onSearch: { showingHeroSearch = true },
+                        onDelete: { heroData = nil }
+                    )
+                }
+                Toggle(L10n.tr("game.logo", lang: language), isOn: $hasLogo)
+                if hasLogo {
+                    ArtworkRow(
+                        titleKey: "game.logo",
+                        data: logoData,
+                        aspect: nil,
+                        thumbWidth: 128,
+                        onPick: {
+                            #if os(macOS)
+                            pickImageFromPanel { logoData = $0 }
+                            #else
+                            showingLogoPicker = true
+                            #endif
+                        },
+                        onSearch: { showingLogoSearch = true },
+                        onDelete: { logoData = nil }
+                    )
                 }
             }
 
@@ -494,12 +559,12 @@ struct GameEditView: View {
                 }
 
                 Section(L10n.tr("completion.scores", lang: language)) {
-                    ScoreSliderRow(titleKey: "dimension.gameplay", value: $sGameplay)
-                    ScoreSliderRow(titleKey: "dimension.design", value: $sDesign)
-                    ScoreSliderRow(titleKey: "dimension.story", value: $sStory)
-                    ScoreSliderRow(titleKey: "dimension.art", value: $sArt)
-                    ScoreSliderRow(titleKey: "dimension.music", value: $sMusic)
-                    ScoreSliderRow(titleKey: "dimension.performance", value: $sPerformance)
+                    ScoreSliderRow(titleKey: "dimension.gameplay", value: $sGameplay, isEnabled: $eGameplay)
+                    ScoreSliderRow(titleKey: "dimension.design", value: $sDesign, isEnabled: $eDesign)
+                    ScoreSliderRow(titleKey: "dimension.story", value: $sStory, isEnabled: $eStory)
+                    ScoreSliderRow(titleKey: "dimension.art", value: $sArt, isEnabled: $eArt)
+                    ScoreSliderRow(titleKey: "dimension.music", value: $sMusic, isEnabled: $eMusic)
+                    ScoreSliderRow(titleKey: "dimension.performance", value: $sPerformance, isEnabled: $ePerformance)
                 }
             }
         }
@@ -527,12 +592,36 @@ struct GameEditView: View {
             Text(verbatim: validationError ?? "")
         }
         .sheet(isPresented: $showingCoverSearch) {
-            CoverSearchSheet(coverData: $coverData)
+            CoverSearchSheet(kind: .poster, imageData: $coverData)
+        }
+        .sheet(isPresented: $showingLandscapeSearch) {
+            CoverSearchSheet(kind: .landscape, imageData: $landscapeData)
+        }
+        .sheet(isPresented: $showingHeroSearch) {
+            CoverSearchSheet(kind: .hero, imageData: $heroData)
+        }
+        .sheet(isPresented: $showingLogoSearch) {
+            CoverSearchSheet(kind: .logo, imageData: $logoData)
         }
         #if !os(macOS)
         .imageSourcePicker(isPresented: $showingCoverPicker, onImages: { datas in
             if let data = datas.first {
                 coverData = data
+            }
+        })
+        .imageSourcePicker(isPresented: $showingLandscapePicker, onImages: { datas in
+            if let data = datas.first {
+                landscapeData = data
+            }
+        })
+        .imageSourcePicker(isPresented: $showingHeroPicker, onImages: { datas in
+            if let data = datas.first {
+                heroData = data
+            }
+        })
+        .imageSourcePicker(isPresented: $showingLogoPicker, onImages: { datas in
+            if let data = datas.first {
+                logoData = data
             }
         })
         #endif
@@ -563,6 +652,12 @@ struct GameEditView: View {
         hasReleaseDate = game.releaseDate != nil
         releaseDate = game.releaseDate ?? Date()
         coverData = game.coverData
+        landscapeData = game.landscapeData
+        heroData = game.heroData
+        logoData = game.logoData
+        hasLandscape = game.landscapeData != nil
+        hasHero = game.heroData != nil
+        hasLogo = game.logoData != nil
         reviewTitle = game.reviewTitle
         reviewBody = game.reviewBody
         groupIDs = Set(game.groups.map(\.persistentModelID))
@@ -579,21 +674,20 @@ struct GameEditView: View {
         aliasInput = ""
     }
 
-    private func pickCover() {
+    // MARK: - 自动匹配封面
+
+    /// macOS 本地选图（iOS 走 imageSourcePicker modifier，回调里写对应 @State）。
+    private func pickImageFromPanel(apply: @escaping (Data) -> Void) {
         #if os(macOS)
         let panel = NSOpenPanel()
         panel.allowedContentTypes = [.image]
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
         if panel.runModal() == .OK, let url = panel.url, let data = try? Data(contentsOf: url) {
-            coverData = data
+            apply(data)
         }
-        #else
-        // iOS：阶段 3 用 PhotosPicker / fileImporter 实现选图。
         #endif
     }
-
-    // MARK: - 自动匹配封面
 
     /// 输入游戏名 → 防抖后自动匹配封面（仅当开关开、已配 key、且尚无封面时）。
     /// 由 `.task(id: name)` 驱动：名字每次变化时取消重开、600ms 后匹配；名字未变（如编辑打开）不匹配。
@@ -610,7 +704,8 @@ struct GameEditView: View {
         guard coverData == nil else { return }
         let client = SteamGridDBClient(apiKey: steamGridDBKey)
         do {
-            if let data = try await client.autoCover(for: term), coverData == nil {
+            // 复查 isCancelled：快速连续改名时旧名字的响应若已在取消生效前返回，不能写入。
+            if let data = try await client.autoCover(for: term), !Task.isCancelled, coverData == nil {
                 coverData = data
             }
         } catch {
@@ -648,6 +743,11 @@ struct GameEditView: View {
                     validationError = L10n.tr("validation.reviewTitleRequired", lang: language)
                     return
                 }
+                // 六维至少评一维（视觉小说等可只评剧情/音乐/美术，但不能全不评）。
+                if !(eGameplay || eDesign || eStory || eArt || eMusic || ePerformance) {
+                    validationError = L10n.tr("validation.scoreRequired", lang: language)
+                    return
+                }
             }
             let newGame = Game(
                 name: trimmedName,
@@ -657,7 +757,11 @@ struct GameEditView: View {
                 platform: platform,
                 releaseDate: hasReleaseDate ? releaseDate : nil,
                 coverData: coverData,
-                reviewTitle: reviewTitle,
+                landscapeData: hasLandscape ? landscapeData : nil,
+                heroData: hasHero ? heroData : nil,
+                logoData: hasLogo ? logoData : nil,
+                // 与上方校验同口径：入库用 trim 后的标题（iOS 编辑 sheet / 写字台保存也是 trim 口径）。
+                reviewTitle: reviewTitle.trimmingCharacters(in: .whitespaces),
                 reviewBody: reviewBody,
                 status: status
             )
@@ -671,12 +775,12 @@ struct GameEditView: View {
                     degree: degree,
                     playtime: playtimeIsNone ? nil : parsedPlaytime,
                     notes: notes,
-                    scoreGameplay: sGameplay,
-                    scoreDesign: sDesign,
-                    scoreStory: sStory,
-                    scoreArt: sArt,
-                    scoreMusic: sMusic,
-                    scorePerformance: sPerformance
+                    scoreGameplay: eGameplay ? sGameplay : nil,
+                    scoreDesign: eDesign ? sDesign : nil,
+                    scoreStory: eStory ? sStory : nil,
+                    scoreArt: eArt ? sArt : nil,
+                    scoreMusic: eMusic ? sMusic : nil,
+                    scorePerformance: ePerformance ? sPerformance : nil
                 )
                 completion.game = newGame
                 context.insert(completion)
@@ -719,11 +823,95 @@ struct GameEditView: View {
             game.aliases = aliases
             game.releaseDate = hasReleaseDate ? releaseDate : nil
             game.coverData = coverData
+            game.landscapeData = hasLandscape ? landscapeData : nil
+            game.heroData = hasHero ? heroData : nil
+            game.logoData = hasLogo ? logoData : nil
             game.reviewTitle = reviewTitle
             game.reviewBody = reviewBody
             game.groups = allGroups.filter { groupIDs.contains($0.persistentModelID) }
             game.updatedAt = .now
         }
         dismiss()
+    }
+}
+
+// MARK: - 图像录入行（封面 / 横向封面 / 背景图 / Logo 四类共用）
+
+/// 图像录入行：左侧按类型比例的缩略预览（无图显示占位），右侧标题 + 选择图片 / 搜索 / 删除按钮。
+/// `aspect` = 宽高比（nil = Logo 等不定比例，contain 显示 + 衬底，避免透明 PNG 深色模式隐形）。
+struct ArtworkRow: View {
+    let titleKey: String
+    let data: Data?
+    let aspect: Double?
+    var thumbWidth: CGFloat = 72
+    /// 仅封面行用：自动匹配进行中在缩略图上盖 spinner（由 GameEditView 传入其 @State）。
+    var isAutoMatching = false
+    let onPick: () -> Void
+    let onSearch: () -> Void
+    let onDelete: () -> Void
+
+    @Environment(\.appLanguageCode) private var language
+    @AppStorage("steamGridDBKey") private var steamGridDBKey = ""
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Group {
+                if let data, let image = AppImage(data: data) {
+                    if let aspect {
+                        Image(appImage: image)
+                            .resizable()
+                            .scaledToFill()
+                            .aspectRatio(aspect, contentMode: .fit)
+                    } else {
+                        // Logo 等透明 PNG：contain 显示 + 固定浅灰衬底（白 logo 在纯白衬底上会隐形，
+                        // 浅灰在深浅色模式下都能衬托白/彩色 logo），描边标出边界。
+                        // 宽高必须同时给定：只给高度时宽度无约束，宽幅 logo 会溢出被居中裁掉两侧。
+                        Image(appImage: image)
+                            .resizable()
+                            .scaledToFit()
+                            .padding(6)
+                            .background(Rectangle().fill(Color(red: 0.88, green: 0.88, blue: 0.90)))
+                            .overlay(Rectangle().strokeBorder(Color.semantic(.separator), lineWidth: 0.5))
+                            .frame(width: thumbWidth, height: thumbWidth)
+                    }
+                } else {
+                    ZStack {
+                        Rectangle().fill(Color.semantic(.quaternarySystemFill))
+                        Image(systemName: "photo")
+                            .foregroundStyle(.tertiary)
+                    }
+                    .aspectRatio(aspect ?? 1, contentMode: .fit)
+                }
+            }
+            .frame(width: thumbWidth)
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .overlay {
+                if isAutoMatching {
+                    ZStack {
+                        Color.black.opacity(0.35)
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 10) {
+                LText(titleKey)
+                    .font(.callout.weight(.medium))
+                Button(L10n.tr("game.chooseCover", lang: language), action: onPick)
+                    .appStandardButton()
+                    .controlSize(.small)
+                Button(L10n.tr("game.searchCover", lang: language), action: onSearch)
+                    .appStandardButton()
+                    .controlSize(.small)
+                    .disabled(steamGridDBKey.isEmpty)
+                if data != nil {
+                    Button(L10n.tr("common.delete", lang: language), role: .destructive, action: onDelete)
+                        .appStandardButton()
+                        .controlSize(.small)
+                }
+            }
+        }
     }
 }

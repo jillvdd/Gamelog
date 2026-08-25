@@ -30,6 +30,10 @@ struct GameDTO: Codable {
     var platform: String?
     var releaseDate: Date?
     var coverBase64: String?
+    /// 横向封面/背景图/Logo（旧版备份缺字段 → nil，导入保持现状）。
+    var landscapeBase64: String?
+    var heroBase64: String?
+    var logoBase64: String?
     var reviewTitle: String
     var reviewBody: String
     var groupNames: [String]
@@ -97,6 +101,9 @@ enum BackupManager {
                     platform: game.platform,
                     releaseDate: game.releaseDate,
                     coverBase64: game.coverData?.base64EncodedString(),
+                    landscapeBase64: game.landscapeData?.base64EncodedString(),
+                    heroBase64: game.heroData?.base64EncodedString(),
+                    logoBase64: game.logoData?.base64EncodedString(),
                     reviewTitle: game.reviewTitle,
                     reviewBody: game.reviewBody,
                     groupNames: game.groups.map(\.name),
@@ -189,6 +196,8 @@ enum BackupManager {
             // 或与游戏 groupNames 引用错位（如导出 "ABC "、游戏引用 "ABC"）。
             let groupName = groupDTO.name.trimmingCharacters(in: .whitespaces)
             guard !groupName.isEmpty else { continue }
+            // 重名只建第一个（手工编辑过的备份可能出现重复名，否则会产生重复的孤儿分组）。
+            guard groupMap[groupName] == nil else { continue }
             let group = GameGroup(name: groupName)
             // 旧版备份缺 review → 保持现状（默认空串）
             if let review = groupDTO.review {
@@ -207,6 +216,9 @@ enum BackupManager {
                 platform: gameDTO.platform ?? "",
                 releaseDate: gameDTO.releaseDate,
                 coverData: gameDTO.coverBase64.flatMap { Data(base64Encoded: $0) },
+                landscapeData: gameDTO.landscapeBase64.flatMap { Data(base64Encoded: $0) },
+                heroData: gameDTO.heroBase64.flatMap { Data(base64Encoded: $0) },
+                logoData: gameDTO.logoBase64.flatMap { Data(base64Encoded: $0) },
                 reviewTitle: gameDTO.reviewTitle,
                 reviewBody: gameDTO.reviewBody,
                 // 旧版备份缺 status → 默认已通关。

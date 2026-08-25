@@ -254,6 +254,12 @@ private struct WheelColumn: NSViewRepresentable {
 
         init(_ parent: WheelColumn) { self.parent = parent }
 
+        deinit {
+            // 观察者 token 不清理会随每次打开编辑页永久累积（闭包 weak self 不致悬挂，但纯泄漏）。
+            if let boundsObserver { NotificationCenter.default.removeObserver(boundsObserver) }
+            if let liveScrollObserver { NotificationCenter.default.removeObserver(liveScrollObserver) }
+        }
+
         func attach(scroll: NSScrollView, document: WheelDocumentView) {
             self.scroll = scroll
             self.document = document

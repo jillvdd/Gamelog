@@ -511,8 +511,10 @@ struct SettingsView: View {
     }
 
     private func backupNow() {
-        AutoBackup.shared.writeNow()
-        statusMessage = L10n.tr("backup.nowDone", lang: language)
+        // 据实提示：写盘失败（磁盘满等）时不再误报「已保存备份」。
+        statusMessage = AutoBackup.shared.writeNow()
+            ? L10n.tr("backup.nowDone", lang: language)
+            : L10n.tr("backup.nowFailed", lang: language)
     }
 
     private func restoreFromAutoBackup() {

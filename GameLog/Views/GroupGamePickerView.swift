@@ -91,26 +91,31 @@ struct GroupGamePickerView: View {
 
     @ViewBuilder
     private func cell(for game: Game) -> some View {
-        VStack(spacing: 6) {
-            ZStack(alignment: .topTrailing) {
-                cover(for: game)
-                if isInGroup(game) {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(.white)
-                        .frame(width: 20, height: 20)
-                        .background(Color.accentColor, in: Circle())
-                        .padding(4)
+        // 按钮化：按压反馈（原 onTapGesture 无视觉响应）。
+        Button {
+            toggle(game)
+        } label: {
+            VStack(spacing: 6) {
+                ZStack(alignment: .topTrailing) {
+                    cover(for: game)
+                    if isInGroup(game) {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 12, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 20, height: 20)
+                            .background(Color.accentColor, in: Circle())
+                            .padding(4)
+                    }
                 }
+                Text(verbatim: game.displayName(for: language))
+                    .font(.caption)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
             }
-            Text(verbatim: game.displayName(for: language))
-                .font(.caption)
-                .lineLimit(2)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
         }
-        .contentShape(Rectangle())
-        .onTapGesture { toggle(game) }
+        .buttonStyle(PressFeedbackButtonStyle(pressedScale: 0.95))
     }
 
     @ViewBuilder

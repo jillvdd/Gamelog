@@ -508,7 +508,8 @@ private struct DegreePill: View {
     }
 }
 
-/// 未通关状态大徽章：替代六维/分数区。
+/// 未通关状态大徽章：替代六维/分数区。仿真玻璃（状态色半透明底 + 同色描边 + 白字，
+/// 保留颜色语义；原因同 ScoreCapsule——ImageRenderer 不渲染 glassEffect）。
 private struct StatusHeroBadge: View {
     let game: Game
     let theme: ShareTheme
@@ -523,11 +524,11 @@ private struct StatusHeroBadge: View {
             Text(verbatim: L10n.tr(status.labelKey, lang: language))
                 .font(.system(size: 46, weight: .semibold))
         }
-        .foregroundStyle(color)
+        .foregroundStyle(.white)
         .padding(.horizontal, 44)
         .padding(.vertical, 24)
-        .background(Capsule().fill(color.opacity(0.16)))
-        .overlay(Capsule().stroke(color.opacity(0.55), lineWidth: 2))
+        .background(Capsule().fill(color.opacity(0.26)))
+        .overlay(Capsule().stroke(color.opacity(0.50), lineWidth: 2))
     }
 
     private func statusIcon(_ s: GameStatus) -> String {
@@ -618,7 +619,8 @@ private struct ScoreRow: View {
     }
 }
 
-/// 库分右上角胶囊。
+/// 库分右上角胶囊：仿真玻璃（分享卡经 ImageRenderer 出图，`.glassEffect` 在渲染管线中
+/// 不产出内容——实测整枚胶囊消失；用半透明深底 + 高光描边在模糊垫底上呈现玻璃质感）。
 private struct ScoreCapsule: View {
     let game: Game
     let theme: ShareTheme
@@ -629,10 +631,11 @@ private struct ScoreCapsule: View {
             Text(verbatim: String(format: "%.1f", score))
                 .font(.system(size: fontSize, weight: .bold))
                 .monospacedDigit()
-                .foregroundStyle(.black.opacity(0.85))
+                .foregroundStyle(.white)
                 .padding(.horizontal, fontSize * 0.55)
-                .padding(.vertical, fontSize * 0.26)
-                .background(Capsule().fill(theme.accent))
+                .frame(height: fontSize * 1.6)
+                .background(Capsule().fill(Color.black.opacity(0.38)))
+                .overlay(Capsule().stroke(Color.white.opacity(0.16), lineWidth: 1))
                 .shadow(color: .black.opacity(0.3), radius: 8, y: 2)
         }
     }

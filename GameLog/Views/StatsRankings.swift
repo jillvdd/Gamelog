@@ -127,7 +127,8 @@ struct RankingBoard: View {
 
 /// 价值榜条目：聚合实体（游戏 / 平台 / 分组）的总估值，按当前语言格式化金额展示。
 struct ValueRankingEntry: Identifiable {
-    let id = UUID()
+    /// 稳定身份（实体标识派生）：此前每次重算生成新 UUID，ForEach 全量换身份、失去增量 diff。
+    let id: String
     let label: String
     /// 总估值（按当前语言）；nil = 无估值，排末位。
     let value: Double?
@@ -145,6 +146,7 @@ enum ValueRankings {
         games.map { game in
             let v = game.totalEstimate(for: language)
             return ValueRankingEntry(
+                id: "game:\(game.persistentModelID.hashValue)",
                 label: game.displayName(for: language),
                 value: v,
                 valueText: PriceFormat.string(v, language: language) ?? "—",
@@ -165,6 +167,7 @@ enum ValueRankings {
         }
         return byPlatform.map { (platform, total) in
             ValueRankingEntry(
+                id: "platform:\(platform)",
                 label: Presets.display(platform, category: .platform, language: language),
                 value: total,
                 valueText: PriceFormat.string(total, language: language) ?? "—",
@@ -175,10 +178,13 @@ enum ValueRankings {
     }
 
     /// 按分组价值：分组下所有游戏的总估值求和排序。
+    /// 全组都无估值（含空分组）→ value = nil 显示「—」，与按游戏/按机器口径一致（此前空组显示 ¥0）。
     static func byGroup(groups: [GameGroup], language: String) -> [ValueRankingEntry] {
         groups.map { group in
-            let total = group.games.compactMap { $0.totalEstimate(for: language) }.reduce(0, +)
+            let vals = group.games.compactMap { $0.totalEstimate(for: language) }
+            let total: Double? = vals.isEmpty ? nil : vals.reduce(0, +)
             return ValueRankingEntry(
+                id: "group:\(group.persistentModelID.hashValue)",
                 label: group.name,
                 value: total,
                 valueText: PriceFormat.string(total, language: language) ?? "—",
@@ -291,7 +297,8 @@ struct SegmentSlider: View {
                                 .frame(width: cellWidth, height: geo.size.height)
                                 .contentShape(Rectangle())
                         }
-                        .buttonStyle(.plain)
+                        // 分段本体按压形变（选中滑块另有 spring 动画）。
+                        .buttonStyle(PressFeedbackButtonStyle(pressedScale: 0.94, pressedOpacity: 0.55))
                     }
                 }
             }
@@ -425,26 +432,30 @@ struct OverallRankingView: View {
             }
 
             Divider()
-            HStack(spacing: 20) {
-                Spacer()
-                Button {
-                    page = max(0, page - 1)
-                } label: {
-                    Label(L10n.tr("stats.prevPage", lang: language), systemImage: "chevron.left")
+            // 翻页控件只作用于分数榜（价值榜整板直出、不分页）；价值榜页签下隐藏，
+            // 否则控件显示/操作的是不可见的分数榜数据。
+            if category == 0 {
+                HStack(spacing: 20) {
+                    Spacer()
+                    Button {
+                        page = max(0, page - 1)
+                    } label: {
+                        Label(L10n.tr("stats.prevPage", lang: language), systemImage: "chevron.left")
+                    }
+                    .disabled(page == 0)
+                    Text(verbatim: "\(page + 1) / \(pageCount)")
+                        .font(.callout.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                    Button {
+                        page = min(pageCount - 1, page + 1)
+                    } label: {
+                        Label(L10n.tr("stats.nextPage", lang: language), systemImage: "chevron.right")
+                    }
+                    .disabled(page >= pageCount - 1)
+                    Spacer()
                 }
-                .disabled(page == 0)
-                Text(verbatim: "\(page + 1) / \(pageCount)")
-                    .font(.callout.monospacedDigit())
-                    .foregroundStyle(.secondary)
-                Button {
-                    page = min(pageCount - 1, page + 1)
-                } label: {
-                    Label(L10n.tr("stats.nextPage", lang: language), systemImage: "chevron.right")
-                }
-                .disabled(page >= pageCount - 1)
-                Spacer()
+                .padding(.vertical, 10)
             }
-            .padding(.vertical, 10)
         }
         .navigationTitle(hideToolbarGlass ? "" : L10n.tr("stats.overallRanking", lang: language))
         .appToolbar()

@@ -202,6 +202,7 @@ struct SharePanelView: View {
             }
             .buttonStyle(.borderless)
             .foregroundStyle(.secondary)
+            .help(L10n.tr("common.close", lang: language))
         }
         #if os(macOS)
         .padding()
@@ -255,40 +256,48 @@ struct SharePanelView: View {
         List {
             if mode == .games {
                 ForEach(visibleGames) { game in
-                    HStack(spacing: 8) {
-                        Image(systemName: selectedIDs.contains(game.persistentModelID) ? "checkmark.square.fill" : "square")
-                            .foregroundStyle(selectedIDs.contains(game.persistentModelID) ? Color.accentColor : Color.secondary)
-                        coverThumb(game)
-                        Text(verbatim: game.displayName(for: language))
-                            .lineLimit(1)
-                        Spacer()
-                        if let score = game.libraryScore {
-                            Text(verbatim: String(format: "%.1f", score))
+                    Button {
+                        toggle(game)
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: selectedIDs.contains(game.persistentModelID) ? "checkmark.square.fill" : "square")
+                                .foregroundStyle(selectedIDs.contains(game.persistentModelID) ? Color.accentColor : Color.secondary)
+                            coverThumb(game)
+                            Text(verbatim: game.displayName(for: language))
+                                .lineLimit(1)
+                            Spacer()
+                            if let score = game.libraryScore {
+                                Text(verbatim: String(format: "%.1f", score))
+                                    .font(.caption)
+                                    .monospacedDigit()
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(PressFeedbackButtonStyle(pressedOpacity: 0.55))
+                }
+            } else {
+                ForEach(groups) { group in
+                    Button {
+                        toggleGroup(group)
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: selectedGroupID == group.persistentModelID ? "checkmark.square.fill" : "square")
+                                .foregroundStyle(selectedGroupID == group.persistentModelID ? Color.accentColor : Color.secondary)
+                            Image(systemName: "folder")
+                                .foregroundStyle(.secondary)
+                            Text(verbatim: group.name)
+                                .lineLimit(1)
+                            Spacer()
+                            Text(verbatim: "\(group.games.count)")
                                 .font(.caption)
                                 .monospacedDigit()
                                 .foregroundStyle(.secondary)
                         }
+                        .contentShape(Rectangle())
                     }
-                    .contentShape(Rectangle())
-                    .onTapGesture { toggle(game) }
-                }
-            } else {
-                ForEach(groups) { group in
-                    HStack(spacing: 8) {
-                        Image(systemName: selectedGroupID == group.persistentModelID ? "checkmark.square.fill" : "square")
-                            .foregroundStyle(selectedGroupID == group.persistentModelID ? Color.accentColor : Color.secondary)
-                        Image(systemName: "folder")
-                            .foregroundStyle(.secondary)
-                        Text(verbatim: group.name)
-                            .lineLimit(1)
-                        Spacer()
-                        Text(verbatim: "\(group.games.count)")
-                            .font(.caption)
-                            .monospacedDigit()
-                            .foregroundStyle(.secondary)
-                    }
-                    .contentShape(Rectangle())
-                    .onTapGesture { toggleGroup(group) }
+                    .buttonStyle(PressFeedbackButtonStyle(pressedOpacity: 0.55))
                 }
             }
         }
@@ -351,10 +360,12 @@ struct SharePanelView: View {
                     .scaledToFit()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .padding(16)
+                    .background(Color(red: 0.075, green: 0.067, blue: 0.055))
+                    // iOS 点预览全屏看大图：按钮化带按压反馈（原 onTapGesture 无视觉响应）。
                     #if os(iOS)
+                    .contentShape(Rectangle())
                     .onTapGesture { showingFullscreenPreview = true }
                     #endif
-                    .background(Color(red: 0.075, green: 0.067, blue: 0.055))
             } else {
                 ContentUnavailableView {
                     Image(systemName: "photo.on.rectangle.angled")

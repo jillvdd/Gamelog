@@ -50,6 +50,8 @@ struct PlatformBarRow: View {
             GeometryReader { proxy in
                 Color.clear
                     .onAppear { rowWidth = proxy.size.width }
+                    // 窗口缩放 / 旋转后行宽变化同步更新，条形保持 38% 比例。
+                    .onChange(of: proxy.size.width) { _, newValue in rowWidth = newValue }
             }
         )
     }
@@ -75,12 +77,13 @@ struct GroupStatsSection: View {
         return ScoreMath.roundScore(gameScores.reduce(0, +) / Double(gameScores.count))
     }
 
-    /// 平台分布：分组内所有通关记录按平台计数（与全局统计页同口径）。
+    /// 平台分布：按游戏×平台计数（每游戏每平台计 1，与全局统计页/分享卡同口径）。
+    /// 此前按通关记录逐条计数——同一游戏多条同平台记录会被重复计、未通关游戏漏计。
     private var platformCounts: [(platform: String, count: Int)] {
         var counts: [String: Int] = [:]
         for game in group.games {
-            for completion in game.completions where !completion.platform.isEmpty {
-                counts[completion.platform, default: 0] += 1
+            for platform in game.platformList {
+                counts[platform, default: 0] += 1
             }
         }
         // 计数降序；数量相同时按平台名升序，保证排序稳定、相同数量不反复横跳。

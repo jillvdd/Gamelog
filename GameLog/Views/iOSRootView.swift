@@ -207,12 +207,25 @@ struct iOSGroupManagerSheet: View {
                         Text(verbatim: group.name)
                             .lineLimit(1)
                         Spacer()
-                        Button { renaming = group } label: { Image(systemName: "pencil") }
-                            .buttonStyle(.borderless)
-                        Button { pickingGames = group } label: { Image(systemName: "checkmark.square") }
-                            .buttonStyle(.borderless)
-                        Button(role: .destructive) { deleting = group } label: { Image(systemName: "trash") }
-                            .buttonStyle(.borderless)
+                        // 行内图标按钮补足 44×44 触控目标（HIG），视觉不变。
+                        Button { renaming = group } label: {
+                            Image(systemName: "pencil")
+                                .frame(width: 44, height: 44)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.borderless)
+                        Button { pickingGames = group } label: {
+                            Image(systemName: "checkmark.square")
+                                .frame(width: 44, height: 44)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.borderless)
+                        Button(role: .destructive) { deleting = group } label: {
+                            Image(systemName: "trash")
+                                .frame(width: 44, height: 44)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.borderless)
                     }
                 }
             }

@@ -53,6 +53,12 @@ final class Game {
     var platform: String = ""
     var releaseDate: Date?
     var coverData: Data?
+    /// 横向封面（SteamGridDB 920×430 横版 grid；可选）。展示位置待设计，先只做录入与存储。
+    var landscapeData: Data?
+    /// 背景图（SteamGridDB heroes 宽幅横图；可选）。展示位置待设计。
+    var heroData: Data?
+    /// 游戏 Logo（SteamGridDB logos 透明 PNG；可选）。展示位置待设计。
+    var logoData: Data?
     var reviewTitle: String
     var reviewBody: String
     var createdAt: Date
@@ -74,7 +80,8 @@ final class Game {
 
     init(name: String, nameZh: String? = nil, nameJa: String? = nil,
          aliases: [String] = [], platform: String = "", releaseDate: Date? = nil,
-         coverData: Data? = nil, reviewTitle: String = "", reviewBody: String = "",
+         coverData: Data? = nil, landscapeData: Data? = nil, heroData: Data? = nil,
+         logoData: Data? = nil, reviewTitle: String = "", reviewBody: String = "",
          createdAt: Date = .now, status: GameStatus = .completed) {
         self.name = name
         self.nameZh = nameZh
@@ -83,6 +90,9 @@ final class Game {
         self.platform = platform
         self.releaseDate = releaseDate
         self.coverData = coverData
+        self.landscapeData = landscapeData
+        self.heroData = heroData
+        self.logoData = logoData
         self.reviewTitle = reviewTitle
         self.reviewBody = reviewBody
         self.createdAt = createdAt

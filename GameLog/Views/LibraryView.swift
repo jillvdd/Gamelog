@@ -81,25 +81,37 @@ struct LibraryView: View {
         if !searchText.isEmpty {
             result = result.filter { $0.matches(search: searchText) }
         }
+        // 主比较器 + 稳定裁决键：Swift sort 非稳定、分组关系数组顺序也不保证，
+        // 并列条目（同名/同分/同日期）每次 body 重算可能互换跳动，统一以显示名→创建时间裁决。
+        func stableSort(by areInOrder: (Game, Game) -> Bool) {
+            result.sort { a, b in
+                if areInOrder(a, b) { return true }
+                if areInOrder(b, a) { return false }
+                let an = a.displayName(for: language), bn = b.displayName(for: language)
+                if an.caseInsensitiveCompare(bn) == .orderedAscending { return true }
+                if bn.caseInsensitiveCompare(an) == .orderedAscending { return false }
+                return a.createdAt < b.createdAt
+            }
+        }
         switch sortOption {
         case .name:
-            result.sort { $0.displayName(for: language).localizedCaseInsensitiveCompare($1.displayName(for: language)) == .orderedAscending }
+            stableSort { $0.displayName(for: language).localizedCaseInsensitiveCompare($1.displayName(for: language)) == .orderedAscending }
         case .releaseDate:
-            result.sort { ($0.releaseDate ?? .distantPast) > ($1.releaseDate ?? .distantPast) }
+            stableSort { ($0.releaseDate ?? .distantPast) > ($1.releaseDate ?? .distantPast) }
         case .completionDate:
-            result.sort { ($0.latestCompletionDate ?? .distantPast) > ($1.latestCompletionDate ?? .distantPast) }
+            stableSort { ($0.latestCompletionDate ?? .distantPast) > ($1.latestCompletionDate ?? .distantPast) }
         case .scoreAscending:
             // 未评分（nil）按无穷大处理，排在已评分之后。
-            result.sort { ($0.rawLibraryScore(platform: nil) ?? .greatestFiniteMagnitude) < ($1.rawLibraryScore(platform: nil) ?? .greatestFiniteMagnitude) }
+            stableSort { ($0.rawLibraryScore(platform: nil) ?? .greatestFiniteMagnitude) < ($1.rawLibraryScore(platform: nil) ?? .greatestFiniteMagnitude) }
         case .scoreDescending:
             // 未评分（nil）按 -1 处理，排在已评分之后。
-            result.sort { ($0.rawLibraryScore(platform: nil) ?? -1) > ($1.rawLibraryScore(platform: nil) ?? -1) }
+            stableSort { ($0.rawLibraryScore(platform: nil) ?? -1) > ($1.rawLibraryScore(platform: nil) ?? -1) }
         case .recentEdit:
             // 最近编辑：无编辑记录退回创建时间；越新越靠前。
-            result.sort { $0.lastEditedAt > $1.lastEditedAt }
+            stableSort { $0.lastEditedAt > $1.lastEditedAt }
         case .valueDescending:
             // 价值最高（总估值，按当前语言）；无估值（nil）排最后。
-            result.sort { ($0.totalEstimate(for: language) ?? -1) > ($1.totalEstimate(for: language) ?? -1) }
+            stableSort { ($0.totalEstimate(for: language) ?? -1) > ($1.totalEstimate(for: language) ?? -1) }
         }
         return result
     }
@@ -160,7 +172,9 @@ struct LibraryView: View {
     /// 网格：自适应列，卡片可点击进详情、右键菜单。
     @ViewBuilder
     private func gameGrid(_ games: [Game]) -> some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150, maximum: 200), spacing: 16)], spacing: 16) {
+        // alignment: .top——GridItem 默认垂直居中,同行里较高的卡片(如平台名折两行)
+        // 会把矮卡片顶边压下去,造成每列顶端参差;顶部对齐后每行卡片顶端平齐。
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150, maximum: 200), spacing: 16, alignment: .top)], spacing: 16) {
             ForEach(games) { game in
                 gameCard(game)
             }
@@ -177,32 +191,105 @@ struct LibraryView: View {
         }
     }
 
+    /// 排序菜单项（勾选态随 sortOption）。
+    @ViewBuilder
+    private var sortMenuItems: some View {
+        Button {
+            sortRaw = LibrarySort.recentEdit.rawValue
+        } label: {
+            if sortOption == .recentEdit {
+                Label(L10n.tr("library.sortByRecentEdit", lang: language), systemImage: "checkmark")
+            } else {
+                Text(verbatim: L10n.tr("library.sortByRecentEdit", lang: language))
+            }
+        }
+        Button {
+            sortRaw = LibrarySort.name.rawValue
+        } label: {
+            if sortOption == .name {
+                Label(L10n.tr("library.sortByName", lang: language), systemImage: "checkmark")
+            } else {
+                Text(verbatim: L10n.tr("library.sortByName", lang: language))
+            }
+        }
+        Button {
+            sortRaw = LibrarySort.releaseDate.rawValue
+        } label: {
+            if sortOption == .releaseDate {
+                Label(L10n.tr("library.sortByRelease", lang: language), systemImage: "checkmark")
+            } else {
+                Text(verbatim: L10n.tr("library.sortByRelease", lang: language))
+            }
+        }
+        Button {
+            sortRaw = LibrarySort.completionDate.rawValue
+        } label: {
+            if sortOption == .completionDate {
+                Label(L10n.tr("library.sortByCompletion", lang: language), systemImage: "checkmark")
+            } else {
+                Text(verbatim: L10n.tr("library.sortByCompletion", lang: language))
+            }
+        }
+        Button {
+            sortRaw = LibrarySort.scoreAscending.rawValue
+        } label: {
+            if sortOption == .scoreAscending {
+                Label(L10n.tr("library.sortByScoreAsc", lang: language), systemImage: "checkmark")
+            } else {
+                Text(verbatim: L10n.tr("library.sortByScoreAsc", lang: language))
+            }
+        }
+        Button {
+            sortRaw = LibrarySort.scoreDescending.rawValue
+        } label: {
+            if sortOption == .scoreDescending {
+                Label(L10n.tr("library.sortByScoreDesc", lang: language), systemImage: "checkmark")
+            } else {
+                Text(verbatim: L10n.tr("library.sortByScoreDesc", lang: language))
+            }
+        }
+        Button {
+            sortRaw = LibrarySort.valueDescending.rawValue
+        } label: {
+            if sortOption == .valueDescending {
+                Label(L10n.tr("library.sortByValueDesc", lang: language), systemImage: "checkmark")
+            } else {
+                Text(verbatim: L10n.tr("library.sortByValueDesc", lang: language))
+            }
+        }
+    }
+
     @ViewBuilder
     private func gameCard(_ game: Game) -> some View {
-        GameCardView(game: game)
-            .contentShape(Rectangle())
-            .onTapGesture {
-                #if os(macOS)
-                path.append(game)
-                #else
-                selectedGame = game
-                #endif
-            }
-            .contextMenu { cardMenu(for: game) }
+        // Button + 按压反馈样式（原 onTapGesture 点按无任何视觉响应，不符 iOS 触控预期）。
+        Button {
+            #if os(macOS)
+            path.append(game)
+            #else
+            selectedGame = game
+            #endif
+        } label: {
+            GameCardView(game: game)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(PressFeedbackButtonStyle())
+        .contextMenu { cardMenu(for: game) }
     }
 
     @ViewBuilder
     private func gameRow(_ game: Game) -> some View {
-        GameRowView(game: game)
-            .contentShape(Rectangle())
-            .onTapGesture {
-                #if os(macOS)
-                path.append(game)
-                #else
-                selectedGame = game
-                #endif
-            }
-            .contextMenu { cardMenu(for: game) }
+        Button {
+            #if os(macOS)
+            path.append(game)
+            #else
+            selectedGame = game
+            #endif
+        } label: {
+            GameRowView(game: game)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(PressFeedbackButtonStyle())
+        .contextMenu { cardMenu(for: game) }
     }
 
     @ViewBuilder
@@ -396,98 +483,46 @@ struct LibraryView: View {
             #endif
             #if os(macOS)
             ToolbarItem {
+                // 排序菜单:原生 Menu 样式——系统会给它独立的小玻璃胶囊(与右侧三连胶囊
+                // 分组分开),并自带系统悬停/按压行为;自定义样式会被并进同一条玻璃。
                 Menu {
-                    Button {
-                        sortRaw = LibrarySort.recentEdit.rawValue
-                    } label: {
-                        if sortOption == .recentEdit {
-                            Label(L10n.tr("library.sortByRecentEdit", lang: language), systemImage: "checkmark")
-                        } else {
-                            Text(verbatim: L10n.tr("library.sortByRecentEdit", lang: language))
-                        }
-                    }
-                    Button {
-                        sortRaw = LibrarySort.name.rawValue
-                    } label: {
-                        if sortOption == .name {
-                            Label(L10n.tr("library.sortByName", lang: language), systemImage: "checkmark")
-                        } else {
-                            Text(verbatim: L10n.tr("library.sortByName", lang: language))
-                        }
-                    }
-                    Button {
-                        sortRaw = LibrarySort.releaseDate.rawValue
-                    } label: {
-                        if sortOption == .releaseDate {
-                            Label(L10n.tr("library.sortByRelease", lang: language), systemImage: "checkmark")
-                        } else {
-                            Text(verbatim: L10n.tr("library.sortByRelease", lang: language))
-                        }
-                    }
-                    Button {
-                        sortRaw = LibrarySort.completionDate.rawValue
-                    } label: {
-                        if sortOption == .completionDate {
-                            Label(L10n.tr("library.sortByCompletion", lang: language), systemImage: "checkmark")
-                        } else {
-                            Text(verbatim: L10n.tr("library.sortByCompletion", lang: language))
-                        }
-                    }
-                    Button {
-                        sortRaw = LibrarySort.scoreAscending.rawValue
-                    } label: {
-                        if sortOption == .scoreAscending {
-                            Label(L10n.tr("library.sortByScoreAsc", lang: language), systemImage: "checkmark")
-                        } else {
-                            Text(verbatim: L10n.tr("library.sortByScoreAsc", lang: language))
-                        }
-                    }
-                    Button {
-                        sortRaw = LibrarySort.scoreDescending.rawValue
-                    } label: {
-                        if sortOption == .scoreDescending {
-                            Label(L10n.tr("library.sortByScoreDesc", lang: language), systemImage: "checkmark")
-                        } else {
-                            Text(verbatim: L10n.tr("library.sortByScoreDesc", lang: language))
-                        }
-                    }
-                    Button {
-                        sortRaw = LibrarySort.valueDescending.rawValue
-                    } label: {
-                        if sortOption == .valueDescending {
-                            Label(L10n.tr("library.sortByValueDesc", lang: language), systemImage: "checkmark")
-                        } else {
-                            Text(verbatim: L10n.tr("library.sortByValueDesc", lang: language))
-                        }
-                    }
+                    sortMenuItems
                 } label: {
                     Image(systemName: "arrow.up.arrow.down")
                 }
                 .help(L10n.tr("library.sort", lang: language))
             }
-            ToolbarItem {
-                Button {
-                    useGridView.toggle()
-                } label: {
-                    Image(systemName: useGridView ? "list.bullet" : "square.grid.2x2")
+            ToolbarItem(placement: .primaryAction) {
+                // 三按钮装进一整条玻璃长胶囊,右对齐(与搜索框相邻)。
+                HStack(spacing: 0) {
+                    Button {
+                        useGridView.toggle()
+                    } label: {
+                        // 自定义按钮样式会丢掉系统工具栏的自动图标放大,显式给到原生尺寸(15pt)。
+                        Image(systemName: useGridView ? "list.bullet" : "square.grid.2x2")
+                            .font(.system(size: 15))
+                    }
+                    .toolbarSegmentStyle()
+                    .help(useGridView ? L10n.tr("library.listView", lang: language) : L10n.tr("library.gridView", lang: language))
+
+                    Button {
+                        showingShare = true
+                    } label: {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: 15))
+                    }
+                    .toolbarSegmentStyle()
+                    .help(L10n.tr("library.share", lang: language))
+
+                    Button {
+                        showingNewGame = true
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 15))
+                    }
+                    .toolbarSegmentStyle()
+                    .help(L10n.tr("library.addGame", lang: language))
                 }
-                .help(useGridView ? L10n.tr("library.listView", lang: language) : L10n.tr("library.gridView", lang: language))
-            }
-            ToolbarItem {
-                Button {
-                    showingShare = true
-                } label: {
-                    Image(systemName: "square.and.arrow.up")
-                }
-                .help(L10n.tr("library.share", lang: language))
-            }
-            ToolbarItem {
-                Button {
-                    showingNewGame = true
-                } label: {
-                    Image(systemName: "plus")
-                }
-                .help(L10n.tr("library.addGame", lang: language))
             }
             #else
             // iOS：仅保留「新建游戏」+ 一个「更多」菜单（排序/网格/分享收进去），

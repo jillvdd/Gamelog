@@ -9,7 +9,7 @@
 //     GameLog/Support/ScoreMath.swift GameLog/Support/AppLanguage.swift GameLog/Support/L10n.swift \
 //     GameLog/Support/UserCustomization.swift GameLog/Support/PlatformImage.swift \
 //     GameLog/Support/EnumPickerRow.swift GameLog/Support/PriceFormat.swift \
-//     GameLog/Support/MarkdownReview.swift \
+//     GameLog/Support/MarkdownReview.swift GameLog/Support/LiquidGlassToolbar.swift \
 //     GameLog/Share/ShareCardView.swift GameLog/Share/ShareCardRenderer.swift \
 //     -plugin-path <Xcode-beta 插件路径>
 //   /tmp/gamelog_sharetest
@@ -191,17 +191,6 @@ func run() -> Int {
         check("分组卡横版宽 1920、高与布局一致 \(Int(expected.height))（实际 \(size.width)x\(size.height)）",
               size.width == 1920 && abs(Double(size.height) - expected.height) <= 1 && size.height >= 1080)
         try? png.write(to: URL(fileURLWithPath: "/tmp/gamelog_share_group_desktop.png"))
-
-        // 调试:裁最底 80px 条带,供 Read 检查底边白线/水印位置(验收期临时件)。
-        if let img = NSImage(data: png), let tiff = img.tiffRepresentation,
-           let rep = NSBitmapImageRep(data: tiff), let cg = rep.cgImage {
-            let strip = cg.cropping(to: CGRect(x: 0, y: cg.height - 80, width: cg.width, height: 80))
-            if let strip {
-                let srep = NSBitmapImageRep(cgImage: strip)
-                try? srep.representation(using: .png, properties: [:])?
-                    .write(to: URL(fileURLWithPath: "/tmp/gamelog_share_bottom_strip.png"))
-            }
-        }
     } else {
         check("分组卡横版渲染成功", false)
     }

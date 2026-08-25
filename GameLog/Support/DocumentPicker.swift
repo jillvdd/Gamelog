@@ -22,10 +22,7 @@ enum DocumentPicker {
         let coordinator = Coordinator(onPicked: onPicked, onCancel: onCancel)
         picker.delegate = coordinator
         holders.append(coordinator)
-        print("[DocPicker] present types=\(types.map(\.identifier)) topVC=\(Swift.type(of: root))")
-        root.present(picker, animated: true) {
-            print("[DocPicker] PICKER PRESENTED")
-        }
+        root.present(picker, animated: true)
     }
 
     private static func topMostViewController(base: UIViewController? = nil) -> UIViewController? {
@@ -56,7 +53,6 @@ enum DocumentPicker {
         }
 
         func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
-            print("[DocPicker] DID PICK count=\(urls.count)")
             release()
             guard let url = urls.first else { return }
             // 推迟到下一个 runloop：picker 正在 dismiss，避免在 presentation 过渡中同步改 SwiftUI 状态。
@@ -64,7 +60,6 @@ enum DocumentPicker {
         }
 
         func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
-            print("[DocPicker] DID CANCEL")
             release()
             DispatchQueue.main.async { self.onCancel?() }
         }

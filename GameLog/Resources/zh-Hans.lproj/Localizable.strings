@@ -72,12 +72,15 @@
 "dimension.performance" = "性能";
 "score.average" = "平均分";
 "score.unrated" = "未评分";
+"card.cleared" = "通关日期 %@";
+"card.released" = "发售日期 %@";
 "common.save" = "保存";
 "common.cancel" = "取消";
 "common.edit" = "编辑";
 "common.delete" = "删除";
 "common.custom" = "自定义…";
 "common.done" = "完成";
+"common.close" = "关闭";
 "common.confirmDelete" = "删除";
 "common.back" = "返回";
 "delete.confirmGame" = "确定删除「%@」？该游戏的所有通关记录也会被删除。";
@@ -156,6 +159,7 @@
 "crop.titleAvatar" = "裁切头像";
 "crop.titleIcon" = "裁切图标";
 "crop.zoom" = "缩放";
+"crop.reset" = "重置";
 "share.brandUser" = "%@的游戏簿";
 "about.menu" = "关于我的游戏簿";
 "about.version" = "版本";
@@ -169,6 +173,7 @@
 "backup.importConfirm" = "导入将替换当前全部数据，确定继续吗？";
 "validation.nameRequired" = "请输入游戏名称";
 "validation.reviewTitleRequired" = "评价标题必填";
+"validation.scoreRequired" = "至少需要评分一个维度";
 "validation.scoresRequired" = "首条记录需要完成四项评分";
 "validation.playtimeInvalid" = "游戏时长请输入非负数字（小时）";
 "title.newGame" = "新建游戏";
@@ -217,8 +222,18 @@
 "completion.playtimeFormat" = "%.1f 小时";
 "cover.searchFailed" = "封面获取失败，请检查网络或 API Key";
 "cover.noGrids" = "未找到该游戏的封面";
+"cover.loadMore" = "加载更多";
 "cover.title" = "搜索封面";
 "cover.close" = "关闭";
+"game.landscape" = "横向封面";
+"game.hero" = "背景图";
+"game.logo" = "Logo";
+"cover.titleLandscape" = "搜索横向封面";
+"cover.titleHero" = "搜索背景图";
+"cover.titleLogo" = "搜索 Logo";
+"cover.noLandscape" = "未找到该游戏的横向封面";
+"cover.noHero" = "未找到该游戏的背景图";
+"cover.noLogo" = "未找到该游戏的 Logo";
 
 // 持有 / 藏品档案（beta 2.2）
 "copy.media.physicalStandard" = "实体标准版";
@@ -329,6 +344,7 @@
 "backup.restoreNow" = "从备份恢复";
 "backup.keepEmpty" = "保留空库";
 "backup.nowDone" = "已保存备份";
+"backup.nowFailed" = "备份失败，请检查磁盘空间";
 "backup.noBackupYet" = "尚未备份";
 "settings.storage" = "存储与缓存";
 "settings.cacheSize" = "当前缓存占用：%@";

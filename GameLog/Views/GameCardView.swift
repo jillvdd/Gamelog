@@ -100,11 +100,31 @@ struct GameCardView: View {
         return shown
     }
 
-    /// 最近一次通关日期，单独一行；无日期返回空串（不显示）。
-    /// 与库排序同口径：取全部记录中最大的通关日期（latestCompletionDate），而非最后创建的那条。
-    private var dateText: String {
-        guard let date = game.latestCompletionDate else { return "" }
-        return date.formatted(date: .abbreviated, time: .omitted)
+    /// 通关日期行（全部记录中最大的通关日期，与库排序同口径；无日期不显示）。
+    private var clearDateText: String? {
+        game.latestCompletionDate.map {
+            L10n.tr("card.cleared", [Self.cardDate($0, language: language)], lang: language)
+        }
+    }
+
+    /// 发售日期行（有发售日才显示）。
+    private var releaseDateText: String? {
+        game.releaseDate.map {
+            L10n.tr("card.released", [Self.cardDate($0, language: language)], lang: language)
+        }
+    }
+
+    /// 跟随界面语言的卡片日期格式。此前 `Date.formatted` 跟随系统 locale，
+    /// 中文界面会显示英文日期「2 Aug 2026」。
+    static func cardDate(_ date: Date, language: String) -> String {
+        let fmt = DateFormatter()
+        fmt.locale = Locale(identifier: language)
+        if language == "zh-Hans" || language == "ja" {
+            fmt.dateFormat = "yyyy年M月d日"
+        } else {
+            fmt.dateFormat = "MMM d, yyyy"
+        }
+        return fmt.string(from: date)
     }
 
     var body: some View {
@@ -116,20 +136,24 @@ struct GameCardView: View {
                     if let score = game.libraryScore {
                         Text(verbatim: Self.formatScore(score))
                             .font(.system(size: 12, weight: .bold))
+                            .monospacedDigit()
                             .foregroundStyle(.white)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 3)
-                            .background(.black.opacity(0.72), in: Capsule())
+                            .padding(.horizontal, 8)
+                            .frame(height: 22)
+                            .glassCapsuleBadge(tint: Color.black.opacity(0.30),
+                                               fallback: Color.black.opacity(0.72))
                             .padding(6)
                     }
                 } else {
                     // 想玩/在玩/搁置/弃坑：右上角状态标签。
+                    // 两种徽章统一尺寸（高 22、字号 12、水平内边距 8）+ 液态玻璃（状态用品牌色染色玻璃）。
                     Text(verbatim: L10n.tr(game.statusValue.labelKey, lang: language))
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(.white)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(game.statusValue.statusColor.opacity(0.88), in: Capsule())
+                        .padding(.horizontal, 8)
+                        .frame(height: 22)
+                        .glassCapsuleBadge(tint: game.statusValue.statusColor.opacity(0.55),
+                                           fallback: game.statusValue.statusColor.opacity(0.88))
                         .padding(6)
                 }
             }
@@ -156,8 +180,14 @@ struct GameCardView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
-            if !dateText.isEmpty {
-                Text(verbatim: dateText)
+            // 发售日期在上(有才显示),通关日期在下——按时间先后自然排列。
+            if let releaseDateText {
+                Text(verbatim: releaseDateText)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            if let clearDateText {
+                Text(verbatim: clearDateText)
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }

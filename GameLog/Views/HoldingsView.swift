@@ -74,7 +74,7 @@ struct HoldingsView: View {
         game.copies.sorted { $0.createdAt < $1.createdAt }
     }
 
-    /// 版本数（去重版本名）。
+    /// 版本数（持有档案条数；同名版本是各自独立的档案，各计一条）。
     private var editionCount: Int { sortedCopies.count }
     /// 总数量。
     private var totalQuantity: Int { sortedCopies.reduce(0) { $0 + $1.count } }
@@ -152,7 +152,7 @@ struct HoldingsView: View {
                                     .frame(width: cellWidth, height: geo.size.height)
                                     .contentShape(Rectangle())
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(PressFeedbackButtonStyle(pressedScale: 0.9, pressedOpacity: 0.55))
                             Button {
                                 guard useGridView else { return }
                                 gridSliderIndex = 1
@@ -164,7 +164,7 @@ struct HoldingsView: View {
                                     .frame(width: cellWidth, height: geo.size.height)
                                     .contentShape(Rectangle())
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(PressFeedbackButtonStyle(pressedScale: 0.9, pressedOpacity: 0.55))
                         }
                     }
                 }
@@ -259,7 +259,7 @@ struct HoldingsView: View {
 
     /// 网格视图：首图当主视觉 + 余下 +N 角标。
     private var gridModeContent: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 200, maximum: 260), spacing: 16)], spacing: 16) {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 200, maximum: 260), spacing: 16, alignment: .top)], spacing: 16) {
             ForEach(sortedCopies) { copy in
                 CopyGridCellView(
                     copy: copy,
@@ -415,10 +415,16 @@ private struct CopyGridCellView: View {
             .aspectRatio(3.0 / 4.0, contentMode: .fit)
             .overlay {
                 if let data = firstImage, let image = AppImage(data: data) {
-                    Image(appImage: image)
-                        .resizable()
-                        .scaledToFill()
-                        .onTapGesture { onEnlarge(data) }
+                    // 按钮化：按压反馈（原 onTapGesture 无视觉响应）。
+                    Button {
+                        onEnlarge(data)
+                    } label: {
+                        Image(appImage: image)
+                            .resizable()
+                            .scaledToFill()
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(PressFeedbackButtonStyle(pressedScale: 0.96))
                 } else {
                     ZStack {
                         RoundedRectangle(cornerRadius: 8).fill(Color.semantic(.quaternarySystemFill))
@@ -627,7 +633,9 @@ private struct CopyCardView: View {
             }
             if !copy.notes.isEmpty {
                 VStack(alignment: .leading, spacing: 2) {
-                    LText(copy.notes)
+                    // 用户自由备注按原样显示；走 LText 会把备注内容当本地化 key 查表，
+                    // 备注恰好命中某个 key（如 common.cancel）时会显示翻译文案而非原文。
+                    Text(verbatim: copy.notes)
                         .font(.callout)
                         .foregroundStyle(.secondary)
                         .textSelection(.enabled)
@@ -727,34 +735,40 @@ private struct ThumbnailView: View {
     @State private var hovering = false
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
-            Color.clear
-                .aspectRatio(1, contentMode: .fit)
-                .overlay {
-                    if let image = AppImage(data: data) {
-                        Image(appImage: image)
-                            .resizable()
-                            .scaledToFill()
-                    } else {
-                        Rectangle().fill(Color.semantic(.quaternarySystemFill))
+        // 按钮化：按压反馈（原 onTapGesture 无视觉响应）；× 删除角标是嵌套按钮，点按以内层为准。
+        Button {
+            onEnlarge()
+        } label: {
+            ZStack(alignment: .topTrailing) {
+                Color.clear
+                    .aspectRatio(1, contentMode: .fit)
+                    .overlay {
+                        if let image = AppImage(data: data) {
+                            Image(appImage: image)
+                                .resizable()
+                                .scaledToFill()
+                        } else {
+                            Rectangle().fill(Color.semantic(.quaternarySystemFill))
+                        }
                     }
-                }
-                .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
 
-            Group {
-                #if os(macOS)
-                if hovering {
-                    deleteBadge.transition(.opacity)
+                Group {
+                    #if os(macOS)
+                    if hovering {
+                        deleteBadge.transition(.opacity)
+                    }
+                    #else
+                    deleteBadge
+                    #endif
                 }
-                #else
-                deleteBadge
-                #endif
             }
+            .contentShape(Rectangle())
         }
+        .buttonStyle(PressFeedbackButtonStyle(pressedScale: 0.96))
         #if os(macOS)
         .onHover { hovering = $0 }
         #endif
-        .onTapGesture(perform: onEnlarge)
         .help(L10n.tr("copy.viewImage", lang: language))
     }
 
@@ -806,11 +820,17 @@ struct CopyEditSheet: View {
         _condition = State(initialValue: copy?.condition ?? .used)
         _acquisition = State(initialValue: copy?.acquisition ?? .officialChannelOverseas)
         _platform = State(initialValue: (copy?.platform.isEmpty ?? true) ? Presets.platforms[0] : copy!.platform)
-        _priceText = State(initialValue: copy?.price(for: lang).map { String(format: "%.0f", $0) } ?? "")
-        _estValueText = State(initialValue: copy?.estValue(for: lang).map { String(format: "%.0f", $0) } ?? "")
+        // 回填保留原值精度（%.0f 会把 199.5 四舍五入成 "200"，直接点保存就无声改了库里的价格）。
+        _priceText = State(initialValue: copy?.price(for: lang).map(Self.priceText) ?? "")
+        _estValueText = State(initialValue: copy?.estValue(for: lang).map(Self.priceText) ?? "")
         _hasPurchaseDate = State(initialValue: copy?.purchaseDate != nil)
         _purchaseDate = State(initialValue: copy?.purchaseDate ?? Date())
         _notes = State(initialValue: copy?.notes ?? "")
+    }
+
+    /// 价格回填文本：整数不带小数点，小数保留原值（价格来自用户输入解析，无二进制噪声）。
+    private static func priceText(_ value: Double) -> String {
+        value == value.rounded() ? String(Int(value)) : String(value)
     }
 
     private var trimmed: String { version.trimmingCharacters(in: .whitespaces) }

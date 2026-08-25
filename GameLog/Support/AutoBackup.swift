@@ -130,12 +130,13 @@ final class AutoBackup: ObservableObject {
         }
     }
 
-    /// 立即写入（设置页「立即备份」/ 启动检查用）。
-    func writeNow() {
+    /// 立即写入（设置页「立即备份」/ 启动检查用）。返回是否真正写盘成功。
+    @discardableResult
+    func writeNow() -> Bool {
         needsWrite = true
         debounceTask?.cancel()
         debounceTask = nil
-        performWrite()
+        return performWrite()
     }
 
     /// 退出/后台兜底：有未落盘的改动才写（避免每次后台都重编码）。
@@ -147,14 +148,15 @@ final class AutoBackup: ObservableObject {
         }
     }
 
-    private func performWrite() {
-        guard Self.isEnabled else { return }
-        guard let container else { return }
+    @discardableResult
+    private func performWrite() -> Bool {
+        guard Self.isEnabled else { return false }
+        guard let container else { return false }
         guard let games = try? container.mainContext.fetch(FetchDescriptor<Game>()),
-              let groups = try? container.mainContext.fetch(FetchDescriptor<GameGroup>()) else { return }
+              let groups = try? container.mainContext.fetch(FetchDescriptor<GameGroup>()) else { return false }
         // 防空库覆盖：库为空时不写滚动备份——避免把上一份好的备份覆盖成空
         // （对应「store 被清空但 app 数据丢了」的场景，见 HANDOVER §25.5）。
-        guard !games.isEmpty || !groups.isEmpty else { return }
+        guard !games.isEmpty || !groups.isEmpty else { return false }
         do {
             let data = try BackupManager.encode(games: games, groups: groups)
             let url = Self.backupFileURL
@@ -163,8 +165,10 @@ final class AutoBackup: ObservableObject {
             needsWrite = false
             UserDefaults.standard.set(Date(), forKey: Self.lastBackupDateKey)
             UserDefaults.standard.set(data.count, forKey: Self.lastBackupSizeKey)
+            return true
         } catch {
             // 写盘失败（磁盘满等罕见）：needsWrite 保持，下次保存仍重试。
+            return false
         }
     }
 
@@ -239,6 +243,27 @@ final class AutoBackup: ObservableObject {
         let url = Self.backupDir.appendingPathComponent("GameLog-autobackup-snapshot-\(Self.snapshotTimestamp()).json")
         try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try? data.write(to: url, options: .atomic)
+        trimSnapshotFiles(keep: 10)
+    }
+
+    /// 只保留最近 keep 份恢复前快照（按修改时间，删除更旧的）。
+    /// 此前快照无任何清理、无限累积（每份含封面可达数十 MB，HANDOVER §30.1 记录的磁盘隐患）。
+    private func trimSnapshotFiles(keep: Int) {
+        let fm = FileManager.default
+        guard let files = try? fm.contentsOfDirectory(
+            at: Self.backupDir,
+            includingPropertiesForKeys: [.contentModificationDateKey]
+        ) else { return }
+        let matches = files
+            .filter { $0.lastPathComponent.hasPrefix("GameLog-autobackup-snapshot-") && $0.pathExtension == "json" }
+            .sorted { lhs, rhs in
+                let l = (try? lhs.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantPast
+                let r = (try? rhs.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantPast
+                return l < r
+            }
+        if matches.count > keep {
+            matches.prefix(matches.count - keep).forEach { try? fm.removeItem(at: $0) }
+        }
     }
 
     /// 只保留最近 keep 份 pre-版本 快照（按修改时间，删除更旧的）。

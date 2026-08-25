@@ -11,6 +11,8 @@ struct SteamGridDBGameHit: Decodable, Identifiable, Hashable {
 struct SteamGridDBGrid: Decodable, Identifiable {
     let id: Int
     let url: String
+    /// 缩略图 URL（浏览用,全尺寸图单张数百 KB）。
+    let thumb: String?
     let width: Int
     let height: Int
     let style: String?
@@ -19,6 +21,9 @@ struct SteamGridDBGrid: Decodable, Identifiable {
 struct SteamGridDBResponse<T: Decodable>: Decodable {
     let success: Bool
     let data: T
+    /// 列表端点（grids/heroes/logos）的分页信息；search 无此字段。
+    var total: Int?
+    var page: Int?
 }
 
 /// SteamGridDB 客户端：按名字搜索游戏，取封面，下载图片。
@@ -54,6 +59,51 @@ struct SteamGridDBClient {
         let data = try await requestData(url)
         let response = try JSONDecoder().decode(SteamGridDBResponse<[SteamGridDBGrid]>.self, from: data)
         return response.success ? response.data : []
+    }
+
+    /// 封面浏览分页结果。
+    struct GridPage {
+        let grids: [SteamGridDBGrid]
+        let total: Int
+        let page: Int
+    }
+
+    /// 封面浏览分页结果（**只取 2:3 竖版 600x900**——本 app 封面主格式，用户拍板；
+    /// API 每页 50 条，`page` 从 0 起）。热门游戏 2:3 也有数十张（RE4 2005 ≈ 41 张），分页渐进浏览。
+    func gridsPage(for gameID: Int, page: Int) async throws -> GridPage {
+        let url = URL(string: "\(Self.base)/grids/game/\(gameID)?dimensions=600x900&page=\(page)")!
+        let data = try await requestData(url)
+        let response = try JSONDecoder().decode(SteamGridDBResponse<[SteamGridDBGrid]>.self, from: data)
+        return GridPage(grids: response.success ? response.data : [],
+                        total: response.total ?? 0,
+                        page: response.page ?? page)
+    }
+
+    /// 取某个游戏的宽幅横图 heroes（1920×620 / 3840×1240 等，适合背景/横幅用途）。
+    /// 响应结构与 grids 完全一致，复用 SteamGridDBGrid。
+    func heroes(for gameID: Int) async throws -> [SteamGridDBGrid] {
+        let url = URL(string: "\(Self.base)/heroes/game/\(gameID)")!
+        let data = try await requestData(url)
+        let response = try JSONDecoder().decode(SteamGridDBResponse<[SteamGridDBGrid]>.self, from: data)
+        return response.success ? response.data : []
+    }
+
+    /// 取某个游戏的透明 clear logo（PNG，适合叠在背景/封面上）。
+    func logos(for gameID: Int) async throws -> [SteamGridDBGrid] {
+        let url = URL(string: "\(Self.base)/logos/game/\(gameID)")!
+        let data = try await requestData(url)
+        let response = try JSONDecoder().decode(SteamGridDBResponse<[SteamGridDBGrid]>.self, from: data)
+        return response.success ? response.data : []
+    }
+
+    /// 横向封面浏览分页结果（**只取 920×430 横版**——游戏横向封面主格式；API 每页 50 条，`page` 从 0 起）。
+    func landscapesPage(for gameID: Int, page: Int) async throws -> GridPage {
+        let url = URL(string: "\(Self.base)/grids/game/\(gameID)?dimensions=920x430&page=\(page)")!
+        let data = try await requestData(url)
+        let response = try JSONDecoder().decode(SteamGridDBResponse<[SteamGridDBGrid]>.self, from: data)
+        return GridPage(grids: response.success ? response.data : [],
+                        total: response.total ?? 0,
+                        page: response.page ?? page)
     }
 
     /// 下载图片数据。

@@ -220,7 +220,8 @@ struct StatsView: View {
             )
 
             LazyVGrid(columns: rankingColumns(for: width), spacing: 12) {
-                ForEach(Dimension.allCases) { dimension in
+                // 全库都没人评的维度不显示空榜。
+                ForEach(Dimension.allCases.filter { !Rankings.byDimension($0, games: games, platform: nil).isEmpty }) { dimension in
                     RankingBoard(
                         title: L10n.tr(dimension.labelKey, lang: language),
                         entries: Rankings.byDimension(dimension, games: games, platform: nil),

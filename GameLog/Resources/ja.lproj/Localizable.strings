@@ -72,12 +72,15 @@
 "dimension.performance" = "パフォーマンス";
 "score.average" = "平均スコア";
 "score.unrated" = "未評価";
+"card.cleared" = "クリア %@";
+"card.released" = "発売 %@";
 "common.save" = "保存";
 "common.cancel" = "キャンセル";
 "common.edit" = "編集";
 "common.delete" = "削除";
 "common.custom" = "カスタム…";
 "common.done" = "完了";
+"common.close" = "閉じる";
 "common.confirmDelete" = "削除";
 "common.back" = "戻る";
 "delete.confirmGame" = "「%@」を削除しますか？このゲームのすべてのクリア記録も削除されます。";
@@ -156,6 +159,7 @@
 "crop.titleAvatar" = "アバターをトリミング";
 "crop.titleIcon" = "アイコンをトリミング";
 "crop.zoom" = "ズーム";
+"crop.reset" = "リセット";
 "share.brandUser" = "%@のGamelog";
 "about.menu" = "Gamelogについて";
 "about.version" = "バージョン";
@@ -169,6 +173,7 @@
 "backup.importConfirm" = "読み込むと現在のデータがすべて置き換えられます。続けますか？";
 "validation.nameRequired" = "ゲーム名を入力してください";
 "validation.reviewTitleRequired" = "レビュータイトルは必須です";
+"validation.scoreRequired" = "少なくとも1つの軸を評価してください";
 "validation.scoresRequired" = "初回記録には4項目のスコアが必要です";
 "validation.playtimeInvalid" = "プレイ時間は0以上の数値（時間）で入力してください";
 "title.newGame" = "新規ゲーム";
@@ -217,8 +222,18 @@
 "completion.playtimeFormat" = "%.1f時間";
 "cover.searchFailed" = "カバーを取得できませんでした。ネットワーク接続または API Key を確認してください";
 "cover.noGrids" = "このゲームのカバーが見つかりません";
+"cover.loadMore" = "さらに読み込む";
 "cover.title" = "カバーを検索";
 "cover.close" = "閉じる";
+"game.landscape" = "横カバー";
+"game.hero" = "背景画像";
+"game.logo" = "ロゴ";
+"cover.titleLandscape" = "横カバーを検索";
+"cover.titleHero" = "背景画像を検索";
+"cover.titleLogo" = "ロゴを検索";
+"cover.noLandscape" = "このゲームの横カバーが見つかりません";
+"cover.noHero" = "このゲームの背景画像が見つかりません";
+"cover.noLogo" = "このゲームのロゴが見つかりません";
 
 // 所持 / コレクションアーカイブ（beta 2.2）
 "copy.media.physicalStandard" = "物理標準版";
@@ -329,6 +344,7 @@
 "backup.restoreNow" = "バックアップから復元";
 "backup.keepEmpty" = "空のままにする";
 "backup.nowDone" = "バックアップを保存しました";
+"backup.nowFailed" = "バックアップに失敗しました。ディスク容量を確認してください";
 "backup.noBackupYet" = "まだバックアップはありません";
 "settings.storage" = "ストレージとキャッシュ";
 "settings.cacheSize" = "キャッシュ容量：%@";

@@ -69,8 +69,9 @@ struct CompletionCardView: View {
             }
 
             if completion.hasScores {
+                // 只显示该记录评了的维度（未评维度不占位）。
                 HStack(spacing: 16) {
-                    ForEach(Dimension.allCases) { dimension in
+                    ForEach(Dimension.allCases.filter { completion.score(for: $0) != nil }) { dimension in
                         VStack(spacing: 2) {
                             LText(dimension.labelKey)
                                 .font(.caption2)
@@ -121,6 +122,11 @@ struct CompletionCardView: View {
     private var editButton: some View {
         Button(action: onEdit) {
             Image(systemName: "pencil")
+                // iOS 触控目标补足 44×44（HIG）；macOS 保持紧凑。
+                #if os(iOS)
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+                #endif
         }
         .buttonStyle(.borderless)
     }
@@ -128,6 +134,10 @@ struct CompletionCardView: View {
     private var deleteButton: some View {
         Button(action: onDelete) {
             Image(systemName: "trash")
+                #if os(iOS)
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+                #endif
         }
         .buttonStyle(.borderless)
         .foregroundStyle(.red)
@@ -148,7 +158,8 @@ private struct DimensionScoreBars: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            ForEach(Dimension.allCases) { dimension in
+            // 只显示有评分的维度（每维可选评/不评，未评维度均值 nil）。
+            ForEach(Dimension.allCases.filter { game.dimensionAverage(for: $0) != nil }) { dimension in
                 let value = game.dimensionAverage(for: dimension)
                 HStack(spacing: 8) {
                     LText(dimension.labelKey)
@@ -248,7 +259,7 @@ private struct DetailStatusPicker: View {
                     .frame(width: cellWidth, height: geo.size.height)
                     .offset(x: CGFloat(sliderIndex) * cellWidth)
                     .animation(.spring(response: 0.3, dampingFraction: 0.78), value: status)
-                // 按钮层：每个状态一列，整格可点。
+                // 按钮层：每个状态一列，整格可点；分段本体带按压形变（选中滑块另有 spring 动画）。
                 HStack(spacing: 0) {
                     ForEach(all) { s in
                         Button {
@@ -269,7 +280,7 @@ private struct DetailStatusPicker: View {
                             .frame(width: cellWidth, height: geo.size.height)
                             .contentShape(Rectangle())
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(PressFeedbackButtonStyle(pressedScale: 0.94, pressedOpacity: 0.55))
                         .help(L10n.tr(s.labelKey, lang: language))
                     }
                 }
@@ -342,7 +353,9 @@ struct GameDetailView: View {
     }
 
     /// 仅在离开详情页时把本地选中的状态写回模型；未变更则跳过（避免无谓的 SwiftData 写入）。
+    /// 游戏被删除（删除确认 → dismiss → onDisappear）时模型已删，写回会访问失效对象。
     private func persistStatusIfChanged() {
+        guard !game.isDeleted else { return }
         guard detailStatus != game.statusValue else { return }
         game.statusValue = detailStatus
         try? context.save()
@@ -387,28 +400,47 @@ struct GameDetailView: View {
         // 全屏毛玻璃下推 + 「隐藏上方毛玻璃」开关由全局 appToolbar() 统一处理。
         .appToolbar()
         .toolbar {
-            ToolbarItemGroup {
-                Button {
-                    showingShare = true
-                } label: {
-                    Label(L10n.tr("library.share", lang: language), systemImage: "square.and.arrow.up")
-                }
-                if detailStatus.isCompletedOrLongRunning {
+            ToolbarItem {
+                HStack(spacing: 0) {
                     Button {
-                        showingAddCompletion = true
+                        showingShare = true
                     } label: {
-                        Label(L10n.tr("completion.add", lang: language), systemImage: "plus")
+                        Label(L10n.tr("library.share", lang: language), systemImage: "square.and.arrow.up")
+                            .labelStyle(.iconOnly)
+                            .font(.system(size: 15))
                     }
-                }
-                Button {
-                    showingEditGame = true
-                } label: {
-                    Label(L10n.tr("common.edit", lang: language), systemImage: "pencil")
-                }
-                Button(role: .destructive) {
-                    showingDeleteGame = true
-                } label: {
-                    Label(L10n.tr("common.delete", lang: language), systemImage: "trash")
+                    .toolbarSegmentStyle()
+                    .help(L10n.tr("library.share", lang: language))
+                    if detailStatus.isCompletedOrLongRunning {
+                        Button {
+                            showingAddCompletion = true
+                        } label: {
+                            Label(L10n.tr("completion.add", lang: language), systemImage: "plus")
+                                .labelStyle(.iconOnly)
+                            .font(.system(size: 15))
+                        }
+                        .toolbarSegmentStyle()
+                        .help(L10n.tr("completion.add", lang: language))
+                    }
+                    Button {
+                        showingEditGame = true
+                    } label: {
+                        Label(L10n.tr("common.edit", lang: language), systemImage: "pencil")
+                            .labelStyle(.iconOnly)
+                            .font(.system(size: 15))
+                    }
+                    .toolbarSegmentStyle()
+                    .help(L10n.tr("common.edit", lang: language))
+                    Button(role: .destructive) {
+                        showingDeleteGame = true
+                    } label: {
+                        Label(L10n.tr("common.delete", lang: language), systemImage: "trash")
+                            .labelStyle(.iconOnly)
+                            .font(.system(size: 15))
+                            .foregroundStyle(.red)
+                    }
+                    .toolbarSegmentStyle()
+                    .help(L10n.tr("common.delete", lang: language))
                 }
             }
         }
@@ -638,6 +670,9 @@ struct GameDetailView: View {
 
     private func openReviewEditor() {
         #if os(macOS)
+        // game / group 互斥：GroupFooter 设 groupID 时会清 gameID，这里对称清 groupID——
+        // 否则编辑过分组评价后再开任一游戏的写字台，load() 先查 groupID 会载入上次的分组。
+        ReviewEditorSession.shared.groupID = nil
         ReviewEditorSession.shared.gameID = game.persistentModelID
         openWindow(id: "reviewEditor")
         #else
@@ -713,7 +748,7 @@ struct GameDetailView: View {
                                 .frame(width: cellWidth, height: geo.size.height)
                                 .contentShape(Rectangle())
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(PressFeedbackButtonStyle(pressedScale: 0.94, pressedOpacity: 0.55))
                     }
                 }
             }

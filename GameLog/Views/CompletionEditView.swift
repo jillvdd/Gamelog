@@ -16,7 +16,14 @@ struct CompletionEditView: View {
     @State private var playtimeText = ""
     @State private var playtimeIsNone = false
     @State private var notes = ""
-    @State private var skipScores = false
+    /// 每维评分开关：关 = 该维分数存 nil（平均分只算开启的维度）。全关 = 跳过评分。
+    /// 首条记录至少开一维。
+    @State private var eGameplay = true
+    @State private var eDesign = true
+    @State private var eStory = true
+    @State private var eArt = true
+    @State private var eMusic = true
+    @State private var ePerformance = true
     @State private var sGameplay = 7.0
     @State private var sDesign = 7.0
     @State private var sStory = 7.0
@@ -65,16 +72,12 @@ struct CompletionEditView: View {
             }
 
             Section(L10n.tr("completion.scores", lang: language)) {
-                Toggle(L10n.tr("completion.skipScores", lang: language), isOn: $skipScores)
-                    .disabled(isFirst)
-                if !skipScores {
-                    ScoreSliderRow(titleKey: "dimension.gameplay", value: $sGameplay)
-                    ScoreSliderRow(titleKey: "dimension.design", value: $sDesign)
-                    ScoreSliderRow(titleKey: "dimension.story", value: $sStory)
-                    ScoreSliderRow(titleKey: "dimension.art", value: $sArt)
-                    ScoreSliderRow(titleKey: "dimension.music", value: $sMusic)
-                    ScoreSliderRow(titleKey: "dimension.performance", value: $sPerformance)
-                }
+                ScoreSliderRow(titleKey: "dimension.gameplay", value: $sGameplay, isEnabled: $eGameplay)
+                ScoreSliderRow(titleKey: "dimension.design", value: $sDesign, isEnabled: $eDesign)
+                ScoreSliderRow(titleKey: "dimension.story", value: $sStory, isEnabled: $eStory)
+                ScoreSliderRow(titleKey: "dimension.art", value: $sArt, isEnabled: $eArt)
+                ScoreSliderRow(titleKey: "dimension.music", value: $sMusic, isEnabled: $eMusic)
+                ScoreSliderRow(titleKey: "dimension.performance", value: $sPerformance, isEnabled: $ePerformance)
             }
         }
         .formStyle(.grouped)
@@ -112,7 +115,13 @@ struct CompletionEditView: View {
         playtimeText = completion.playtime.map { String($0) } ?? ""
         playtimeIsNone = completion.playtime == nil
         notes = completion.notes
-        skipScores = !completion.hasScores && !isFirst
+        // 开关 = 该维是否有分；无分记录（历史跳过评分的）全维关闭，滑块值保持默认 7 备用。
+        eGameplay = completion.scoreGameplay != nil
+        eDesign = completion.scoreDesign != nil
+        eStory = completion.scoreStory != nil
+        eArt = completion.scoreArt != nil
+        eMusic = completion.scoreMusic != nil
+        ePerformance = completion.scorePerformance != nil
         if let v = completion.scoreGameplay { sGameplay = v }
         if let v = completion.scoreDesign { sDesign = v }
         if let v = completion.scoreStory { sStory = v }
@@ -135,7 +144,12 @@ struct CompletionEditView: View {
                 return
             }
         }
-        let effectiveSkip = isFirst ? false : skipScores
+        // 首条记录至少评一维；后续记录全关 = 跳过评分（合法）。
+        let anyEnabled = eGameplay || eDesign || eStory || eArt || eMusic || ePerformance
+        if isFirst && !anyEnabled {
+            validationError = L10n.tr("validation.scoreRequired", lang: language)
+            return
+        }
 
         if let completion {
             completion.platform = platform
@@ -143,21 +157,12 @@ struct CompletionEditView: View {
             completion.degree = degree
             completion.playtime = playtimeIsNone ? nil : parsedPlaytime
             completion.notes = notes
-            if effectiveSkip {
-                completion.scoreGameplay = nil
-                completion.scoreDesign = nil
-                completion.scoreStory = nil
-                completion.scoreArt = nil
-                completion.scoreMusic = nil
-                completion.scorePerformance = nil
-            } else {
-                completion.scoreGameplay = sGameplay
-                completion.scoreDesign = sDesign
-                completion.scoreStory = sStory
-                completion.scoreArt = sArt
-                completion.scoreMusic = sMusic
-                completion.scorePerformance = sPerformance
-            }
+            completion.scoreGameplay = eGameplay ? sGameplay : nil
+            completion.scoreDesign = eDesign ? sDesign : nil
+            completion.scoreStory = eStory ? sStory : nil
+            completion.scoreArt = eArt ? sArt : nil
+            completion.scoreMusic = eMusic ? sMusic : nil
+            completion.scorePerformance = ePerformance ? sPerformance : nil
         } else {
             let newCompletion = Completion(
                 platform: platform,
@@ -165,12 +170,12 @@ struct CompletionEditView: View {
                 degree: degree,
                 playtime: playtimeIsNone ? nil : parsedPlaytime,
                 notes: notes,
-                scoreGameplay: effectiveSkip ? nil : sGameplay,
-                scoreDesign: effectiveSkip ? nil : sDesign,
-                scoreStory: effectiveSkip ? nil : sStory,
-                scoreArt: effectiveSkip ? nil : sArt,
-                scoreMusic: effectiveSkip ? nil : sMusic,
-                scorePerformance: effectiveSkip ? nil : sPerformance
+                scoreGameplay: eGameplay ? sGameplay : nil,
+                scoreDesign: eDesign ? sDesign : nil,
+                scoreStory: eStory ? sStory : nil,
+                scoreArt: eArt ? sArt : nil,
+                scoreMusic: eMusic ? sMusic : nil,
+                scorePerformance: ePerformance ? sPerformance : nil
             )
             newCompletion.game = game
             context.insert(newCompletion)

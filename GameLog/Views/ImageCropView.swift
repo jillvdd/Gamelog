@@ -43,6 +43,8 @@ struct ImageCropSheet: View {
 
     @Environment(\.appLanguageCode) private var language
     @State private var offset: CGSize = .zero
+    /// 本次拖拽前的累计偏移基准（DragGesture.translation 相对每次手势起点，需自行累积）。
+    @State private var dragBase: CGSize = .zero
     @State private var scale: CGFloat = 1.0
     @State private var canvasSide: CGFloat = 440
 
@@ -69,12 +71,18 @@ struct ImageCropSheet: View {
                 Slider(value: $scale, in: 0.8...8)
                 Button {
                     offset = .zero
+                    dragBase = .zero
                     scale = 1.0
                 } label: {
                     Image(systemName: "arrow.counterclockwise")
+                        #if os(iOS)
+                        // 触控目标补足 44×44（HIG）；macOS 悬停有 help 提示，保持紧凑。
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                        #endif
                 }
                 .buttonStyle(.borderless)
-                .help("重置")
+                .help(L10n.tr("crop.reset", lang: language))
             }
             #if os(macOS)
             .frame(width: 440)
@@ -142,9 +150,19 @@ struct ImageCropSheet: View {
             .contentShape(Rectangle())
             .gesture(
                 DragGesture()
-                    .onChanged { value in offset = value.translation }
+                    // translation 相对每次手势起点：以 dragBase 累积，否则第二次拖动会把图片拉回中心附近。
+                    .onChanged { value in
+                        offset = CGSize(width: dragBase.width + value.translation.width,
+                                        height: dragBase.height + value.translation.height)
+                    }
+                    .onEnded { value in
+                        dragBase = CGSize(width: dragBase.width + value.translation.width,
+                                          height: dragBase.height + value.translation.height)
+                    }
             )
             .onAppear { canvasSide = side }
+            // iOS 画布随窗口/旋转变化：confirm() 的像素映射依赖 canvasSide，过期会裁错区域。
+            .onChange(of: side) { _, newValue in canvasSide = newValue }
         }
     }
 

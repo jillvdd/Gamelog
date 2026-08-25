@@ -76,6 +76,10 @@ private struct IOSActionSheetModifier: ViewModifier {
     }
 
     /// 挂载一个空 UIViewController 作为 present 锚点；`isPresented` 变 true 时弹出 action sheet。
+    ///
+    /// ⚠️ 绑定只能在「动作/取消执行完之后」才能复位——调用点的动作闭包普遍读取 pending 状态
+    /// （如 `pendingDeleteCopy`），而绑定 set(false) 恰恰会清掉它。曾在 present 后立即异步复位，
+    /// 导致用户点「删除」时状态已是 nil、删除静默失效（iOS 全部删除确认受影响）。
     private struct Presenter: UIViewControllerRepresentable {
         let title: String
         let message: String?
@@ -83,12 +87,20 @@ private struct IOSActionSheetModifier: ViewModifier {
         @Binding var isPresented: Bool
         let actions: [ConfirmAction]
 
+        func makeCoordinator() -> Coordinator { Coordinator() }
+
         func makeUIViewController(context: Context) -> UIViewController {
             UIViewController()
         }
 
         func updateUIViewController(_ viewController: UIViewController, context: Context) {
-            guard isPresented else { return }
+            let coordinator = context.coordinator
+            coordinator.dismiss = { isPresented = false }
+            if !isPresented {
+                coordinator.isAlertPresented = false
+                return
+            }
+            guard !coordinator.isAlertPresented else { return }
             let alert = UIAlertController(title: title, message: message, preferredStyle: .actionSheet)
             for action in actions {
                 alert.addAction(
@@ -97,10 +109,13 @@ private struct IOSActionSheetModifier: ViewModifier {
                         style: action.isDestructive ? .destructive : .default
                     ) { _ in
                         action.action()
+                        isPresented = false
                     }
                 )
             }
-            alert.addAction(UIAlertAction(title: cancelTitle, style: .cancel) { _ in })
+            alert.addAction(UIAlertAction(title: cancelTitle, style: .cancel) { _ in
+                isPresented = false
+            })
             // iPhone 恒为底部 action sheet；iPad 需要 popover 锚点（居中、无箭头）。
             if let popover = alert.popoverPresentationController {
                 popover.sourceView = viewController.view
@@ -112,10 +127,20 @@ private struct IOSActionSheetModifier: ViewModifier {
                 )
                 popover.permittedArrowDirections = []
             }
+            // 点外部/下滑关闭（iPad popover）时 UIAlertController 无完成回调，
+            // 用 presentation controller delegate 兜底复位绑定，防止绑定滞留 true。
+            alert.presentationController?.delegate = coordinator
             viewController.present(alert, animated: true)
-            // present 后立即复位，避免同一绑定反复触发；关闭由用户点按钮或点外部完成。
-            DispatchQueue.main.async {
-                isPresented = false
+            coordinator.isAlertPresented = true
+        }
+
+        final class Coordinator: NSObject, UIAdaptivePresentationControllerDelegate {
+            var isAlertPresented = false
+            var dismiss: (() -> Void)?
+
+            func presentationControllerDidDismiss(_ presentationController: UIPresentationController) {
+                isAlertPresented = false
+                dismiss?()
             }
         }
     }

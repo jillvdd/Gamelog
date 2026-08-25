@@ -13,14 +13,46 @@ struct PlatformIcon: View {
     var size: CGFloat = 16
     /// 是否放大显示（非白底图标统一 ×1.5、PS 系 ×1.2）。密集行（统计条）传 false 保持原始尺寸。
     var enlarge: Bool = true
+    /// 固定槽位（如侧边栏）：图标等比缩放 contain 进槽内、居中，槽宽恒定——
+    /// 用于品牌 logo 尺寸/宽高比参差的列表（白底宽字标按槽宽缩放，不再横向溢出）。
+    /// 设置后 `size`/`enlarge` 不参与计算。
+    var slot: CGSize? = nil
     @AppStorage(UserCustomization.platformIconsKey) private var showPlatformIcons = true
 
     var body: some View {
         if !showPlatformIcons {
             EmptyView()
+        } else if let slot {
+            slotBody(slot)
         } else {
             iconBody
         }
+    }
+
+    /// 槽位模式：等比 contain 进固定槽，行内图标列宽恒定、名字不换行。
+    /// ⚠️ 有效宽高比必须与 PlatformIconImage 的渲染口径一致（白底字标用原始比例、
+    /// 其余钳制 0.5–3），否则字标会溢出槽位盖住名字。
+    private func slotBody(_ slot: CGSize) -> some View {
+        let fileName = Presets.platformIconFile(for: platform)
+        let rawAspect = fileName.flatMap { PlatformIconLoader.aspect(named: $0) } ?? 1.0
+        let isWhite = fileName.map { PlatformIconLoader.needsWhiteBackground(named: $0) } ?? false
+        let effectiveAspect = isWhite ? rawAspect : min(max(rawAspect, 0.5), 3.0)
+        let fitHeight = min(slot.height, slot.width / effectiveAspect)
+        return Group {
+            if let fileName, PlatformIconLoader.image(named: fileName) != nil {
+                PlatformIconImage(
+                    image: PlatformIconLoader.image(named: fileName)!,
+                    size: fitHeight,
+                    isTemplate: PlatformIconLoader.isTemplate(named: fileName),
+                    whiteBackground: isWhite
+                )
+            } else {
+                Image(systemName: Presets.platformIconSymbol(for: platform) ?? "gamecontroller")
+                    .font(.system(size: slot.height * 0.7))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(width: slot.width, height: slot.height)
     }
 
     private var iconBody: some View {

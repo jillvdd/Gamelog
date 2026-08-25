@@ -129,7 +129,11 @@ extension AppImage {
         let maxDim = max(size.width, size.height)
         let scale = maxDim > maxEdge ? maxEdge / maxDim : 1.0
         let target = CGSize(width: max(1, size.width * scale), height: max(1, size.height * scale))
-        let renderer = UIGraphicsImageRenderer(size: target)
+        // 强制 scale=1（像素=点）：renderer 默认用设备 scale，3x 屏会把「最长边≤1600px」
+        // 的压缩图实际渲成 4800px，体积约为预期的 9 倍。
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let renderer = UIGraphicsImageRenderer(size: target, format: format)
         let drawn = renderer.image { _ in
             draw(in: CGRect(origin: .zero, size: target))
         }
