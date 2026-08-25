@@ -300,6 +300,8 @@ private struct CopyGridCellView: View {
     #if !os(macOS)
     @State private var showImageSource = false
     #endif
+    /// macOS 照片图库选择器开关（photoLibraryPicker 在 iOS 为 no-op，状态无害）。
+    @State private var showPhotoLibrary = false
 
     private var firstImage: Data? { copy.images.first }
 
@@ -406,6 +408,11 @@ private struct CopyGridCellView: View {
             onImages: processImages
         )
         #endif
+        .photoLibraryPicker(
+            isPresented: $showPhotoLibrary,
+            maxSelectionCount: max(1, 6 - copy.images.count),
+            onImages: processImages
+        )
     }
 
     /// 首图方格（固定 1:1，用 §4.22 的安全图案：Color.clear 占位确定尺寸 + overlay Image 覆盖裁剪，
@@ -439,11 +446,18 @@ private struct CopyGridCellView: View {
     @ViewBuilder
     private var addImageButton: some View {
         #if os(macOS)
-        Button { pickImages() } label: {
+        // 加图来源二选一菜单：照片图库 / 文件（与 iOS 底部菜单同思路，macOS 用下拉 Menu 呈现）。
+        // menuStyle(.button) 呈现为原 bordered 小按钮观感（Menu 不吃 .buttonStyle，此前漏挂会退回裸文字）。
+        Menu {
+            Button(L10n.tr("image.photoLibrary", lang: language)) { showPhotoLibrary = true }
+            Button(L10n.tr("image.fromFiles", lang: language)) { pickImages() }
+        } label: {
             Label(L10n.tr("copy.addImage", lang: language), systemImage: "plus")
                 .font(.system(size: 12))
         }
+        .menuStyle(.button)
         .buttonStyle(.bordered)
+        .menuIndicator(.hidden)
         .controlSize(.small)
         .disabled(copy.images.count >= 6)
         #else
@@ -512,6 +526,8 @@ private struct CopyCardView: View {
     #if !os(macOS)
     @State private var showImageSource = false
     #endif
+    /// macOS 照片图库选择器开关（photoLibraryPicker 在 iOS 为 no-op，状态无害）。
+    @State private var showPhotoLibrary = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -594,6 +610,11 @@ private struct CopyCardView: View {
             onImages: processImages
         )
         #endif
+        .photoLibraryPicker(
+            isPresented: $showPhotoLibrary,
+            maxSelectionCount: max(1, 6 - copy.images.count),
+            onImages: processImages
+        )
     }
 
     /// 档案信息区：介质 → 版本区分 → 品相（仅实体）→ 来源 → 购买日 + 备注。
@@ -659,9 +680,17 @@ private struct CopyCardView: View {
     @ViewBuilder
     private var addImageButton: some View {
         #if os(macOS)
-        Button { pickImages() } label: { addImageLabel }
-            .buttonStyle(.plain)
-            .help(L10n.tr("copy.addImage", lang: language))
+        // 加图来源二选一菜单：照片图库 / 文件。borderlessButton 菜单样式让 label（虚线方格）外观不变。
+        Menu {
+            Button(L10n.tr("image.photoLibrary", lang: language)) { showPhotoLibrary = true }
+            Button(L10n.tr("image.fromFiles", lang: language)) { pickImages() }
+        } label: {
+            addImageLabel
+        }
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .disabled(copy.images.count >= 6)
+        .help(L10n.tr("copy.addImage", lang: language))
         #else
         Button { showImageSource = true } label: { addImageLabel }
             .buttonStyle(.plain)

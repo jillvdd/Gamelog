@@ -218,11 +218,10 @@ struct GameEditView: View {
     @State private var logoData: Data?
     // 各图像的搜索面板开关。
     @State private var showingLandscapeSearch = false
-    #if !os(macOS)
+    // 照片图库选择器开关（macOS 走 photoLibraryPicker；iOS 走 imageSourcePicker 的相册分支）。
     @State private var showingLandscapePicker = false
     @State private var showingHeroPicker = false
     @State private var showingLogoPicker = false
-    #endif
     @State private var showingHeroSearch = false
     @State private var showingLogoSearch = false
     @State private var reviewTitle = ""
@@ -271,9 +270,7 @@ struct GameEditView: View {
 
     @State private var validationError: String?
     @State private var showingCoverSearch = false
-    #if !os(macOS)
     @State private var showingCoverPicker = false
-    #endif
     @AppStorage("steamGridDBKey") private var steamGridDBKey = ""
     @AppStorage(UserCustomization.autoMatchCoverKey) private var autoMatchCover = false
     @AppStorage(UserCustomization.collectorModeKey) private var collectorMode = false
@@ -401,6 +398,7 @@ struct GameEditView: View {
                         showingCoverPicker = true
                         #endif
                     },
+                    onPickFromLibrary: { showingCoverPicker = true },
                     onSearch: { showingCoverSearch = true },
                     onDelete: { coverData = nil }
                 )
@@ -420,6 +418,7 @@ struct GameEditView: View {
                             showingLandscapePicker = true
                             #endif
                         },
+                        onPickFromLibrary: { showingLandscapePicker = true },
                         onSearch: { showingLandscapeSearch = true },
                         onDelete: { landscapeData = nil }
                     )
@@ -438,6 +437,7 @@ struct GameEditView: View {
                             showingHeroPicker = true
                             #endif
                         },
+                        onPickFromLibrary: { showingHeroPicker = true },
                         onSearch: { showingHeroSearch = true },
                         onDelete: { heroData = nil }
                     )
@@ -456,6 +456,7 @@ struct GameEditView: View {
                             showingLogoPicker = true
                             #endif
                         },
+                        onPickFromLibrary: { showingLogoPicker = true },
                         onSearch: { showingLogoSearch = true },
                         onDelete: { logoData = nil }
                     )
@@ -620,6 +621,29 @@ struct GameEditView: View {
             }
         })
         .imageSourcePicker(isPresented: $showingLogoPicker, onImages: { datas in
+            if let data = datas.first {
+                logoData = data
+            }
+        })
+        #endif
+        #if os(macOS)
+        // macOS 照片图库选择器：与 iOS 相册分支同口径——取 first 原样入库，不压缩。
+        .photoLibraryPicker(isPresented: $showingCoverPicker, onImages: { datas in
+            if let data = datas.first {
+                coverData = data
+            }
+        })
+        .photoLibraryPicker(isPresented: $showingLandscapePicker, onImages: { datas in
+            if let data = datas.first {
+                landscapeData = data
+            }
+        })
+        .photoLibraryPicker(isPresented: $showingHeroPicker, onImages: { datas in
+            if let data = datas.first {
+                heroData = data
+            }
+        })
+        .photoLibraryPicker(isPresented: $showingLogoPicker, onImages: { datas in
             if let data = datas.first {
                 logoData = data
             }
@@ -847,6 +871,8 @@ struct ArtworkRow: View {
     /// 仅封面行用：自动匹配进行中在缩略图上盖 spinner（由 GameEditView 传入其 @State）。
     var isAutoMatching = false
     let onPick: () -> Void
+    /// 「照片图库…」按钮（nil = 不显示）。仅 macOS 渲染：iOS 编辑页保持原三按钮不变。
+    var onPickFromLibrary: (() -> Void)? = nil
     let onSearch: () -> Void
     let onDelete: () -> Void
 
@@ -902,6 +928,13 @@ struct ArtworkRow: View {
                 Button(L10n.tr("game.chooseCover", lang: language), action: onPick)
                     .appStandardButton()
                     .controlSize(.small)
+                #if os(macOS)
+                if let onPickFromLibrary {
+                    Button(L10n.tr("image.photoLibrary", lang: language), action: onPickFromLibrary)
+                        .appStandardButton()
+                        .controlSize(.small)
+                }
+                #endif
                 Button(L10n.tr("game.searchCover", lang: language), action: onSearch)
                     .appStandardButton()
                     .controlSize(.small)

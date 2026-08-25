@@ -38,6 +38,12 @@ enum UserCustomization {
     static let shareOverviewStatsKey = "share.overviewStats"
     /// 游戏格子字段池（总览格与分组卡格共用，同上格式）。
     static let shareTileFieldsKey = "share.tileFields"
+    /// 侧边栏「状态」区展开（默认 true=展开，跨会话记忆）。
+    static let sidebarStatusExpandedKey = "customization.sidebar.statusExpanded"
+    /// 侧边栏「平台」区展开（默认 true=展开，跨会话记忆）。
+    static let sidebarPlatformsExpandedKey = "customization.sidebar.platformsExpanded"
+    /// 侧边栏「分组」区展开（默认 true=展开，跨会话记忆）。
+    static let sidebarGroupsExpandedKey = "customization.sidebar.groupsExpanded"
 
     /// 用户名长度上限（设置页输入与导入时统一截断）。
     static let usernameMaxLength = 20

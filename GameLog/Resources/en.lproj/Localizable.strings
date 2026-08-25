@@ -171,6 +171,7 @@
 "backup.importDone" = "Backup Imported";
 "backup.importFailed" = "Import failed. Check that the file is a valid backup.";
 "backup.importConfirm" = "Importing will replace all current data. Continue?";
+"backup.share" = "Share Backup…";
 "validation.nameRequired" = "Enter a game name";
 "validation.reviewTitleRequired" = "Review title is required";
 "validation.scoreRequired" = "Score at least one dimension";
@@ -314,6 +315,7 @@
 
 "image.pickSource" = "Add Image";
 "image.fromPhotos" = "Choose from Photo Library";
+"image.photoLibrary" = "Choose from Photo Library…";
 "image.fromFiles" = "Choose from Files";
 "image.takePhoto" = "Take Photo";
 "image.cameraUnavailable" = "Camera isn't available on this device";

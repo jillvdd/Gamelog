@@ -44,6 +44,9 @@ struct SettingsView: View {
 
     @State private var statusMessage: String?
     @State private var showingImportConfirm = false
+    /// macOS 分享备份：待分享的临时文件 URL + 分享面板锚点触发开关。
+    @State private var backupShareURL: URL?
+    @State private var showingBackupShare = false
     @State private var cropSession: CropSession?
     /// SteamGridDB key 是否明文显示。
     @State private var showKey = false
@@ -60,6 +63,9 @@ struct SettingsView: View {
     @State private var cacheSizeBytes: Int64 = 0
     /// 缓存区操作反馈（清除成功）。
     @State private var cacheMessage: String?
+    /// 照片图库选择器开关（macOS 用；photoLibraryPicker 在 iOS 为 no-op，状态无害）。
+    @State private var showingAvatarLibrary = false
+    @State private var showingIconLibrary = false
     #if !os(macOS)
     @State private var showingAvatarPicker = false
     @State private var showingAbout = false
@@ -91,6 +97,8 @@ struct SettingsView: View {
                         #if os(macOS)
                         Button(L10n.tr("settings.chooseImage", lang: language)) { pickImage(for: .avatar) }
                             .appStandardButton()
+                        Button(L10n.tr("image.photoLibrary", lang: language)) { showingAvatarLibrary = true }
+                            .appStandardButton()
                         #else
                         Button(L10n.tr("settings.chooseImage", lang: language)) { showingAvatarPicker = true }
                             .appStandardButton()
@@ -106,7 +114,11 @@ struct SettingsView: View {
                     HStack {
                         iconPreview
                         Button(L10n.tr("settings.chooseImage", lang: language)) { pickImage(for: .icon) }
+                            .appStandardButton()
+                        Button(L10n.tr("image.photoLibrary", lang: language)) { showingIconLibrary = true }
+                            .appStandardButton()
                         Button(L10n.tr("settings.restoreIcon", lang: language)) { UserCustomization.removeIcon() }
+                            .appStandardButton()
                             .disabled(iconFile.isEmpty)
                     }
                 }
@@ -191,8 +203,24 @@ struct SettingsView: View {
                     .appStandardButton()
 
                 #if os(macOS)
-                Button(L10n.tr("backup.export", lang: language)) { export() }
+                HStack {
+                    Button(L10n.tr("backup.export", lang: language)) { export() }
+                        .appStandardButton()
+                    Button {
+                        shareBackup()
+                    } label: {
+                        Label(L10n.tr("backup.share", lang: language), systemImage: "square.and.arrow.up")
+                    }
+                    .appStandardButton()
+                    // 系统分享面板（含 AirDrop）从本按钮位置弹出；anchor 隐藏在按钮背后。
+                    .background {
+                        if let url = backupShareURL {
+                            MacSharingAnchor(isPresented: $showingBackupShare) { [url] }
+                        }
+                    }
+                }
                 Button(L10n.tr("backup.import", lang: language)) { showingImportConfirm = true }
+                    .appStandardButton()
                 #else
                 // iOS：导出分享单由 prepareBackupShare 直接以 UIKit 呈现（不走 SwiftUI sheet，
                 // 规避 sheet 首次弹出为空白、需先弹其他窗「预热」的问题）。
@@ -282,6 +310,19 @@ struct SettingsView: View {
         .imageSourcePicker(isPresented: $showingAvatarPicker, onImages: { datas in
             if let data = datas.first, let image = AppImage(data: data) {
                 cropSession = CropSession(kind: .avatar, image: image)
+            }
+        })
+        #endif
+        #if os(macOS)
+        // macOS 照片图库选图：与 iOS 相册分支同口径——Data → AppImage → 进既有裁切链。
+        .photoLibraryPicker(isPresented: $showingAvatarLibrary, onImages: { datas in
+            if let data = datas.first, let image = AppImage(data: data) {
+                cropSession = CropSession(kind: .avatar, image: image)
+            }
+        })
+        .photoLibraryPicker(isPresented: $showingIconLibrary, onImages: { datas in
+            if let data = datas.first, let image = AppImage(data: data) {
+                cropSession = CropSession(kind: .icon, image: image)
             }
         })
         #endif
@@ -414,14 +455,19 @@ struct SettingsView: View {
 
     // MARK: - 备份
 
+    /// 备份导出文件名（macOS NSSavePanel 预填名 / 双平台分享临时文件共用；POSIX locale 保证格式稳定）。
+    private func backupFileName() -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd-HH-mm"
+        return "GameLog-backup-\(formatter.string(from: Date())).json"
+    }
+
     private func export() {
         #if os(macOS)
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.json]
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "yyyy-MM-dd-HH-mm"
-        panel.nameFieldStringValue = "GameLog-backup-\(formatter.string(from: Date())).json"
+        panel.nameFieldStringValue = backupFileName()
         panel.canCreateDirectories = true
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
@@ -436,6 +482,24 @@ struct SettingsView: View {
         #endif
     }
 
+    #if os(macOS)
+    /// macOS 分享备份：编码整库 → 写临时文件 → 从「分享备份」按钮位置弹出系统分享面板（含 AirDrop）。
+    /// 同步编码与 export() / iOS prepareBackupShare 口径一致。
+    private func shareBackup() {
+        guard let data = try? BackupManager.encode(games: games, groups: groups) else {
+            statusMessage = L10n.tr("backup.exportFailed", lang: language)
+            return
+        }
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(backupFileName())
+        guard (try? data.write(to: url)) != nil else {
+            statusMessage = L10n.tr("backup.exportFailed", lang: language)
+            return
+        }
+        backupShareURL = url
+        showingBackupShare = true
+    }
+    #endif
+
     #if !os(macOS)
     /// iOS 备份导出：编码成 JSON → 写临时文件 → 直接用 UIKit 呈现系统分享单（含 AirDrop / 存储到文件）。
     /// 不走 SwiftUI sheet：挂 Form 行按钮上的 sheet 首次弹窗会呈现为空白、静默失败（先弹别的窗可「预热」）。
@@ -445,10 +509,7 @@ struct SettingsView: View {
             return
         }
         // 文件名带时间，与 macOS 导出（NSSavePanel 预填名）同一格式。
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd-HH-mm"
-        let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("GameLog-backup-\(formatter.string(from: Date())).json")
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent(backupFileName())
         guard (try? data.write(to: url)) != nil else {
             statusMessage = L10n.tr("backup.exportFailed", lang: language)
             return

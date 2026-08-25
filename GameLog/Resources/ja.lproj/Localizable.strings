@@ -171,6 +171,7 @@
 "backup.importDone" = "バックアップを読み込みました";
 "backup.importFailed" = "読み込みに失敗しました。有効なバックアップファイルか確認してください";
 "backup.importConfirm" = "読み込むと現在のデータがすべて置き換えられます。続けますか？";
+"backup.share" = "バックアップを共有…";
 "validation.nameRequired" = "ゲーム名を入力してください";
 "validation.reviewTitleRequired" = "レビュータイトルは必須です";
 "validation.scoreRequired" = "少なくとも1つの軸を評価してください";
@@ -314,6 +315,7 @@
 
 "image.pickSource" = "画像を追加";
 "image.fromPhotos" = "写真ライブラリから選択";
+"image.photoLibrary" = "写真ライブラリから選択…";
 "image.fromFiles" = "ファイルから選択";
 "image.takePhoto" = "写真を撮る";
 "image.cameraUnavailable" = "このデバイスではカメラを使用できません";
