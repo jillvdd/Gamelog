@@ -66,8 +66,8 @@ xcrun simctl launch booted com.abcleg.GameLog
 
 リポジトリには 2 種類の Release IPA（`dist/`）があります。いずれも未署名のため、自分で署名してからインストールしてください：
 
-- `GameLog-beta-2.4.ipa` — シミュレータ汎用スライス（x86_64 + arm64）
-- `GameLog-beta-2.4-device.ipa` — 実機 arm64 スライス（未署名）。eSign などのツールで再署名して実機インストールする向け
+- `GameLog-beta-2.5.ipa` — シミュレータ汎用スライス（x86_64 + arm64）
+- `GameLog-beta-2.5-device.ipa` — 実機 arm64 スライス（未署名）。eSign などのツールで再署名して実機インストールする向け
 
 > ヒント：シミュレータや開発中のデバッグは Xcode で Run するだけで十分で、IPA は不要です。
 

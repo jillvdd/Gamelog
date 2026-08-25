@@ -66,8 +66,8 @@ Or open `GameLog.xcodeproj` in Xcode and Run the `GameLog` (macOS) or `GameLog-i
 
 The repository provides two Release IPAs under `dist/`, both unsigned — sign them yourself before installing:
 
-- `GameLog-beta-2.4.ipa` — simulator universal slice (x86_64 + arm64)
-- `GameLog-beta-2.4-device.ipa` — device arm64 slice (unsigned), suited for re-signing with eSign or similar tools
+- `GameLog-beta-2.5.ipa` — simulator universal slice (x86_64 + arm64)
+- `GameLog-beta-2.5-device.ipa` — device arm64 slice (unsigned), suited for re-signing with eSign or similar tools
 
 > Tip: for simulator or daily development debugging, just Run from Xcode — no IPA needed.
 
