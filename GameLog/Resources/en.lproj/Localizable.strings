@@ -29,6 +29,9 @@
 "game.aliasPlaceholder" = "Enter an alias";
 "game.aliasAdd" = "Add";
 "game.releaseDate" = "Release Date";
+"game.developer" = "Developer";
+"game.publisher" = "Publisher";
+"game.genre" = "Genre";
 "game.cover" = "Cover";
 "game.chooseCover" = "Choose Image…";
 "game.searchCover" = "Search Covers…";

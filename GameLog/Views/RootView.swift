@@ -90,6 +90,10 @@ struct RootView: View {
     }
 
     var body: some View {
+        mainRoot
+    }
+
+    private var mainRoot: some View {
         NavigationSplitView {
             List(selection: $selection) {
                 Section {
@@ -222,9 +226,10 @@ struct RootView: View {
                 StatsView()
             }
         }
-        // minWidth 须容得下侧边栏(min 180)+ 详情区:此前 900 会把侧边栏压到 180 以下,
-        // 平台名全部挤成多行(平台区观感混乱的历史根源)。
-        .frame(minWidth: 1150, minHeight: 600)
+        // 最小窗口 980×600：对齐本机 Music 手动可拉到的最小尺寸(2026-08-26 用户实测;
+        // HIG 对 macOS 无数值标准)。此前 1150 过宽——缩窗后详情区低于宽头部阈值即自动
+        // 回落紧凑布局,无需再用窗口宽度兜底。侧边栏 min 220 在 980 下仍有 ~700 详情区。
+        .frame(minWidth: 980, minHeight: 600)
         // 导入备份 / 从自动备份恢复会整体删除重建分组（设置页入口），侧边栏若正选中
         // 被删分组，继续渲染会访问已删 SwiftData 模型——与 iOS 侧 iOSLibraryTab 的
         // onChange 兜底同款机制（§24.2#1）。

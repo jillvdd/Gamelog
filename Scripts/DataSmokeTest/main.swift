@@ -32,6 +32,7 @@ let context = ModelContext(container)
 // --- 1. 多对多双向 + 首条记录评分必填语义 ---
 let game1 = Game(name: "塞尔达传说 旷野之息", aliases: ["BotW", "Zelda"],
                  releaseDate: Date(timeIntervalSince1970: 1_500_000_000),
+                 developer: "Nintendo EPD", publisher: "Nintendo", genre: "开放世界 ARPG",
                  coverData: "fakecover".data(using: .utf8),
                  reviewTitle: "神作", reviewBody: "开放世界标杆")
 let groupA = GameGroup(name: "塞尔达系列")
@@ -101,6 +102,7 @@ check("零记录游戏 latestCompletionDate 为 nil", game2.latestCompletionDate
 // --- 6. 备份：全字段往返 ---
 let exportGame = Game(name: "异度神剑3", aliases: ["XB3", "ゼノブレイド3"],
                       releaseDate: Date(timeIntervalSince1970: 1_650_000_000),
+                      developer: "Monolith Soft", publisher: "Nintendo", genre: "JRPG",
                       coverData: "COVER_BASE64_MARKER".data(using: .utf8),
                       reviewTitle: "RPG 天花板", reviewBody: "系统深度惊人")
 context.insert(exportGame)
@@ -138,6 +140,7 @@ let ig = importedGames[0]
 check("名称往返", ig.name == "异度神剑3")
 check("别名往返", ig.aliases == ["XB3", "ゼノブレイド3"])
 check("发售日期保真", ig.releaseDate == originalRelease)
+check("厂商/发行商/类型备份往返", ig.developer == "Monolith Soft" && ig.publisher == "Nintendo" && ig.genre == "JRPG")
 check("封面 base64 往返", ig.coverData == "COVER_BASE64_MARKER".data(using: .utf8))
 check("评价标题往返", ig.reviewTitle == "RPG 天花板")
 check("评价正文往返", ig.reviewBody == "系统深度惊人")

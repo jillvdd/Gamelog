@@ -119,7 +119,9 @@ struct SharePanelView: View {
                 Divider()
                 controls
             }
-            .frame(minWidth: 1060, minHeight: 700)
+            // minWidth 900：主窗最小 980（对齐 Music）下放得下——左栏 300 + 预览 ~570。
+            // 此前 1060 是按主窗 minWidth 1150 定的，主窗缩小后必须跟着降。
+            .frame(minWidth: 900, minHeight: 700)
             #else
             // iOS 纵向三段：① 预览 + 输出设置（尺寸/格式）置顶；② 模式+搜索一行，
             // 勾选列表吃掉全部弹性空间（最大化）；③ 标题 + 样式/导出一行收在底部拇指区。

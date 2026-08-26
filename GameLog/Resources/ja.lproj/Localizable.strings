@@ -29,6 +29,9 @@
 "game.aliasPlaceholder" = "別名を入力";
 "game.aliasAdd" = "追加";
 "game.releaseDate" = "発売日";
+"game.developer" = "開発元";
+"game.publisher" = "発売元";
+"game.genre" = "ジャンル";
 "game.cover" = "カバー";
 "game.chooseCover" = "画像を選択…";
 "game.searchCover" = "カバーを検索…";

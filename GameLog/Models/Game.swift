@@ -52,6 +52,12 @@ final class Game {
     /// 游戏主平台（状态机轻量状态无通关记录时用于展示/筛选；已通关时与通关记录平台合并去重）。
     var platform: String = ""
     var releaseDate: Date?
+    /// 厂商（开发者，可选）。
+    var developer: String?
+    /// 发行商（可选）。
+    var publisher: String?
+    /// 游戏类型（如 RPG / AVG，可选，自由文本）。
+    var genre: String?
     var coverData: Data?
     /// 横向封面（SteamGridDB 920×430 横版 grid；可选）。展示位置待设计，先只做录入与存储。
     var landscapeData: Data?
@@ -80,6 +86,7 @@ final class Game {
 
     init(name: String, nameZh: String? = nil, nameJa: String? = nil,
          aliases: [String] = [], platform: String = "", releaseDate: Date? = nil,
+         developer: String? = nil, publisher: String? = nil, genre: String? = nil,
          coverData: Data? = nil, landscapeData: Data? = nil, heroData: Data? = nil,
          logoData: Data? = nil, reviewTitle: String = "", reviewBody: String = "",
          createdAt: Date = .now, status: GameStatus = .completed) {
@@ -89,6 +96,9 @@ final class Game {
         self.aliases = aliases
         self.platform = platform
         self.releaseDate = releaseDate
+        self.developer = developer
+        self.publisher = publisher
+        self.genre = genre
         self.coverData = coverData
         self.landscapeData = landscapeData
         self.heroData = heroData

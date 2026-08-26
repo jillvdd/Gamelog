@@ -41,6 +41,8 @@ private extension GameStatus {
 
 /// 游戏名右侧的平台图标：最多显示 maxCount 个，超出显示 +N。
 /// 仅作为平台符号提示，下方的平台文字行保持不变。
+/// 与名字同行时整体垂直居中对齐（不用 firstTextBaseline——图标放大系数随平台不同，
+/// 底对齐会让各图标顶部参差；居中后多出的高度上下均分，观感齐平）。
 struct GamePlatformIcons: View {
     let platforms: [String]
     var maxCount: Int = 3
@@ -48,7 +50,7 @@ struct GamePlatformIcons: View {
 
     var body: some View {
         let shown = platforms.prefix(maxCount)
-        HStack(spacing: 3) {
+        HStack(alignment: .center, spacing: 3) {
             ForEach(shown, id: \.self) { p in
                 PlatformIcon(platform: p, size: iconSize)
             }
@@ -158,8 +160,9 @@ struct GameCardView: View {
                 }
             }
             // 名字 + 平台图标：一行放得下就并排；放不下（多平台/超宽字标）图标换到名字下方一行，名字不被挤压省略。
+            // 图标行与名字中轴对齐（各平台放大系数不同，基线/底对齐会顶部参差）。
             ViewThatFits(in: .horizontal) {
-                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                HStack(alignment: .center, spacing: 4) {
                     Text(verbatim: game.displayName(for: language))
                         .font(.system(size: 12, weight: .medium))
                         .lineLimit(2)

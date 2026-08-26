@@ -208,6 +208,10 @@ struct GameEditView: View {
     @State private var aliasInput = ""
     @State private var hasReleaseDate = false
     @State private var releaseDate = Date()
+    // 厂商/发行商/游戏类型（可选自由文本）。
+    @State private var developer = ""
+    @State private var publisher = ""
+    @State private var genre = ""
     @State private var coverData: Data?
     // 三类附加图像（可选，展示位置待设计，先只做录入与存储）：开关关 = 不使用该图（保存时清空）。
     @State private var hasLandscape = false
@@ -366,6 +370,10 @@ struct GameEditView: View {
                 if hasReleaseDate {
                     DateMenuPicker(title: L10n.tr("game.releaseDate", lang: language), selection: $releaseDate)
                 }
+
+                BorderedTextField(text: $developer, placeholder: L10n.tr("game.developer", lang: language))
+                BorderedTextField(text: $publisher, placeholder: L10n.tr("game.publisher", lang: language))
+                BorderedTextField(text: $genre, placeholder: L10n.tr("game.genre", lang: language))
 
                 // 分组
                 if !allGroups.isEmpty {
@@ -675,6 +683,9 @@ struct GameEditView: View {
         nameJa = game.nameJa ?? ""
         hasReleaseDate = game.releaseDate != nil
         releaseDate = game.releaseDate ?? Date()
+        developer = game.developer ?? ""
+        publisher = game.publisher ?? ""
+        genre = game.genre ?? ""
         coverData = game.coverData
         landscapeData = game.landscapeData
         heroData = game.heroData
@@ -780,6 +791,9 @@ struct GameEditView: View {
                 aliases: aliases,
                 platform: platform,
                 releaseDate: hasReleaseDate ? releaseDate : nil,
+                developer: developer.trimmingCharacters(in: .whitespaces).isEmpty ? nil : developer.trimmingCharacters(in: .whitespaces),
+                publisher: publisher.trimmingCharacters(in: .whitespaces).isEmpty ? nil : publisher.trimmingCharacters(in: .whitespaces),
+                genre: genre.trimmingCharacters(in: .whitespaces).isEmpty ? nil : genre.trimmingCharacters(in: .whitespaces),
                 coverData: coverData,
                 landscapeData: hasLandscape ? landscapeData : nil,
                 heroData: hasHero ? heroData : nil,
@@ -846,6 +860,9 @@ struct GameEditView: View {
             game.platform = platform
             game.aliases = aliases
             game.releaseDate = hasReleaseDate ? releaseDate : nil
+            game.developer = developer.trimmingCharacters(in: .whitespaces).isEmpty ? nil : developer.trimmingCharacters(in: .whitespaces)
+            game.publisher = publisher.trimmingCharacters(in: .whitespaces).isEmpty ? nil : publisher.trimmingCharacters(in: .whitespaces)
+            game.genre = genre.trimmingCharacters(in: .whitespaces).isEmpty ? nil : genre.trimmingCharacters(in: .whitespaces)
             game.coverData = coverData
             game.landscapeData = hasLandscape ? landscapeData : nil
             game.heroData = hasHero ? heroData : nil

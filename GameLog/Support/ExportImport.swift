@@ -29,6 +29,10 @@ struct GameDTO: Codable {
     /// 游戏主平台（旧版备份缺字段 → nil，导入默认空）。
     var platform: String?
     var releaseDate: Date?
+    /// 厂商/发行商/游戏类型（旧版备份缺字段 → nil，导入保持现状）。
+    var developer: String?
+    var publisher: String?
+    var genre: String?
     var coverBase64: String?
     /// 横向封面/背景图/Logo（旧版备份缺字段 → nil，导入保持现状）。
     var landscapeBase64: String?
@@ -100,6 +104,9 @@ enum BackupManager {
                     aliases: game.aliases,
                     platform: game.platform,
                     releaseDate: game.releaseDate,
+                    developer: game.developer,
+                    publisher: game.publisher,
+                    genre: game.genre,
                     coverBase64: game.coverData?.base64EncodedString(),
                     landscapeBase64: game.landscapeData?.base64EncodedString(),
                     heroBase64: game.heroData?.base64EncodedString(),
@@ -215,6 +222,9 @@ enum BackupManager {
                 aliases: gameDTO.aliases,
                 platform: gameDTO.platform ?? "",
                 releaseDate: gameDTO.releaseDate,
+                developer: gameDTO.developer,
+                publisher: gameDTO.publisher,
+                genre: gameDTO.genre,
                 coverData: gameDTO.coverBase64.flatMap { Data(base64Encoded: $0) },
                 landscapeData: gameDTO.landscapeBase64.flatMap { Data(base64Encoded: $0) },
                 heroData: gameDTO.heroBase64.flatMap { Data(base64Encoded: $0) },

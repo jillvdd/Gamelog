@@ -29,6 +29,9 @@
 "game.aliasPlaceholder" = "输入别名";
 "game.aliasAdd" = "添加";
 "game.releaseDate" = "发售日期";
+"game.developer" = "厂商";
+"game.publisher" = "发行商";
+"game.genre" = "游戏类型";
 "game.cover" = "封面";
 "game.chooseCover" = "选择图片…";
 "game.searchCover" = "搜索封面…";

@@ -155,6 +155,8 @@ struct CompletionCardView: View {
 /// 详情页头部的六维评分条形图：每维度一条，颜色区分，长度按 10 分制比例。
 private struct DimensionScoreBars: View {
     let game: Game
+    /// 维度标签列宽：默认 96（旧单列布局），评分卡内用 64 紧凑变体。
+    var labelWidth: CGFloat = 96
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -167,7 +169,7 @@ private struct DimensionScoreBars: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
-                        .frame(width: 96, alignment: .leading)
+                        .frame(width: labelWidth, alignment: .leading)
                     ZStack(alignment: .leading) {
                         Capsule().fill(Color.semantic(.quaternarySystemFill))
                         if let value {
@@ -205,6 +207,8 @@ private extension Dimension {
 private struct LocalizedNamesSubtitle: View {
     let game: Game
     let currentLanguage: String
+    /// 字体：默认 callout（旧单列布局）；宽窗头部传 body 与评分卡平衡。
+    var font: Font = .callout
 
     private var names: [String] {
         let others: [String]
@@ -222,7 +226,7 @@ private struct LocalizedNamesSubtitle: View {
             VStack(alignment: .leading, spacing: 2) {
                 ForEach(Array(names.enumerated()), id: \.offset) { _, name in
                     Text(verbatim: name)
-                        .font(.callout)
+                        .font(font)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -373,7 +377,7 @@ struct GameDetailView: View {
         GeometryReader { geo in
             ScrollView {
                 VStack(alignment: .leading, spacing: 28) {
-                    header
+                    header(width: geo.size.width)
                     if collectorMode {
                         detailTabPicker
                     }
@@ -509,13 +513,21 @@ struct GameDetailView: View {
 
     // MARK: - 头部
 
-    private var header: some View {
+    /// macOS 头部布局阈值：内容宽 ≥ 此值走「封面顶带 + 信息行 + 评分卡」新布局，低于回落单列。
+    /// 窗口 minWidth 980 − 侧边栏最宽 320 − 页面 padding 56 ≈ 604，取 640 留余量。
+    private static let wideHeaderThreshold: CGFloat = 640
+
+    private func header(width: CGFloat) -> some View {
         Group {
             #if os(macOS)
-            HStack(alignment: .top, spacing: 24) {
-                coverBlock
-                infoBlock
-                Spacer()
+            if width >= Self.wideHeaderThreshold {
+                wideHeader
+            } else {
+                HStack(alignment: .top, spacing: 24) {
+                    coverBlock
+                    infoBlock
+                    Spacer()
+                }
             }
             #else
             VStack(alignment: .leading, spacing: 16) {
@@ -524,6 +536,122 @@ struct GameDetailView: View {
             }
             #endif
         }
+    }
+    /// macOS 宽窗头部（2026-08-26 用户定稿）：封面单独在顶带（右移 48pt、左右全留白）；
+    /// 名字/其他语言名/元数据行贴内容左缘；评分卡在名字块右侧、顶端与游戏名平齐；
+    /// 状态滑块限宽 720 独占一行（在左列内、元数据下方）。未评分（想玩等）不渲染评分卡。
+    /// 左列字号/间距按「与右侧评分卡视觉平衡」调校：名字 30pt、行距 12/8。
+    @ViewBuilder
+    private var wideHeader: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            coverBlock
+                .padding(.leading, 48)
+
+            HStack(alignment: .top, spacing: 24) {
+                VStack(alignment: .leading, spacing: 12) {
+                    nameRow
+                    LocalizedNamesSubtitle(game: game, currentLanguage: language, font: .body)
+                    metadataFlowRow
+                }
+                if game.libraryScore != nil {
+                    scoreCard
+                }
+                Spacer(minLength: 0)
+            }
+
+            DetailStatusPicker(status: $detailStatus)
+                .frame(maxWidth: 720, alignment: .leading)
+        }
+    }
+
+    /// 游戏名 + 平台图标（宽窄两种布局共用的名字行，保留 ViewThatFits 换行）。
+    /// 图标行与名字中轴对齐：各平台图标放大系数不同（白底字标原尺寸 / PS 1.2× / 其余 1.5×），
+    /// firstTextBaseline 对图片等效底对齐、顶部参差；居中后多出的高度上下均分。
+    private var nameRow: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .center, spacing: 6) {
+                Text(verbatim: game.displayName(for: language))
+                    .font(.system(size: 30, weight: .bold))
+                GamePlatformIcons(platforms: platforms, maxCount: 10, iconSize: 20)
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                Text(verbatim: game.displayName(for: language))
+                    .font(.system(size: 30, weight: .bold))
+                GamePlatformIcons(platforms: platforms, maxCount: 10, iconSize: 20)
+            }
+        }
+    }
+
+    /// 元数据区（宽窗）：平台行 → 发售日期行 → 厂商/发行商/游戏类型行，各自缺项跳过。
+    @ViewBuilder
+    private var metadataFlowRow: some View {
+        let platformText = platforms
+            .map { Presets.display($0, category: .platform, language: language) }
+            .joined(separator: " · ")
+        VStack(alignment: .leading, spacing: 8) {
+            if !platforms.isEmpty {
+                Text(verbatim: platformText)
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+            }
+            if let date = game.releaseDate {
+                Text(verbatim: date.formatted(date: .long, time: .omitted))
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+            }
+            factPieces(font: .body)
+            if !game.groups.isEmpty {
+                HStack(spacing: 6) {
+                    ForEach(game.groups) { group in
+                        Text(verbatim: group.name)
+                            .font(.caption)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(Capsule().fill(Color.accentColor.opacity(0.12)))
+                    }
+                }
+                .padding(.top, 2)
+            }
+        }
+    }
+
+    /// 厂商 · 发行商（一段式小字）；游戏类型独立成行。各自缺项跳过，全空整行不占位。
+    /// 字体参数：宽窗传 body 与评分卡平衡，窄布局保持 callout。
+    @ViewBuilder
+    private func factPieces(font: Font = .callout) -> some View {
+        let house = [game.developer, game.publisher].compactMap { $0 }.filter { !$0.isEmpty }
+        let genre = game.genre?.trimmingCharacters(in: .whitespaces) ?? ""
+        if !house.isEmpty {
+            Text(verbatim: house.joined(separator: " · "))
+                .font(font)
+                .foregroundStyle(.secondary)
+        }
+        if !genre.isEmpty {
+            Text(verbatim: genre)
+                .font(font)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    /// 宽窗头部右侧评分卡：库显示分 + 六维条形图，玻璃底 + 描边（与状态滑块同材质语言）。
+    /// 未评分（libraryScore == nil，含想玩等轻量状态）时调用方整卡不渲染、右侧留白。
+    private var scoreCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(verbatim: game.libraryScore.map { String(format: "%.1f", $0) } ?? "")
+                    .font(.system(size: 44, weight: .bold))
+                    .monospacedDigit()
+                LText("score.average")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            Divider()
+            DimensionScoreBars(game: game, labelWidth: 72)
+        }
+        .padding(18)
+        .frame(width: 310, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 14).fill(.thinMaterial))
+        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.semantic(.separator), lineWidth: 1))
     }
 
     /// 封面块：160×213 竖版封面（无封面时占位图标）。
@@ -552,8 +680,9 @@ struct GameDetailView: View {
     private var infoBlock: some View {
         VStack(alignment: .leading, spacing: 10) {
             // 名字 + 平台图标：一行放得下就并排；放不下（尤其多平台+超宽字标）自动换行成两行，避免撑宽整页布局。
+            // 图标行与名字中轴对齐（各平台放大系数不同，基线/底对齐会顶部参差，同宽窗 nameRow 口径）。
             ViewThatFits(in: .horizontal) {
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                HStack(alignment: .center, spacing: 6) {
                     Text(verbatim: game.displayName(for: language))
                         .font(.system(size: 26, weight: .bold))
                     GamePlatformIcons(platforms: platforms, maxCount: 10, iconSize: 18)
@@ -572,12 +701,6 @@ struct GameDetailView: View {
             // 图标 + 文字同显（含 iOS：只有图标用户会看不懂含义）。
             DetailStatusPicker(status: $detailStatus)
 
-            if let date = game.releaseDate {
-                Text(verbatim: date.formatted(date: .long, time: .omitted))
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
-
             if !platforms.isEmpty {
                 Text(verbatim: platforms
                     .map { Presets.display($0, category: .platform, language: language) }
@@ -585,6 +708,14 @@ struct GameDetailView: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
+
+            if let date = game.releaseDate {
+                Text(verbatim: date.formatted(date: .long, time: .omitted))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+
+            factPieces()
 
             if !game.groups.isEmpty {
                 HStack(spacing: 6) {
