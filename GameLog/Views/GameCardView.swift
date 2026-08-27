@@ -316,17 +316,18 @@ struct GameWideCardView: View {
 
     var body: some View {
         GeometryReader { geo in
-            // 图区按卡宽比例（≈46%）而非满高比例——满高 920:430 在 iPhone 上会把文字列
-            // 挤到截断（2026-08-27 首版教训）；46% 给文字列留足半幅。
-            let imageWidth = geo.size.width * 0.46
+            // 图区按卡宽 50%（2026-08-27 用户反馈「裁切太严重」后定稿）：横图改 scaledToFit
+            // 完整展示零裁切，上下少量卡底材质透出（与竖图回落「透明留边」同一口径）；
+            // 50% 保文字列两行完整（56% 会把长名挤截断）。
+            let imageWidth = geo.size.width * 0.50
             HStack(alignment: .top, spacing: 0) {
                 imageArea(width: imageWidth, height: geo.size.height)
 
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(alignment: .top, spacing: 6) {
                         Text(verbatim: game.displayName(for: language))
-                            .font(.system(size: 15, weight: .semibold))
-                            .lineLimit(2)
+                            .font(.system(size: 14, weight: .semibold))
+                            .lineLimit(3)
                             .multilineTextAlignment(.leading)
                         Spacer(minLength: 6)
                         trailingBadge
@@ -365,16 +366,16 @@ struct GameWideCardView: View {
     /// 卡高：比初版 104 更高（用户定稿「封面尺寸更大一点」）。
     private let cardHeight: CGFloat = 124
 
-    /// 左侧图区：优先横向封面满高裁切铺满；无横向封面用竖版封面等高缩放居中（左右透出卡底材质，
-    /// 不垫灰底）；全无图显示游戏手柄占位。frame 定尺寸在前、clipped 在后——scaledToFill 的图
-    /// 先被约束进给定宽高再裁掉溢出，否则图会按自然比例铺出 frame 压到右侧文字列。
+    /// 左侧图区：横向封面等比缩放完整展示（contain 零裁切，上下少量卡底透出——用户定稿
+    /// 「裁切太严重」修正）；无横向封面用竖版封面等高缩放居中（左右透出卡底材质，不垫灰底）；
+    /// 全无图显示游戏手柄占位。frame 定尺寸在 clip 之前，防止图铺出图区。
     @ViewBuilder
     private func imageArea(width: CGFloat, height: CGFloat) -> some View {
         Group {
             if let image = game.landscapeImage {
                 Image(appImage: image)
                     .resizable()
-                    .scaledToFill()
+                    .scaledToFit()
             } else if let image = game.coverImage {
                 Image(appImage: image)
                     .resizable()
