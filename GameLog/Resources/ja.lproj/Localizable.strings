@@ -65,6 +65,7 @@
 "completion.add" = "クリア記録を追加";
 "completion.edit" = "編集";
 "completion.delete" = "削除";
+"completion.deleteConfirm" = "このクリア記録を削除しますか？この操作は元に戻せません。";
 "completion.skipScores" = "今回はスコアを付けない";
 "completion.scores" = "6項目のスコア";
 "dimension.gameplay" = "ゲーム性";
@@ -84,7 +85,7 @@
 "common.custom" = "カスタム…";
 "common.done" = "完了";
 "common.close" = "閉じる";
-"common.confirmDelete" = "削除";
+"common.confirmDelete" = "削除の確認";
 "common.back" = "戻る";
 "delete.confirmGame" = "「%@」を削除しますか？このゲームのすべてのクリア記録も削除されます。";
 "share.selectGames" = "共有するゲームを選択";
@@ -137,7 +138,7 @@
 "settings.removeAvatar" = "アバターを削除";
 "settings.restoreIcon" = "デフォルトアイコンに戻す";
 "settings.autoMatchCover" = "カバーを自動取得";
-"settings.autoMatchCoverHint" = "ゲーム名を入力すると SteamGridDB を検索し、最初に見つかったカバーを自動設定します（下で API Key の設定が必要です）。";
+"settings.autoMatchCoverHint" = "ゲーム名を入力すると SteamGridDB を検索し、最初に見つかったカバーを自動設定します。スイッチを開いていて未設定の横カバー／背景画像／ロゴも一緒に設定されます（下で API Key の設定が必要です）。";
 "settings.hideToolbarGlass" = "上部ツールバーの背景を隠す";
 "settings.hideToolbarGlassHint" = "すべてのページ（ライブラリ / 詳細 / 統計）の上部ツールバーにあるすりガラスの背景を隠し、すっきりした表示にします。（macOS 15 以降）";
 "settings.collectorMode" = "コレクターモード";
@@ -232,6 +233,18 @@
 "game.landscape" = "横カバー";
 "game.hero" = "背景画像";
 "game.logo" = "ロゴ";
+"game.logoSize" = "ロゴサイズ";
+"game.logoVertical" = "ロゴ縦位置";
+"game.logoHorizontal" = "ロゴ横位置";
+"logo.size.small" = "小";
+"logo.size.medium" = "中";
+"logo.size.large" = "大";
+"logo.vertical.top" = "上";
+"logo.vertical.center" = "中央";
+"logo.vertical.bottom" = "下";
+"logo.horizontal.leading" = "左";
+"logo.horizontal.center" = "中央";
+"logo.horizontal.trailing" = "右";
 "cover.titleLandscape" = "横カバーを検索";
 "cover.titleHero" = "背景画像を検索";
 "cover.titleLogo" = "ロゴを検索";

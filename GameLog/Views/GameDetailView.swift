@@ -16,26 +16,27 @@ struct CompletionCardView: View {
         VStack(alignment: .leading, spacing: 10) {
             Group {
                 #if os(macOS)
-                HStack(spacing: 8) {
-                    if let date = completion.date {
-                        Text(verbatim: date.formatted(date: .abbreviated, time: .omitted))
-                            .font(.system(size: 12, weight: .semibold))
+                // 头部自适应：整行放得下就单行（原样式）；放不下（窄列如宽窗评价右栏）
+                // 信息项走流式换行、分数与按钮独立成行靠右——避免无谓溢出把卡片内容挤出右边。
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 8) {
+                        headerInfoItems
+                        Spacer()
+                        scoreView
+                        editButton
+                        deleteButton
                     }
-                    if !completion.platform.isEmpty {
-                        chip(Presets.display(completion.platform, category: .platform, language: language))
+                    VStack(alignment: .leading, spacing: 8) {
+                        WrappingLayout(spacing: 6, lineSpacing: 6) {
+                            headerInfoItems
+                        }
+                        HStack {
+                            Spacer()
+                            scoreView
+                            editButton
+                            deleteButton
+                        }
                     }
-                    if !completion.degree.isEmpty {
-                        chip(Presets.display(completion.degree, category: .degree, language: language))
-                    }
-                    if let playtime = completion.playtime {
-                        Text(verbatim: L10n.tr("completion.playtimeFormat", [playtime], lang: language))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    scoreView
-                    editButton
-                    deleteButton
                 }
                 #else
                 VStack(alignment: .leading, spacing: 8) {
@@ -103,6 +104,27 @@ struct CompletionCardView: View {
             RoundedRectangle(cornerRadius: 10)
                 .stroke(Color.semantic(.separator))
         )
+    }
+
+    /// 头部信息项：通关日期 / 平台胶囊 / 通关程度胶囊 / 时长（各缺项跳过）。
+    /// macOS 头部单行与流式换行两个分支共用，iOS 分支也用它保持同一样式源。
+    @ViewBuilder
+    private var headerInfoItems: some View {
+        if let date = completion.date {
+            Text(verbatim: date.formatted(date: .abbreviated, time: .omitted))
+                .font(.system(size: 12, weight: .semibold))
+        }
+        if !completion.platform.isEmpty {
+            chip(Presets.display(completion.platform, category: .platform, language: language))
+        }
+        if !completion.degree.isEmpty {
+            chip(Presets.display(completion.degree, category: .degree, language: language))
+        }
+        if let playtime = completion.playtime {
+            Text(verbatim: L10n.tr("completion.playtimeFormat", [playtime], lang: language))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
     }
 
     /// 平均分显示（已评分显示数字，未评分显示「未评分」）。
@@ -374,8 +396,53 @@ struct GameDetailView: View {
     var body: some View {
         // 单 ScrollView 内联铺开：游戏信息 → (详情|持有) 滑块 → 详情内容 / 持有档案内联在信息下方。
         // 不再整页替换（§29.9：HoldingsView 已去掉自带 ScrollView，作为内联子视图承载于本 ScrollView）。
+        // macOS 已设背景图时走独立分支：heroBanner 提出内边距层外——左右满幅、顶边零间隙贴住
+        // 详情页顶端，下方内容保持原 28 边距与原行距；无背景图分支与历史版本逐像素一致。
         GeometryReader { geo in
             ScrollView {
+                #if os(macOS)
+                if game.heroImage != nil {
+                    VStack(alignment: .leading, spacing: 0) {
+                        heroBanner(width: geo.size.width)
+                            // 横幅与下方内容的距离（2026-08-27 用户反馈逐步收紧：24 → 12 → 6，
+                            // 内容区顶部 padding 也从 28 减到 10，合计约 16pt）。
+                            .padding(.bottom, 6)
+                        VStack(alignment: .leading, spacing: 28) {
+                            header(width: geo.size.width - 56, hideCoverBand: true)
+                            if collectorMode {
+                                detailTabPicker
+                            }
+                            if !collectorMode || detailTab == .details {
+                                detailsContent(width: geo.size.width - 56)
+                            }
+                            if collectorMode && detailTab == .holdings {
+                                HoldingsView(game: game)
+                            }
+                        }
+                        .padding(.top, 10)
+                        .padding(.horizontal, 28)
+                        .padding(.bottom, 28)
+                    }
+                    .frame(maxWidth: 1500)
+                    .frame(maxWidth: .infinity, alignment: .top)
+                } else {
+                    VStack(alignment: .leading, spacing: 28) {
+                        header(width: geo.size.width)
+                        if collectorMode {
+                            detailTabPicker
+                        }
+                        if !collectorMode || detailTab == .details {
+                            detailsContent(width: geo.size.width)
+                        }
+                        if collectorMode && detailTab == .holdings {
+                            HoldingsView(game: game)
+                        }
+                    }
+                    .padding(28)
+                    .frame(maxWidth: 1500)
+                    .frame(maxWidth: .infinity, alignment: .top)
+                }
+                #else
                 VStack(alignment: .leading, spacing: 28) {
                     header(width: geo.size.width)
                     if collectorMode {
@@ -388,13 +455,10 @@ struct GameDetailView: View {
                         HoldingsView(game: game)
                     }
                 }
-                #if os(macOS)
-                .padding(28)
-                #else
                 .padding(16)
-                #endif
                 .frame(maxWidth: 1500)
                 .frame(maxWidth: .infinity, alignment: .top)
+                #endif
             }
         }
         .navigationTitle(hideToolbarGlass ? "" : game.displayName(for: language))
@@ -481,11 +545,11 @@ struct GameDetailView: View {
                 get: { pendingDeleteCompletion != nil },
                 set: { if !$0 { pendingDeleteCompletion = nil } }
             ),
-            message: L10n.tr("completion.delete", lang: language),
+            message: L10n.tr("completion.deleteConfirm", lang: language),
             cancelTitle: L10n.tr("common.cancel", lang: language),
             actions: [
                 ConfirmAction(
-                    title: L10n.tr("common.confirmDelete", lang: language),
+                    title: L10n.tr("common.delete", lang: language),
                     isDestructive: true
                 ) {
                     if let completion = pendingDeleteCompletion {
@@ -501,7 +565,7 @@ struct GameDetailView: View {
             cancelTitle: L10n.tr("common.cancel", lang: language),
             actions: [
                 ConfirmAction(
-                    title: L10n.tr("common.confirmDelete", lang: language),
+                    title: L10n.tr("common.delete", lang: language),
                     isDestructive: true
                 ) {
                     context.delete(game)
@@ -517,11 +581,15 @@ struct GameDetailView: View {
     /// 窗口 minWidth 980 − 侧边栏最宽 320 − 页面 padding 56 ≈ 604，取 640 留余量。
     private static let wideHeaderThreshold: CGFloat = 640
 
-    private func header(width: CGFloat) -> some View {
+    private func header(width: CGFloat, hideCoverBand: Bool = false) -> some View {
         Group {
             #if os(macOS)
             if width >= Self.wideHeaderThreshold {
-                wideHeader
+                wideHeader(width: width, hideCoverBand: hideCoverBand)
+            } else if hideCoverBand {
+                // 有背景图：横幅已在 body 层铺满视口，窄布局这里只出信息列。
+                infoBlock
+                Spacer(minLength: 0)
             } else {
                 HStack(alignment: .top, spacing: 24) {
                     coverBlock
@@ -541,11 +609,15 @@ struct GameDetailView: View {
     /// 名字/其他语言名/元数据行贴内容左缘；评分卡在名字块右侧、顶端与游戏名平齐；
     /// 状态滑块限宽 720 独占一行（在左列内、元数据下方）。未评分（想玩等）不渲染评分卡。
     /// 左列字号/间距按「与右侧评分卡视觉平衡」调校：名字 30pt、行距 12/8。
+    /// 2026-08-27 追加：已设背景图时顶带换为 heroBanner——hero 作无虚化背景铺满横幅、
+    /// 位于名字行与评分卡上方；同设 Logo 时横幅前景以 Logo 替代 2:3 封面。
     @ViewBuilder
-    private var wideHeader: some View {
+    private func wideHeader(width: CGFloat, hideCoverBand: Bool) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            coverBlock
-                .padding(.leading, 48)
+            if !hideCoverBand {
+                coverBlock
+                    .padding(.leading, 48)
+            }
 
             HStack(alignment: .top, spacing: 24) {
                 VStack(alignment: .leading, spacing: 12) {
@@ -561,6 +633,82 @@ struct GameDetailView: View {
 
             DetailStatusPicker(status: $detailStatus)
                 .frame(maxWidth: 720, alignment: .leading)
+        }
+    }
+
+    /// 宽窗头部横幅：已设背景图时启用。2026-08-27 用户定稿口径：
+    /// **整幅背景图无裁切显示**——宽度铺满内容区、顶边钉在详情页内容最顶端，
+    /// 高度 = 内容宽 ÷ 图片自身宽高比（随窗口联动伸缩）；窄高比之外的超宽图到不了
+    /// 预设横幅高度也接受（底部留白不强行拉伸）。仅对病态竖长图按 maxHeight 上限
+    /// 整体等比缩小留边，绝不裁切。前景贴左缘 48 缩进、垂直居中于图片实际高度。
+    /// Logo 与背景锁死为同一元素：宽度 = 横幅宽度 × 三档尺寸系数（logoSizeValue，默认
+    /// medium = 0.195），与背景同源于横幅宽度——缩窗时两者等比联动不脱节。水平/垂直
+    /// 位置各三档（logoHorizontalValue/logoVerticalValue）：垂直在剩余空白中锚定
+    /// 上/中/下，水平左 48 / 居中 / 右 48。源 logo 尺寸比例各异，用户按游戏微调。
+    fileprivate func heroBanner(width: CGFloat) -> some View {
+        // 病态竖长图兜底上限：SGDB heroes 正常都 ≥2.3:1 触不到；防手动上传竖图把首屏撑爆。
+        let capHeight: CGFloat = 560
+        let imageAspect = game.heroImage.map { $0.size.width / max($0.size.height, 1) } ?? 3.1
+        let imageHeight = min(capHeight, width / max(imageAspect, 0.5))
+        return ZStack(alignment: .leading) {
+            Color.clear
+                .overlay(alignment: .topLeading) {
+                    if let hero = game.heroImage {
+                        Image(appImage: hero)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: width, height: imageHeight, alignment: .topLeading)
+                    }
+                }
+            heroForeground(bannerHeight: imageHeight, bannerWidth: width)
+        }
+        .frame(width: width, height: imageHeight)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.semantic(.separator), lineWidth: 1)
+        )
+    }
+
+    /// 横幅前景：背景图 + Logo 同设时用 Logo 取代 2:3 封面——宽度按三档尺寸定比随背景
+    /// 等比缩放；水平/垂直按三档选项锚定。无 Logo 时回退 2:3 封面块（矮横幅内等比缩小
+    /// 防出界，仍垂直居中）。
+    @ViewBuilder
+    private func heroForeground(bannerHeight: CGFloat, bannerWidth: CGFloat) -> some View {
+        if let logo = game.logoImage {
+            let logoWidth = bannerWidth * game.logoSizeValue.widthRatio
+            let logoHeight = logo.size.height / max(logo.size.width, 1) * logoWidth
+            let vPad = max(0, bannerHeight - logoHeight)
+            let hPad = max(0, bannerWidth - logoWidth)
+            let topInset: CGFloat = switch game.logoVerticalValue {
+            case .top: 0
+            case .center: vPad / 2
+            case .bottom: vPad * 0.75   // 贴底观感：底部留白 = 顶部 1/3，不真贴死底缘
+            }
+            let leadingInset: CGFloat = switch game.logoHorizontalValue {
+            case .leading: 48
+            case .center: hPad / 2
+            case .trailing: hPad - 48
+            }
+            Image(appImage: logo)
+                .resizable()
+                .scaledToFit()
+                .frame(width: logoWidth)
+                .shadow(color: .black.opacity(0.35), radius: 7, y: 2)
+                .padding(.top, topInset)
+                .padding(.leading, leadingInset)
+                .frame(width: bannerWidth, height: bannerHeight, alignment: .topLeading)
+        } else {
+            // 无 Logo：2:3 封面前景。与背景锁死等比联动——高度 = 横幅高度 × 0.85（上下留少量
+            // 呼吸边），宽度按封面框比例换算；横幅随窗变窄时封面同步缩小不脱节。左 48 + 垂直居中。
+            let coverHeight = bannerHeight * 0.85
+            HStack(spacing: 0) {
+                coverBlock(height: coverHeight)
+                    .shadow(color: .black.opacity(0.25), radius: 6, y: 2)
+                Spacer(minLength: 0)
+            }
+            .padding(.leading, 48)
+            .frame(width: bannerWidth, height: bannerHeight, alignment: .center)
         }
     }
 
@@ -654,9 +802,11 @@ struct GameDetailView: View {
         .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color.semantic(.separator), lineWidth: 1))
     }
 
-    /// 封面块：160×213 竖版封面（无封面时占位图标）。
-    private var coverBlock: some View {
-        Group {
+    /// 封面块：160×213 竖版封面（无封面时占位图标）；height 可调版本供 heroBanner 前景
+    /// 在矮横幅里等比缩小使用（宽高比锁定原框比例）。
+    fileprivate func coverBlock(height: CGFloat) -> some View {
+        let w = height * 160 / 213
+        return Group {
             if let image = game.coverImage {
                 Image(appImage: image)
                     .resizable()
@@ -665,15 +815,19 @@ struct GameDetailView: View {
                 ZStack {
                     Rectangle().fill(Color.semantic(.quaternarySystemFill))
                     Image(systemName: "gamecontroller")
-                        .font(.system(size: 40))
+                        .font(.system(size: 40 * height / 213))
                         .foregroundStyle(.tertiary)
                 }
             }
         }
-        .frame(width: 160, height: 213)
+        .frame(width: w, height: height)
         .background(Rectangle().fill(Color.semantic(.quaternarySystemFill)))
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .shadow(color: .black.opacity(0.15), radius: 6, y: 2)
+    }
+
+    private var coverBlock: some View {
+        coverBlock(height: 213)
     }
 
     /// 信息块：主名/其他语言名/发售日/平台/分组/评分与条形图。

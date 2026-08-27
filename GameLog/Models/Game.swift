@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 import SwiftData
 
@@ -37,6 +38,38 @@ enum GameStatus: String, CaseIterable, Identifiable {
     }
 }
 
+/// 详情页横幅里 Logo 的三档显示尺寸（宽度 = 横幅宽度 × 系数，随窗等比联动）。
+enum LogoBannerSize: String, CaseIterable, Identifiable, LabelKeyed {
+    case small
+    case medium
+    case large
+
+    var id: String { rawValue }
+    /// 横幅宽度占比：small ≈ 封面横向口径、medium = 基线 ×1.5、large 再放大。
+    var widthRatio: CGFloat { switch self { case .small: 0.13; case .medium: 0.195; case .large: 0.26 } }
+    var labelKey: String { "logo.size.\(rawValue)" }
+}
+
+/// 详情页横幅里 Logo 的垂直位置（在剩余空白中的锚点）。
+enum LogoBannerVertical: String, CaseIterable, Identifiable, LabelKeyed {
+    case top
+    case center
+    case bottom
+
+    var id: String { rawValue }
+    var labelKey: String { "logo.vertical.\(rawValue)" }
+}
+
+/// 详情页横幅里 Logo 的水平位置。
+enum LogoBannerHorizontal: String, CaseIterable, Identifiable, LabelKeyed {
+    case leading
+    case center
+    case trailing
+
+    var id: String { rawValue }
+    var labelKey: String { "logo.horizontal.\(rawValue)" }
+}
+
 /// 一个游戏（库条目）。创建时带首条通关记录，之后可追加。
 /// 多语言名字：`name` 为英文名（必须、canonical），`nameZh`/`nameJa` 可选；
 /// 展示时按当前语言用 `displayName(for:)` 回退（中文→nameZh??name，日文→nameJa??name，英文→name）。
@@ -63,8 +96,12 @@ final class Game {
     var landscapeData: Data?
     /// 背景图（SteamGridDB heroes 宽幅横图；可选）。展示位置待设计。
     var heroData: Data?
-    /// 游戏 Logo（SteamGridDB logos 透明 PNG；可选）。展示位置待设计。
+    /// 游戏 Logo（SteamGridDB logos 透明 PNG；可选）。详情页横幅在背景图之上展示。
     var logoData: Data?
+    /// Logo 横幅展示三档调节（源图尺寸/比例各异，用户按游戏微调；默认 = 基线观感）。
+    var logoSize: String = LogoBannerSize.medium.rawValue
+    var logoVertical: String = LogoBannerVertical.center.rawValue
+    var logoHorizontal: String = LogoBannerHorizontal.leading.rawValue
     var reviewTitle: String
     var reviewBody: String
     var createdAt: Date
@@ -88,7 +125,9 @@ final class Game {
          aliases: [String] = [], platform: String = "", releaseDate: Date? = nil,
          developer: String? = nil, publisher: String? = nil, genre: String? = nil,
          coverData: Data? = nil, landscapeData: Data? = nil, heroData: Data? = nil,
-         logoData: Data? = nil, reviewTitle: String = "", reviewBody: String = "",
+         logoData: Data? = nil, logoSize: LogoBannerSize = .medium,
+         logoVertical: LogoBannerVertical = .center, logoHorizontal: LogoBannerHorizontal = .leading,
+         reviewTitle: String = "", reviewBody: String = "",
          createdAt: Date = .now, status: GameStatus = .completed) {
         self.name = name
         self.nameZh = nameZh
@@ -103,6 +142,9 @@ final class Game {
         self.landscapeData = landscapeData
         self.heroData = heroData
         self.logoData = logoData
+        self.logoSize = logoSize.rawValue
+        self.logoVertical = logoVertical.rawValue
+        self.logoHorizontal = logoHorizontal.rawValue
         self.reviewTitle = reviewTitle
         self.reviewBody = reviewBody
         self.createdAt = createdAt
@@ -122,6 +164,20 @@ extension Game {
     var statusValue: GameStatus {
         get { GameStatus(rawValue: status) ?? .completed }
         set { status = newValue.rawValue }
+    }
+
+    /// Logo 横幅三档调节（解析存储值，未知值兜底默认档）。
+    var logoSizeValue: LogoBannerSize {
+        get { LogoBannerSize(rawValue: logoSize) ?? .medium }
+        set { logoSize = newValue.rawValue }
+    }
+    var logoVerticalValue: LogoBannerVertical {
+        get { LogoBannerVertical(rawValue: logoVertical) ?? .center }
+        set { logoVertical = newValue.rawValue }
+    }
+    var logoHorizontalValue: LogoBannerHorizontal {
+        get { LogoBannerHorizontal(rawValue: logoHorizontal) ?? .leading }
+        set { logoHorizontal = newValue.rawValue }
     }
 
     /// 该游戏全部持有版本的总估值（按语言），无持有/无估值则 nil。

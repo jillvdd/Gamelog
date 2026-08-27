@@ -65,6 +65,7 @@
 "completion.add" = "追加通关记录";
 "completion.edit" = "编辑";
 "completion.delete" = "删除";
+"completion.deleteConfirm" = "确定删除这条通关记录吗？此操作无法撤销。";
 "completion.skipScores" = "本次跳过评分";
 "completion.scores" = "六维评分";
 "dimension.gameplay" = "玩法";
@@ -84,7 +85,7 @@
 "common.custom" = "自定义…";
 "common.done" = "完成";
 "common.close" = "关闭";
-"common.confirmDelete" = "删除";
+"common.confirmDelete" = "确认删除";
 "common.back" = "返回";
 "delete.confirmGame" = "确定删除「%@」？该游戏的所有通关记录也会被删除。";
 "share.selectGames" = "选择要分享的游戏";
@@ -137,7 +138,7 @@
 "settings.removeAvatar" = "移除头像";
 "settings.restoreIcon" = "恢复默认图标";
 "settings.autoMatchCover" = "自动匹配封面";
-"settings.autoMatchCoverHint" = "输入游戏名后，自动搜索 SteamGridDB 并填入第一张封面（需在下方配置 API Key）。";
+"settings.autoMatchCoverHint" = "输入游戏名后，自动搜索 SteamGridDB 并填入第一张封面；已展开开关且未设置的横向封面/背景图/Logo 也会一并匹配（需在下方配置 API Key）。";
 "settings.hideToolbarGlass" = "隐藏上方毛玻璃";
 "settings.hideToolbarGlassHint" = "隐藏所有页面（库/详情/统计）顶部工具栏的毛玻璃背景，界面更简洁。（macOS 15 及以上可启用）";
 "settings.collectorMode" = "收藏家模式";
@@ -232,6 +233,18 @@
 "game.landscape" = "横向封面";
 "game.hero" = "背景图";
 "game.logo" = "Logo";
+"game.logoSize" = "Logo 大小";
+"game.logoVertical" = "Logo 垂直位置";
+"game.logoHorizontal" = "Logo 水平位置";
+"logo.size.small" = "小";
+"logo.size.medium" = "中";
+"logo.size.large" = "大";
+"logo.vertical.top" = "靠上";
+"logo.vertical.center" = "居中";
+"logo.vertical.bottom" = "靠下";
+"logo.horizontal.leading" = "靠左";
+"logo.horizontal.center" = "居中";
+"logo.horizontal.trailing" = "靠右";
 "cover.titleLandscape" = "搜索横向封面";
 "cover.titleHero" = "搜索背景图";
 "cover.titleLogo" = "搜索 Logo";

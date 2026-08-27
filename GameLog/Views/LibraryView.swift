@@ -384,7 +384,7 @@ struct LibraryView: View {
             cancelTitle: L10n.tr("common.cancel", lang: language),
             actions: [
                 ConfirmAction(
-                    title: L10n.tr("common.confirmDelete", lang: language),
+                    title: L10n.tr("common.delete", lang: language),
                     isDestructive: true
                 ) {
                     if let game = pendingDeleteGame {

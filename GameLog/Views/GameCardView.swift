@@ -15,12 +15,28 @@ extension GameCardView {
 extension Game {
     var coverImage: AppImage? {
         guard let data = coverData else { return nil }
-        let key = NSNumber(value: data.hashValue)
-        if let cached = coverImageCache.object(forKey: key) {
+        return Self.cachedImage(forKey: data.hashValue, decode: { AppImage(data: $0) }, data: data)
+    }
+
+    /// 详情页横幅背景图（与封面共用同一解码缓存，key 用各自 data 哈希不会冲突）。
+    var heroImage: AppImage? {
+        guard let data = heroData else { return nil }
+        return Self.cachedImage(forKey: data.hashValue, decode: { AppImage(data: $0) }, data: data)
+    }
+
+    /// 游戏 Logo（透明 PNG）。详情页在「背景图 + Logo 同时设置」时替代 2:3 封面。
+    var logoImage: AppImage? {
+        guard let data = logoData else { return nil }
+        return Self.cachedImage(forKey: data.hashValue, decode: { AppImage(data: $0) }, data: data)
+    }
+
+    /// 共用解码路径：查缓存 → 未命中解码 → 回填。文件级私有缓存由「清除缓存」统一清空。
+    private static func cachedImage(forKey key: Int, decode: (Data) -> AppImage?, data: Data) -> AppImage? {
+        if let cached = coverImageCache.object(forKey: NSNumber(value: key)) {
             return cached
         }
-        guard let image = AppImage(data: data) else { return nil }
-        coverImageCache.setObject(image, forKey: key)
+        guard let image = decode(data) else { return nil }
+        coverImageCache.setObject(image, forKey: NSNumber(value: key))
         return image
     }
 }

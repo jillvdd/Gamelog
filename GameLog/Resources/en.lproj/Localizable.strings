@@ -65,6 +65,7 @@
 "completion.add" = "Add Completion";
 "completion.edit" = "Edit";
 "completion.delete" = "Delete";
+"completion.deleteConfirm" = "Delete this completion? This cannot be undone.";
 "completion.skipScores" = "Skip scoring this run";
 "completion.scores" = "Dimension Scores";
 "dimension.gameplay" = "Gameplay";
@@ -84,7 +85,7 @@
 "common.custom" = "Custom…";
 "common.done" = "Done";
 "common.close" = "Close";
-"common.confirmDelete" = "Delete";
+"common.confirmDelete" = "Confirm Delete";
 "common.back" = "Back";
 "delete.confirmGame" = "Delete “%@”? All of its completion records will also be deleted.";
 "share.selectGames" = "Select Games to Share";
@@ -137,7 +138,7 @@
 "settings.removeAvatar" = "Remove Avatar";
 "settings.restoreIcon" = "Restore Default Icon";
 "settings.autoMatchCover" = "Automatically Match Cover";
-"settings.autoMatchCoverHint" = "When you enter a game name, automatically searches SteamGridDB and sets the first cover found (requires an API key below).";
+"settings.autoMatchCoverHint" = "When you enter a game name, automatically searches SteamGridDB and sets the first cover found; landscape covers / hero images / logos whose toggle is on and unset are matched too (requires an API key below).";
 "settings.hideToolbarGlass" = "Hide Top Toolbar Background";
 "settings.hideToolbarGlassHint" = "Hides the frosted-glass background of the top toolbar on all pages (Library / Detail / Stats) for a cleaner look. (macOS 15 and later)";
 "settings.collectorMode" = "Collector Mode";
@@ -232,6 +233,18 @@
 "game.landscape" = "Landscape Cover";
 "game.hero" = "Hero Image";
 "game.logo" = "Logo";
+"game.logoSize" = "Logo Size";
+"game.logoVertical" = "Logo Vertical Position";
+"game.logoHorizontal" = "Logo Horizontal Position";
+"logo.size.small" = "Small";
+"logo.size.medium" = "Medium";
+"logo.size.large" = "Large";
+"logo.vertical.top" = "Top";
+"logo.vertical.center" = "Middle";
+"logo.vertical.bottom" = "Bottom";
+"logo.horizontal.leading" = "Left";
+"logo.horizontal.center" = "Center";
+"logo.horizontal.trailing" = "Right";
 "cover.titleLandscape" = "Search Landscape Covers";
 "cover.titleHero" = "Search Hero Images";
 "cover.titleLogo" = "Search Logos";

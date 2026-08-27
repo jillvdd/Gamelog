@@ -213,13 +213,21 @@ struct GameEditView: View {
     @State private var publisher = ""
     @State private var genre = ""
     @State private var coverData: Data?
-    // 三类附加图像（可选，展示位置待设计，先只做录入与存储）：开关关 = 不使用该图（保存时清空）。
+    // 三类附加图（可选，展示位置待设计，先只做录入与存储）：开关关 = 不使用该图（保存时清空）。
     @State private var hasLandscape = false
     @State private var landscapeData: Data?
     @State private var hasHero = false
     @State private var heroData: Data?
     @State private var hasLogo = false
     @State private var logoData: Data?
+    // 附加图自动匹配进行中（各图独立 spinner；开关触发与改名触发共用）。
+    @State private var isAutoMatchingLandscape = false
+    @State private var isAutoMatchingHero = false
+    @State private var isAutoMatchingLogo = false
+    // Logo 横幅展示三档调节（详情页背景图之上的位置/大小；仅 hasLogo 开时有意义）。
+    @State private var logoSize: LogoBannerSize = .medium
+    @State private var logoVertical: LogoBannerVertical = .center
+    @State private var logoHorizontal: LogoBannerHorizontal = .leading
     // 各图像的搜索面板开关。
     @State private var showingLandscapeSearch = false
     // 照片图库选择器开关（macOS 走 photoLibraryPicker；iOS 走 imageSourcePicker 的相册分支）。
@@ -413,12 +421,18 @@ struct GameEditView: View {
 
                 // 三类附加图像：各自开关，默认关；开 = 展开预览与录入按钮。
                 Toggle(L10n.tr("game.landscape", lang: language), isOn: $hasLandscape)
+                    .task(id: hasLandscape) {
+                        await autoMatchOnToggle(kind: .landscape, enabled: hasLandscape,
+                                                isSet: { landscapeData != nil },
+                                                assign: { landscapeData = $0 }, active: $isAutoMatchingLandscape)
+                    }
                 if hasLandscape {
                     ArtworkRow(
                         titleKey: "game.landscape",
                         data: landscapeData,
                         aspect: 2.14,
                         thumbWidth: 128,
+                        isAutoMatching: isAutoMatchingLandscape,
                         onPick: {
                             #if os(macOS)
                             pickImageFromPanel { landscapeData = $0 }
@@ -432,12 +446,18 @@ struct GameEditView: View {
                     )
                 }
                 Toggle(L10n.tr("game.hero", lang: language), isOn: $hasHero)
+                    .task(id: hasHero) {
+                        await autoMatchOnToggle(kind: .hero, enabled: hasHero,
+                                                isSet: { heroData != nil },
+                                                assign: { heroData = $0 }, active: $isAutoMatchingHero)
+                    }
                 if hasHero {
                     ArtworkRow(
                         titleKey: "game.hero",
                         data: heroData,
                         aspect: 3.1,
                         thumbWidth: 168,
+                        isAutoMatching: isAutoMatchingHero,
                         onPick: {
                             #if os(macOS)
                             pickImageFromPanel { heroData = $0 }
@@ -451,12 +471,18 @@ struct GameEditView: View {
                     )
                 }
                 Toggle(L10n.tr("game.logo", lang: language), isOn: $hasLogo)
+                    .task(id: hasLogo) {
+                        await autoMatchOnToggle(kind: .logo, enabled: hasLogo,
+                                                isSet: { logoData != nil },
+                                                assign: { logoData = $0 }, active: $isAutoMatchingLogo)
+                    }
                 if hasLogo {
                     ArtworkRow(
                         titleKey: "game.logo",
                         data: logoData,
                         aspect: nil,
                         thumbWidth: 128,
+                        isAutoMatching: isAutoMatchingLogo,
                         onPick: {
                             #if os(macOS)
                             pickImageFromPanel { logoData = $0 }
@@ -468,6 +494,13 @@ struct GameEditView: View {
                         onSearch: { showingLogoSearch = true },
                         onDelete: { logoData = nil }
                     )
+                    // Logo 源图尺寸比例各异：详情页横幅内的大小/位置三档可调。
+                    EnumPickerRow(title: L10n.tr("game.logoSize", lang: language),
+                                  cases: LogoBannerSize.allCases, selection: $logoSize, language: language)
+                    EnumPickerRow(title: L10n.tr("game.logoVertical", lang: language),
+                                  cases: LogoBannerVertical.allCases, selection: $logoVertical, language: language)
+                    EnumPickerRow(title: L10n.tr("game.logoHorizontal", lang: language),
+                                  cases: LogoBannerHorizontal.allCases, selection: $logoHorizontal, language: language)
                 }
             }
 
@@ -693,6 +726,9 @@ struct GameEditView: View {
         hasLandscape = game.landscapeData != nil
         hasHero = game.heroData != nil
         hasLogo = game.logoData != nil
+        logoSize = game.logoSizeValue
+        logoVertical = game.logoVerticalValue
+        logoHorizontal = game.logoHorizontalValue
         reviewTitle = game.reviewTitle
         reviewBody = game.reviewBody
         groupIDs = Set(game.groups.map(\.persistentModelID))
@@ -724,28 +760,66 @@ struct GameEditView: View {
         #endif
     }
 
-    /// 输入游戏名 → 防抖后自动匹配封面（仅当开关开、已配 key、且尚无封面时）。
+    /// 输入游戏名 → 防抖后自动匹配封面与已开开关且未设置的附加图（仅当开关开、已配 key）。
     /// 由 `.task(id: name)` 驱动：名字每次变化时取消重开、600ms 后匹配；名字未变（如编辑打开）不匹配。
     private func debouncedAutoMatch(_ newValue: String) async {
         guard newValue != nameAtLoad,
-              autoMatchCover, !steamGridDBKey.isEmpty, coverData == nil, didFinishLoading else { return }
+              autoMatchCover, !steamGridDBKey.isEmpty, didFinishLoading else { return }
         let term = newValue.trimmingCharacters(in: .whitespaces)
         // 名字过短（不足 2 字）不搜，避免输字过程中频繁命中。
         guard term.count >= 2 else { return }
         try? await Task.sleep(nanoseconds: 600_000_000)
         guard !Task.isCancelled else { return }
-        isAutoMatching = true
-        defer { isAutoMatching = false }
-        guard coverData == nil else { return }
+        let client = SteamGridDBClient(apiKey: steamGridDBKey)
+        // 封面（原有路径）。
+        if coverData == nil {
+            isAutoMatching = true
+            defer { isAutoMatching = false }
+            do {
+                // 复查 isCancelled：快速连续改名时旧名字的响应若已在取消生效前返回，不能写入。
+                if let data = try await client.autoCover(for: term), !Task.isCancelled, coverData == nil {
+                    coverData = data
+                }
+            } catch {
+                // 匹配失败静默降级：不打断录入，封面保持为空，可随时手动搜索。
+            }
+        }
+        // 三类附加图：开关开着且未设置的跟随改名一起匹配（防抖/静默降级与封面同款）。
+        await autoFillArtwork(kind: .landscape, term: term, enabled: hasLandscape,
+                              isSet: { landscapeData != nil }, assign: { landscapeData = $0 }, active: $isAutoMatchingLandscape)
+        await autoFillArtwork(kind: .hero, term: term, enabled: hasHero,
+                              isSet: { heroData != nil }, assign: { heroData = $0 }, active: $isAutoMatchingHero)
+        await autoFillArtwork(kind: .logo, term: term, enabled: hasLogo,
+                              isSet: { logoData != nil }, assign: { logoData = $0 }, active: $isAutoMatchingLogo)
+    }
+
+    /// 单类附加图的自动匹配：开关开 + 未设置才搜；静默降级；写入前经 isSet 复查实时值
+    /// （await 期间用户可能已手动选图，不能覆盖）。
+    private func autoFillArtwork(kind: ArtworkKind, term: String, enabled: Bool,
+                                 isSet: () -> Bool, assign: @escaping (Data) -> Void, active: Binding<Bool>) async {
+        guard enabled, !isSet() else { return }
+        active.wrappedValue = true
+        defer { active.wrappedValue = false }
         let client = SteamGridDBClient(apiKey: steamGridDBKey)
         do {
-            // 复查 isCancelled：快速连续改名时旧名字的响应若已在取消生效前返回，不能写入。
-            if let data = try await client.autoCover(for: term), !Task.isCancelled, coverData == nil {
-                coverData = data
+            if let data = try await client.autoArtwork(for: term, kind: kind), !Task.isCancelled, !isSet() {
+                assign(data)
             }
         } catch {
-            // 匹配失败静默降级：不打断录入，封面保持为空，可随时手动搜索。
+            // 静默降级，与封面同口径。
         }
+    }
+
+    /// 「未设置时打开某类附加图开关」→ 立即触发该类图的自动匹配（防抖 600ms 同改名路径）。
+    /// 由三处 `.task(id: hasXxx)` 驱动；false→true 且数据为 nil 才匹配。
+    private func autoMatchOnToggle(kind: ArtworkKind, enabled: Bool,
+                                   isSet: @escaping () -> Bool, assign: @escaping (Data) -> Void, active: Binding<Bool>) async {
+        guard enabled, !isSet(), autoMatchCover, !steamGridDBKey.isEmpty, didFinishLoading else { return }
+        let term = name.trimmingCharacters(in: .whitespaces)
+        guard term.count >= 2 else { return }
+        try? await Task.sleep(nanoseconds: 600_000_000)
+        guard !Task.isCancelled else { return }
+        await autoFillArtwork(kind: kind, term: term, enabled: enabled, isSet: isSet, assign: assign, active: active)
     }
 
     private var parsedPlaytime: Double? {
@@ -798,6 +872,9 @@ struct GameEditView: View {
                 landscapeData: hasLandscape ? landscapeData : nil,
                 heroData: hasHero ? heroData : nil,
                 logoData: hasLogo ? logoData : nil,
+                logoSize: logoSize,
+                logoVertical: logoVertical,
+                logoHorizontal: logoHorizontal,
                 // 与上方校验同口径：入库用 trim 后的标题（iOS 编辑 sheet / 写字台保存也是 trim 口径）。
                 reviewTitle: reviewTitle.trimmingCharacters(in: .whitespaces),
                 reviewBody: reviewBody,
@@ -867,6 +944,9 @@ struct GameEditView: View {
             game.landscapeData = hasLandscape ? landscapeData : nil
             game.heroData = hasHero ? heroData : nil
             game.logoData = hasLogo ? logoData : nil
+            game.logoSizeValue = logoSize
+            game.logoVerticalValue = logoVertical
+            game.logoHorizontalValue = logoHorizontal
             game.reviewTitle = reviewTitle
             game.reviewBody = reviewBody
             game.groups = allGroups.filter { groupIDs.contains($0.persistentModelID) }
@@ -892,6 +972,16 @@ struct ArtworkRow: View {
     var onPickFromLibrary: (() -> Void)? = nil
     let onSearch: () -> Void
     let onDelete: () -> Void
+
+    /// 搜索按钮文案按图类区分（复用搜索面板标题 key：搜索封面/搜索横向封面/搜索背景图/搜索 Logo）。
+    private var searchCoverTitleKey: String {
+        switch titleKey {
+        case "game.landscape": return "cover.titleLandscape"
+        case "game.hero": return "cover.titleHero"
+        case "game.logo": return "cover.titleLogo"
+        default: return "cover.title"
+        }
+    }
 
     @Environment(\.appLanguageCode) private var language
     @AppStorage("steamGridDBKey") private var steamGridDBKey = ""
@@ -952,7 +1042,7 @@ struct ArtworkRow: View {
                         .controlSize(.small)
                 }
                 #endif
-                Button(L10n.tr("game.searchCover", lang: language), action: onSearch)
+                Button(L10n.tr(searchCoverTitleKey, lang: language), action: onSearch)
                     .appStandardButton()
                     .controlSize(.small)
                     .disabled(steamGridDBKey.isEmpty)

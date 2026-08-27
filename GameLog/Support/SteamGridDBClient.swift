@@ -123,6 +123,26 @@ struct SteamGridDBClient {
         return try await fetchImage(urlString: grid.url)
     }
 
+    /// 自动匹配附加图（横向封面/背景图/Logo）：搜索第一个命中 → 对应端点第一张 → 下载。
+    /// heroes/logos 一次全量返回、按像素面积大图优先；landscape 用 920×430 端点第一页。
+    func autoArtwork(for term: String, kind: ArtworkKind) async throws -> Data? {
+        let hits = try await search(term: term)
+        guard let first = hits.first else { return nil }
+        let candidates: [SteamGridDBGrid]
+        switch kind {
+        case .landscape:
+            candidates = try await landscapesPage(for: first.id, page: 0).grids
+        case .hero:
+            candidates = try await heroes(for: first.id)
+        case .logo:
+            candidates = try await logos(for: first.id)
+        case .poster:
+            candidates = try await grids(for: first.id)
+        }
+        guard let grid = candidates.first else { return nil }
+        return try await fetchImage(urlString: grid.url)
+    }
+
     /// 竖版优先、大尺寸优先的封面排序（CoverSearchSheet 与自动匹配共用）。
     static func sorted(_ grids: [SteamGridDBGrid]) -> [SteamGridDBGrid] {
         grids.sorted { lhs, rhs in

@@ -38,6 +38,10 @@ struct GameDTO: Codable {
     var landscapeBase64: String?
     var heroBase64: String?
     var logoBase64: String?
+    /// Logo 横幅展示三档（旧版备份缺字段 → nil，导入保持默认档）。
+    var logoSizeRaw: String?
+    var logoVerticalRaw: String?
+    var logoHorizontalRaw: String?
     var reviewTitle: String
     var reviewBody: String
     var groupNames: [String]
@@ -111,6 +115,9 @@ enum BackupManager {
                     landscapeBase64: game.landscapeData?.base64EncodedString(),
                     heroBase64: game.heroData?.base64EncodedString(),
                     logoBase64: game.logoData?.base64EncodedString(),
+                    logoSizeRaw: game.logoSize,
+                    logoVerticalRaw: game.logoVertical,
+                    logoHorizontalRaw: game.logoHorizontal,
                     reviewTitle: game.reviewTitle,
                     reviewBody: game.reviewBody,
                     groupNames: game.groups.map(\.name),
@@ -229,6 +236,9 @@ enum BackupManager {
                 landscapeData: gameDTO.landscapeBase64.flatMap { Data(base64Encoded: $0) },
                 heroData: gameDTO.heroBase64.flatMap { Data(base64Encoded: $0) },
                 logoData: gameDTO.logoBase64.flatMap { Data(base64Encoded: $0) },
+                logoSize: gameDTO.logoSizeRaw.flatMap(LogoBannerSize.init(rawValue:)) ?? .medium,
+                logoVertical: gameDTO.logoVerticalRaw.flatMap(LogoBannerVertical.init(rawValue:)) ?? .center,
+                logoHorizontal: gameDTO.logoHorizontalRaw.flatMap(LogoBannerHorizontal.init(rawValue:)) ?? .leading,
                 reviewTitle: gameDTO.reviewTitle,
                 reviewBody: gameDTO.reviewBody,
                 // 旧版备份缺 status → 默认已通关。
