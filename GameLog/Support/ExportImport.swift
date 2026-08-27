@@ -237,7 +237,7 @@ enum BackupManager {
                 heroData: gameDTO.heroBase64.flatMap { Data(base64Encoded: $0) },
                 logoData: gameDTO.logoBase64.flatMap { Data(base64Encoded: $0) },
                 logoSize: gameDTO.logoSizeRaw.flatMap(LogoBannerSize.init(rawValue:)) ?? .medium,
-                logoVertical: gameDTO.logoVerticalRaw.flatMap(LogoBannerVertical.init(rawValue:)) ?? .center,
+                logoVertical: gameDTO.logoVerticalRaw.flatMap(LogoBannerVertical.init(rawValue:)) ?? .bottom,
                 logoHorizontal: gameDTO.logoHorizontalRaw.flatMap(LogoBannerHorizontal.init(rawValue:)) ?? .leading,
                 reviewTitle: gameDTO.reviewTitle,
                 reviewBody: gameDTO.reviewBody,

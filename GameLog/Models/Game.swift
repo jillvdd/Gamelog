@@ -50,7 +50,7 @@ enum LogoBannerSize: String, CaseIterable, Identifiable, LabelKeyed {
     var labelKey: String { "logo.size.\(rawValue)" }
 }
 
-/// 详情页横幅里 Logo 的垂直位置（在剩余空白中的锚点）。
+/// 详情页横幅里 Logo 的垂直位置（在剩余空白中的锚点；默认 bottom——用户定稿）。
 enum LogoBannerVertical: String, CaseIterable, Identifiable, LabelKeyed {
     case top
     case center
@@ -100,7 +100,7 @@ final class Game {
     var logoData: Data?
     /// Logo 横幅展示三档调节（源图尺寸/比例各异，用户按游戏微调；默认 = 基线观感）。
     var logoSize: String = LogoBannerSize.medium.rawValue
-    var logoVertical: String = LogoBannerVertical.center.rawValue
+    var logoVertical: String = LogoBannerVertical.bottom.rawValue
     var logoHorizontal: String = LogoBannerHorizontal.leading.rawValue
     var reviewTitle: String
     var reviewBody: String
@@ -126,7 +126,7 @@ final class Game {
          developer: String? = nil, publisher: String? = nil, genre: String? = nil,
          coverData: Data? = nil, landscapeData: Data? = nil, heroData: Data? = nil,
          logoData: Data? = nil, logoSize: LogoBannerSize = .medium,
-         logoVertical: LogoBannerVertical = .center, logoHorizontal: LogoBannerHorizontal = .leading,
+         logoVertical: LogoBannerVertical = .bottom, logoHorizontal: LogoBannerHorizontal = .leading,
          reviewTitle: String = "", reviewBody: String = "",
          createdAt: Date = .now, status: GameStatus = .completed) {
         self.name = name
@@ -172,7 +172,7 @@ extension Game {
         set { logoSize = newValue.rawValue }
     }
     var logoVerticalValue: LogoBannerVertical {
-        get { LogoBannerVertical(rawValue: logoVertical) ?? .center }
+        get { LogoBannerVertical(rawValue: logoVertical) ?? .bottom }
         set { logoVertical = newValue.rawValue }
     }
     var logoHorizontalValue: LogoBannerHorizontal {

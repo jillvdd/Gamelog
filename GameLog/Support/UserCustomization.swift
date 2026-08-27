@@ -44,6 +44,9 @@ enum UserCustomization {
     static let sidebarPlatformsExpandedKey = "customization.sidebar.platformsExpanded"
     /// 侧边栏「分组」区展开（默认 true=展开，跨会话记忆）。
     static let sidebarGroupsExpandedKey = "customization.sidebar.groupsExpanded"
+    /// iOS 库视图三态（grid/wideCard/list，原始值字符串）。仅 iOS 读写；macOS 仍用旧 useGridView Bool 键。
+    /// 旧键迁移在 LibraryView 首次读取时做：无此键时按 useGridView 折算 grid/list。
+    static let iosLibraryViewModeKey = "customization.iosLibraryViewMode"
 
     /// 用户名长度上限（设置页输入与导入时统一截断）。
     static let usernameMaxLength = 20

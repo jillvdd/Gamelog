@@ -8,18 +8,20 @@ Interface languages: **简体中文 / 日本語 / English** (switch instantly in
 
 ## Features
 
-- **Game Library**: grid / list view toggle; search by name + aliases + localized names; filter by status / platform / group; group management (macOS sidebar / iOS filter menu), a game can belong to several groups; sort by name / release date / completion date / average score (low to high or high to low) / **recently edited** / **highest value**, defaulting to "recently edited". The library score is the mean of the record averages of all scored completions, rounded to 0.1; unscored games show "Unrated".
-- **Game Status**: six statuses — Backlog / Playing / Paused / Dropped / Completed / Long-Running. Lightweight states need no completion records or scores; records attach when a game moves to Completed or Long-Running. Filter the library by status, pick via a liquid-glass slider on the detail page; non-completed games still carry a game-level platform and join platform filters and stats.
-- **Game Detail**: review area (one-line tagline intro + long-form body), all completions (edit / append / delete), six-dimension colored bar chart; an extra "Holdings" tab when Collector Mode is on.
+- **Game Library**: search by name + aliases + localized names; filter by status / platform / group; group management (macOS sidebar / iOS filter menu), a game can belong to several groups; sort by name / release date / completion date / average score (low to high or high to low) / **recently edited** / **highest value**, defaulting to "recently edited". The library score is the mean of the record averages of all scored completions, rounded to 0.1; unscored games show "Unrated".
+- **Views (per-platform)**: **macOS** grid / list toggle + sidebar; **iOS** three view modes — grid / **single-column wide cards** (landscape cover fills the card height; without one, the portrait cover scales to fit height and centers; glass-material rounded card background with a hairline border and shadow, liquid-glass score capsule at the top-right) / list. The choice persists across launches and migrates from the old preference automatically.
+- **Game Status**: six statuses — Backlog / Playing / Paused / Dropped / Completed / Long-Running. Lightweight states need no completion records or scores; records attach when a game moves to Completed or Long-Running. Filter the library by status, pick via a liquid-glass slider on the detail page (below the score section on both platforms); non-completed games still carry a game-level platform and join platform filters and stats.
+- **Game Detail**: review area (one-line tagline intro + long-form body), all completions (edit / append / delete), six-dimension colored bar chart; three optional fields for developer / publisher / genre; an extra "Holdings" tab when Collector Mode is on. **iOS word-boundary title wrapping**: the large title is tokenized with NLTokenizer so line breaks only fall on word boundaries — no more mid-word breaks like "遺|言".
+- **Detail Header (per-platform)**: **macOS** wide windows use a "cover band + info column + glass score card" layout, falling back to the single column when the window narrows; an optional hero banner (full image with no cropping, flush with the top, full width, height linked to the window and the image's aspect ratio) plus a Logo (transparent PNG; size / vertical / horizontal each in three steps per game, locked to the cover's aspect ratio). **iOS** switches to a full-width banner layout when a landscape cover is set (flush under the nav bar, height from the image's aspect ratio, capped at 260pt, never cropped); without one the original layout is kept unchanged.
 - **Review (Markdown long-form)**: the one-line verdict (tagline) renders as a large lead-in "thesis"; the review body supports a Markdown subset (headings `#` / bold `**` / italic `*` / lists `-`) like a well-set article. **macOS = WYSIWYG rich-text editor** (a dedicated "writing desk" window; the toolbar applies styles directly, saved back to Markdown; CJK italics are synthesized with a shear at draw time); **iOS = editing sheet (TextEditor)**. Per-platform editing shares one Markdown renderer, so both platforms look consistent.
 - **Six-Dimension Scoring**: Gameplay / Design / Story / Art / Music / Performance, 1–10 sliders with 0.1 steps. Overall = mean of the six; the first completion requires scores, later ones may be skipped.
 - **Completions**: platform, completion date (can be "None"), completion degree (main story / all side quests / all endings / platinum / multiple playthroughs / speedrun / custom), playtime (can be "None"), and notes.
 - **Date Picker**: macOS three-column wheel (year / month / day, handles Feb 29 and month-end clamping); iOS uses the system date picker.
 - **Groups**: create / rename / delete; pick games to join via context menu (macOS) or menu (iOS); per-group stats and review (rendered as Markdown; editable in the writing desk on macOS).
 - **Collector Mode** (Settings toggle): "Details / Holdings" segmented switch on the detail page; each game can have multiple holdings (11 media types / 10 regions / 7 conditions / 11 acquisition sources / per-language price & estimated value / purchase date / notes + up to 6 photos), forming a **collection archive**. New games do **not** get a holding by default — you must toggle "I own this (create holding)" to expand the fields and build the archive. The Holdings view offers grid / list layouts, a top overview (edition count / total quantity / total spent / total estimated value), capsule-style metadata, and a full edit sheet; photos open in the system viewer; included in backups.
-- **Cover Art**: import from your device, or search & download via the [SteamGridDB](https://www.steamgriddb.com) API (requires an API Key in Settings, searches as you type); optional **auto-match cover** (about 0.6s after you stop typing, picks the first portrait hit — never overwrites an existing cover, silent on failure). Search results show cover thumbnails. On iOS, adding an image pops a "Photos / Files / Camera" menu.
+- **Cover Art & Images**: import from your device (iOS pops a "Photos / Files / Camera" menu), or search & download via the [SteamGridDB](https://www.steamgriddb.com) API (requires an API Key in Settings, searches as you type); each of the four image kinds has an **auto-match** toggle (portrait cover / landscape cover / hero background / logo — about 0.6s after you stop typing it picks the first hit, never overwrites an existing image, silent on failure; renaming a game also triggers a re-fetch); the search sheet's copy follows the image kind and pre-fills the game's English name; results show thumbnails.
 - **Personalization**: username (20 chars), avatar (circular crop), macOS app icon (rounded-square crop), auto-match cover toggle, hide top frosted glass (macOS 15+), keep-original-images toggle, platform-logos toggle (on by default; turning it off hides brand logos in platform pickers / grouping views). A custom icon reflects on the Dock immediately and persists across restarts.
-- **Share Images (fully reworked in beta 2.4)**: a branded, fixed dark look — warm near-black background with an amber accent, no longer following the system appearance. Three card types:
+- **Share Images (fully reworked in beta 2.4)**: a branded, fixed dark look — warm near-black background with an amber accent; the preview panel itself now follows the system appearance (adjusted 2026-08-27). Three card types:
   - **Single card**: blurred cover backdrop + a crisp poster filling its frame (matched to the cover's true aspect ratio — no letterboxing for SteamGridDB 2:3 portraits); the info panel carries the game name / platforms / release year / completion-degree pill / one-line verdict (gold) / six mini dimension bars / a large library score; non-completed games show a colored status badge instead.
   - **Overview image**: the header summary line and per-game tile fields are both configurable and reorderable in "Style Settings" (summary: game count / average score / total completions / collection value; tiles: platform / score / latest completion / release year / status label); column count adapts to the number of games and the canvas grows with content.
   - **Group card**: title + one-line group-review quote + stat items (average / game count / completions / top game / collection value, toggleable and reorderable) + platform distribution bars + in-group cover grid; separate phone / desktop layouts.
@@ -34,7 +36,7 @@ Interface languages: **简体中文 / 日本語 / English** (switch instantly in
 | Platform | Deployment target | Notes |
 |---|---|---|
 | macOS | 14.0+ | Full features: sidebar, context menus, window toolbar, custom Dock icon, the writing-desk review editor, etc. |
-| iOS | 18.0+ (iPhone / iPad) | Bottom TabBar (Library / Stats / Settings); filter menu, add-image menu, bottom action-sheet confirmations follow iOS design conventions |
+| iOS | 18.0+ (iPhone / iPad) | Bottom TabBar (Library / Stats / Settings); three library view modes, filter menu, add-image menu, bottom action-sheet confirmations follow iOS design conventions |
 
 ## Requirements
 
@@ -66,8 +68,8 @@ Or open `GameLog.xcodeproj` in Xcode and Run the `GameLog` (macOS) or `GameLog-i
 
 The repository provides two Release IPAs under `dist/`, both unsigned — sign them yourself before installing:
 
-- `GameLog-beta-2.5.ipa` — simulator universal slice (x86_64 + arm64)
-- `GameLog-beta-2.5-device.ipa` — device arm64 slice (unsigned), suited for re-signing with eSign or similar tools
+- `GameLog-beta-2.6.ipa` — simulator universal slice (x86_64 + arm64)
+- `GameLog-beta-2.6-device.ipa` — device arm64 slice (unsigned), suited for re-signing with eSign or similar tools
 
 > Tip: for simulator or daily development debugging, just Run from Xcode — no IPA needed.
 
@@ -86,7 +88,7 @@ Note: importing replaces the current data.
 
 1. Register for free at [steamgriddb.com](https://www.steamgriddb.com) and get an API Key from your profile page.
 2. Open Settings → SteamGridDB → enter the Key. The key field supports show/hide, copy, and auto-validation on change (✓ valid / ✗ invalid).
-3. When creating / editing a game, tap "Search Cover…".
+3. When creating / editing a game, tap the search button for the image kind you want (portrait cover / landscape cover / hero background / logo).
 
 ## Project Structure
 
@@ -108,7 +110,7 @@ Scripts/                   # Standalone regression tests (not compiled into the 
 
 ## Development Verification
 
-`Scripts/` holds repeatable standalone regression tests (compiled with `xcrun swiftc`; the macro-plugin path is in each file's header comment):
+`Scripts/` holds repeatable standalone regression tests (compiled with the beta Xcode toolchain `swiftc`; the macro-plugin path is in each file's header comment):
 
 - `Scripts/ScoreMathSelftest/` — score logic self-test (rounding / means / library score)
 - `Scripts/DataSmokeTest/` — data-layer smoke tests: many-to-many, cascade delete, scoring integration, backup round-trip, import idempotence & replace, collection-archive migration & backup, date fidelity, preset localization

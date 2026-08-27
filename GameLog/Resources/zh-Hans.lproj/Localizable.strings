@@ -14,6 +14,8 @@
 "library.sort" = "排序";
 "library.gridView" = "网格视图";
 "library.listView" = "列表视图";
+"library.wideCardView" = "单列卡片";
+"library.viewMode" = "视图";
 "library.addGame" = "新建游戏";
 "library.share" = "分享";
 "library.noGames" = "还没有游戏，点击右上角「新建游戏」开始记录";

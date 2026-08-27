@@ -14,6 +14,8 @@
 "library.sort" = "Sort";
 "library.gridView" = "Grid View";
 "library.listView" = "List View";
+"library.wideCardView" = "Single Column";
+"library.viewMode" = "View";
 "library.addGame" = "Add Game";
 "library.share" = "Share";
 "library.noGames" = "No games yet. Click “Add Game” in the top-right to get started.";

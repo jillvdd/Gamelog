@@ -30,6 +30,12 @@ extension Game {
         return Self.cachedImage(forKey: data.hashValue, decode: { AppImage(data: $0) }, data: data)
     }
 
+    /// 横向封面（SteamGridDB 920×430 横版 grid）。iOS 详情页横幅与库横向卡共用。
+    var landscapeImage: AppImage? {
+        guard let data = landscapeData else { return nil }
+        return Self.cachedImage(forKey: data.hashValue, decode: { AppImage(data: $0) }, data: data)
+    }
+
     /// 共用解码路径：查缓存 → 未命中解码 → 回填。文件级私有缓存由「清除缓存」统一清空。
     private static func cachedImage(forKey key: Int, decode: (Data) -> AppImage?, data: Data) -> AppImage? {
         if let cached = coverImageCache.object(forKey: NSNumber(value: key)) {
@@ -284,6 +290,133 @@ struct GameRowView: View {
             }
         }
         .padding(.vertical, 4)
+    }
+}
+
+/// iOS 库「单列横向卡」视图（2026-08-27 用户定稿卡片化）：SwiftUI 卡片形态——玻璃材质圆角
+/// 卡底（.regularMaterial + 细描边 + 投影，明暗模式自适应），左侧横版封面满高贴边
+/// （有横向封面按卡高裁切铺满；无则竖版封面等高缩放居中，左右透出卡底材质；全无图放占位图标），
+/// 右侧信息列（名字+平台图标 / 发售/通关日期 / 右上角液态玻璃评分胶囊或状态胶囊，
+/// 与网格卡同一 glassCapsuleBadge 口径）。字段口径与网格卡同一套，只是重排成横向构图。
+struct GameWideCardView: View {
+    @Environment(\.appLanguageCode) private var language
+    let game: Game
+
+    private var clearDateText: String? {
+        game.latestCompletionDate.map {
+            L10n.tr("card.cleared", [GameCardView.cardDate($0, language: language)], lang: language)
+        }
+    }
+
+    private var releaseDateText: String? {
+        game.releaseDate.map {
+            L10n.tr("card.released", [GameCardView.cardDate($0, language: language)], lang: language)
+        }
+    }
+
+    var body: some View {
+        GeometryReader { geo in
+            // 图区按卡宽比例（≈46%）而非满高比例——满高 920:430 在 iPhone 上会把文字列
+            // 挤到截断（2026-08-27 首版教训）；46% 给文字列留足半幅。
+            let imageWidth = geo.size.width * 0.46
+            HStack(alignment: .top, spacing: 0) {
+                imageArea(width: imageWidth, height: geo.size.height)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(alignment: .top, spacing: 6) {
+                        Text(verbatim: game.displayName(for: language))
+                            .font(.system(size: 15, weight: .semibold))
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                        Spacer(minLength: 6)
+                        trailingBadge
+                            .layoutPriority(1)
+                    }
+                    GamePlatformIcons(platforms: game.platformList, maxCount: 5, iconSize: 13)
+                    Spacer(minLength: 0)
+                    VStack(alignment: .leading, spacing: 2) {
+                        if let releaseDateText {
+                            Text(verbatim: releaseDateText)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                        if let clearDateText {
+                            Text(verbatim: clearDateText)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .frame(height: cardHeight)
+        .background(.regularMaterial, in: Self.cardShape)
+        .overlay(Self.cardShape.strokeBorder(.quaternary, lineWidth: 0.5))
+        .clipShape(Self.cardShape)
+        .shadow(color: .black.opacity(0.14), radius: 6, x: 0, y: 2)
+    }
+
+    private static let cardShape = RoundedRectangle(cornerRadius: 14, style: .continuous)
+    /// 卡高：比初版 104 更高（用户定稿「封面尺寸更大一点」）。
+    private let cardHeight: CGFloat = 124
+
+    /// 左侧图区：优先横向封面满高裁切铺满；无横向封面用竖版封面等高缩放居中（左右透出卡底材质，
+    /// 不垫灰底）；全无图显示游戏手柄占位。frame 定尺寸在前、clipped 在后——scaledToFill 的图
+    /// 先被约束进给定宽高再裁掉溢出，否则图会按自然比例铺出 frame 压到右侧文字列。
+    @ViewBuilder
+    private func imageArea(width: CGFloat, height: CGFloat) -> some View {
+        Group {
+            if let image = game.landscapeImage {
+                Image(appImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else if let image = game.coverImage {
+                Image(appImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .padding(.horizontal, 10)
+            } else {
+                ZStack {
+                    Rectangle().fill(Color.semantic(.quaternarySystemFill))
+                    Image(systemName: "gamecontroller")
+                        .font(.system(size: 28))
+                        .foregroundStyle(.tertiary)
+                }
+            }
+        }
+        .frame(width: width, height: height)
+        .clipped()
+    }
+
+    /// 右上角徽章：已通关/长线 → 评分液态玻璃胶囊（网格卡同款：深色玻璃白字，未评分不占位）；
+    /// 轻量状态 → 品牌色染色玻璃胶囊。
+    @ViewBuilder
+    private var trailingBadge: some View {
+        if game.isCompletedOrLongRunning {
+            if let score = game.libraryScore {
+                Text(verbatim: GameCardView.formatScore(score))
+                    .font(.system(size: 12, weight: .bold))
+                    .monospacedDigit()
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 8)
+                    .frame(height: 22)
+                    .glassCapsuleBadge(tint: Color.black.opacity(0.30),
+                                       fallback: Color.black.opacity(0.72))
+            }
+        } else {
+            Text(verbatim: L10n.tr(game.statusValue.labelKey, lang: language))
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 8)
+                .frame(height: 22)
+                .glassCapsuleBadge(tint: game.statusValue.statusColor.opacity(0.55),
+                                   fallback: game.statusValue.statusColor.opacity(0.88))
+        }
     }
 }
 

@@ -173,7 +173,9 @@ struct SharePanelView: View {
             }
             #endif
         }
-        .preferredColorScheme(.dark)
+        // 面板跟随系统明暗（2026-08-27 用户定稿，原为强制深色——浅色系统下 iOS 弹出时
+        // 会闪一次暗色切换）。预览画布仍用固定品牌深底衬同样固定深色的分享卡，
+        // 卡片本体全是写死颜色（ShareTheme.brand），两种外观下渲染结果一致。
         .onAppear(perform: setup)
         .onChange(of: mode) { _, _ in scheduleRerender() }
         .onChange(of: selectedIDs) { _, _ in scheduleRerender() }

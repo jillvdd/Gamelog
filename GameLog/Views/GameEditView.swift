@@ -226,7 +226,7 @@ struct GameEditView: View {
     @State private var isAutoMatchingLogo = false
     // Logo 横幅展示三档调节（详情页背景图之上的位置/大小；仅 hasLogo 开时有意义）。
     @State private var logoSize: LogoBannerSize = .medium
-    @State private var logoVertical: LogoBannerVertical = .center
+    @State private var logoVertical: LogoBannerVertical = .bottom
     @State private var logoHorizontal: LogoBannerHorizontal = .leading
     // 各图像的搜索面板开关。
     @State private var showingLandscapeSearch = false
@@ -634,16 +634,16 @@ struct GameEditView: View {
             Text(verbatim: validationError ?? "")
         }
         .sheet(isPresented: $showingCoverSearch) {
-            CoverSearchSheet(kind: .poster, imageData: $coverData)
+            CoverSearchSheet(kind: .poster, imageData: $coverData, initialTerm: name)
         }
         .sheet(isPresented: $showingLandscapeSearch) {
-            CoverSearchSheet(kind: .landscape, imageData: $landscapeData)
+            CoverSearchSheet(kind: .landscape, imageData: $landscapeData, initialTerm: name)
         }
         .sheet(isPresented: $showingHeroSearch) {
-            CoverSearchSheet(kind: .hero, imageData: $heroData)
+            CoverSearchSheet(kind: .hero, imageData: $heroData, initialTerm: name)
         }
         .sheet(isPresented: $showingLogoSearch) {
-            CoverSearchSheet(kind: .logo, imageData: $logoData)
+            CoverSearchSheet(kind: .logo, imageData: $logoData, initialTerm: name)
         }
         #if !os(macOS)
         .imageSourcePicker(isPresented: $showingCoverPicker, onImages: { datas in

@@ -40,6 +40,8 @@ enum ArtworkKind: String, Identifiable {
 struct CoverSearchSheet: View {
     let kind: ArtworkKind
     @Binding var imageData: Data?
+    /// 打开时预填的搜索词（编辑页传当前游戏英文名，免手动重输）。
+    var initialTerm: String = ""
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appLanguageCode) private var language
     @AppStorage("steamGridDBKey") private var apiKey = ""
@@ -235,6 +237,13 @@ struct CoverSearchSheet: View {
                         .padding(.top, 4)
                     }
                 }
+            }
+        }
+        .onAppear {
+            // 打开面板时预填编辑页传来的游戏英文名（不覆盖用户已输入的内容），赋值即触发
+            // searchText onChange 的既有防抖自动搜索。
+            if searchText.isEmpty && !initialTerm.isEmpty {
+                searchText = initialTerm
             }
         }
     }

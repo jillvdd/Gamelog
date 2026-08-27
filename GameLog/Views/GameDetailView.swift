@@ -5,6 +5,34 @@ import SwiftData
 import AppKit
 #endif
 
+#if os(iOS)
+import NaturalLanguage
+#endif
+
+/// iOS 详情页大标题的词边界断行排版：NLTokenizer 按当前语言分词，词内字符间插入
+/// U+2060（WORD JOINER，Unicode 断行算法的禁断点）——换行只允许落在词边界，
+/// 修掉「死神的遺|言」「戰役|進化」这类 CJK 大标题无视词语的硬折行（用户定稿 2026-08-27）。
+/// 实现注记：NLTokenizer 的 token 是 Range<String.Index>，拼串时用 range 映射保词序与空白原样。
+#if os(iOS)
+func lineBreakAwareTitle(_ raw: String, language: String) -> String {
+    guard !raw.isEmpty else { return raw }
+    let tokenizer = NLTokenizer(unit: .word)
+    tokenizer.setLanguage(NLLanguage(language))
+    tokenizer.string = raw
+    var out = ""
+    var cursor = raw.startIndex
+    tokenizer.enumerateTokens(in: raw.startIndex..<raw.endIndex) { range, _ in
+        out += raw[cursor..<range.lowerBound]
+        let word = String(raw[range])
+        out += word.map { String($0) }.joined(separator: "\u{2060}")
+        cursor = range.upperBound
+        return true
+    }
+    out += raw[cursor...]
+    return out
+}
+#endif
+
 /// 一条通关记录的卡片（详情页内）。
 struct CompletionCardView: View {
     @Environment(\.appLanguageCode) private var language
@@ -443,74 +471,106 @@ struct GameDetailView: View {
                     .frame(maxWidth: .infinity, alignment: .top)
                 }
                 #else
-                VStack(alignment: .leading, spacing: 28) {
-                    header(width: geo.size.width)
-                    if collectorMode {
-                        detailTabPicker
+                // iOS 双分支（2026-08-27 grill 定稿）：设了横向封面 → 满宽横幅版式
+                // （横幅提 16pt 内边距层外：左右贴屏、顶贴导航栏下方）；没设 → 原竖排逐像素不变。
+                if game.landscapeImage != nil {
+                    VStack(alignment: .leading, spacing: 0) {
+                        landscapeBanner(width: geo.size.width)
+                        VStack(alignment: .leading, spacing: 28) {
+                            header(width: geo.size.width, hideCover: true)
+                            if collectorMode {
+                                detailTabPicker
+                            }
+                            if !collectorMode || detailTab == .details {
+                                detailsContent(width: geo.size.width)
+                            }
+                            if collectorMode && detailTab == .holdings {
+                                HoldingsView(game: game)
+                            }
+                        }
+                        .padding(.top, 12)
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 16)
                     }
-                    if !collectorMode || detailTab == .details {
-                        detailsContent(width: geo.size.width)
+                } else {
+                    VStack(alignment: .leading, spacing: 28) {
+                        header(width: geo.size.width)
+                        if collectorMode {
+                            detailTabPicker
+                        }
+                        if !collectorMode || detailTab == .details {
+                            detailsContent(width: geo.size.width)
+                        }
+                        if collectorMode && detailTab == .holdings {
+                            HoldingsView(game: game)
+                        }
                     }
-                    if collectorMode && detailTab == .holdings {
-                        HoldingsView(game: game)
-                    }
+                    .padding(16)
+                    .frame(maxWidth: 1500)
+                    .frame(maxWidth: .infinity, alignment: .top)
                 }
-                .padding(16)
-                .frame(maxWidth: 1500)
-                .frame(maxWidth: .infinity, alignment: .top)
                 #endif
             }
         }
+        #if os(macOS)
         .navigationTitle(hideToolbarGlass ? "" : game.displayName(for: language))
+        #else
+        // iOS：内容头部已有带平台图标的大名字，导航大标题置空并切 inline，
+        // 免得同一名字顶部出现两次（2026-08-27 用户反馈）；顶栏只留返回键与操作钮。
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
         .onAppear { detailStatus = game.statusValue }
         // 离开详情页时才把状态变更持久化到模型（§29.14 差异 A：避免点击即时写 SwiftData 触发整页重算卡顿）。
         .onDisappear { persistStatusIfChanged() }
         // 全屏毛玻璃下推 + 「隐藏上方毛玻璃」开关由全局 appToolbar() 统一处理。
         .appToolbar()
         .toolbar {
+            #if os(macOS)
             ToolbarItem {
+                // .help tooltip 是 §34.5 补的 macOS 悬停提示，iOS 无此诉求。
                 HStack(spacing: 0) {
-                    Button {
-                        showingShare = true
-                    } label: {
-                        Label(L10n.tr("library.share", lang: language), systemImage: "square.and.arrow.up")
-                            .labelStyle(.iconOnly)
-                            .font(.system(size: 15))
-                    }
-                    .toolbarSegmentStyle()
-                    .help(L10n.tr("library.share", lang: language))
-                    if detailStatus.isCompletedOrLongRunning {
-                        Button {
-                            showingAddCompletion = true
-                        } label: {
-                            Label(L10n.tr("completion.add", lang: language), systemImage: "plus")
-                                .labelStyle(.iconOnly)
-                            .font(.system(size: 15))
-                        }
+                    toolShareButton
                         .toolbarSegmentStyle()
-                        .help(L10n.tr("completion.add", lang: language))
+                        .help(L10n.tr("library.share", lang: language))
+                    if detailStatus.isCompletedOrLongRunning {
+                        toolAddCompletionButton
+                            .toolbarSegmentStyle()
+                            .help(L10n.tr("completion.add", lang: language))
                     }
-                    Button {
-                        showingEditGame = true
-                    } label: {
-                        Label(L10n.tr("common.edit", lang: language), systemImage: "pencil")
-                            .labelStyle(.iconOnly)
-                            .font(.system(size: 15))
-                    }
-                    .toolbarSegmentStyle()
-                    .help(L10n.tr("common.edit", lang: language))
-                    Button(role: .destructive) {
-                        showingDeleteGame = true
-                    } label: {
-                        Label(L10n.tr("common.delete", lang: language), systemImage: "trash")
-                            .labelStyle(.iconOnly)
-                            .font(.system(size: 15))
-                            .foregroundStyle(.red)
-                    }
-                    .toolbarSegmentStyle()
-                    .help(L10n.tr("common.delete", lang: language))
+                    toolEditButton
+                        .toolbarSegmentStyle()
+                        .help(L10n.tr("common.edit", lang: language))
+                    toolDeleteButton
+                        .toolbarSegmentStyle()
+                        .help(L10n.tr("common.delete", lang: language))
                 }
             }
+            #else
+            // iOS：四钮用相邻的独立 ToolbarItem——系统会把相邻条目融进同一条玻璃胶囊，
+            // 每钮保留自己的圆形分区与内部间距（与库主页右上角新建/更多两钮同款形态，
+            // 2026-08-27 用户指定）。之前单 ToolbarItem 塞一个 HStack 才会挤成无分区的长条。
+            // 旧系统（<26）无液态玻璃合并行为，回退单条分组 + 手动间距。
+            if #available(iOS 26.0, *) {
+                ToolbarItem { toolShareButton }
+                if detailStatus.isCompletedOrLongRunning {
+                    ToolbarItem { toolAddCompletionButton }
+                }
+                ToolbarItem { toolEditButton }
+                ToolbarItem { toolDeleteButton }
+            } else {
+                ToolbarItem {
+                    HStack(spacing: 12) {
+                        toolShareButton
+                        if detailStatus.isCompletedOrLongRunning {
+                            toolAddCompletionButton
+                        }
+                        toolEditButton
+                        toolDeleteButton
+                    }
+                }
+            }
+            #endif
         }
         .sheet(isPresented: $showingEditGame) {
             #if os(macOS)
@@ -575,13 +635,58 @@ struct GameDetailView: View {
         )
     }
 
+    // MARK: - 工具栏按钮
+
+    /// 顶部四钮（分享/加通关/编辑/删除）的 label 定义，macOS 分段长条与 iOS 独立圆钮共用。
+    /// 按钮本体不挂 .help——那是 macOS 专属修饰符，iOS 无需。
+    private var toolShareButton: some View {
+        Button {
+            showingShare = true
+        } label: {
+            Label(L10n.tr("library.share", lang: language), systemImage: "square.and.arrow.up")
+                .labelStyle(.iconOnly)
+                .font(.system(size: 15))
+        }
+    }
+
+    private var toolAddCompletionButton: some View {
+        Button {
+            showingAddCompletion = true
+        } label: {
+            Label(L10n.tr("completion.add", lang: language), systemImage: "plus")
+                .labelStyle(.iconOnly)
+            .font(.system(size: 15))
+        }
+    }
+
+    private var toolEditButton: some View {
+        Button {
+            showingEditGame = true
+        } label: {
+            Label(L10n.tr("common.edit", lang: language), systemImage: "pencil")
+                .labelStyle(.iconOnly)
+                .font(.system(size: 15))
+        }
+    }
+
+    private var toolDeleteButton: some View {
+        Button(role: .destructive) {
+            showingDeleteGame = true
+        } label: {
+            Label(L10n.tr("common.delete", lang: language), systemImage: "trash")
+                .labelStyle(.iconOnly)
+                .font(.system(size: 15))
+                .foregroundStyle(.red)
+        }
+    }
+
     // MARK: - 头部
 
     /// macOS 头部布局阈值：内容宽 ≥ 此值走「封面顶带 + 信息行 + 评分卡」新布局，低于回落单列。
     /// 窗口 minWidth 980 − 侧边栏最宽 320 − 页面 padding 56 ≈ 604，取 640 留余量。
     private static let wideHeaderThreshold: CGFloat = 640
 
-    private func header(width: CGFloat, hideCoverBand: Bool = false) -> some View {
+    private func header(width: CGFloat, hideCoverBand: Bool = false, hideCover: Bool = false) -> some View {
         Group {
             #if os(macOS)
             if width >= Self.wideHeaderThreshold {
@@ -598,12 +703,36 @@ struct GameDetailView: View {
                 }
             }
             #else
-            VStack(alignment: .leading, spacing: 16) {
-                coverBlock
+            if hideCover {
+                // iOS 横向封面横幅版式：横幅已在 body 层贴屏满宽，这里只出信息列。
                 infoBlock
+            } else {
+                VStack(alignment: .leading, spacing: 16) {
+                    coverBlock
+                    infoBlock
+                }
             }
             #endif
         }
+    }
+
+    /// iOS 横向封面横幅（2026-08-27 grill 定稿）：设了 landscapeData 时启用。
+    /// 宽度铺满屏幕、顶贴导航栏下方，高 = 屏宽 ÷ 图片宽高比；上限 260pt——超竖长图
+    /// 等比缩小居中留透明边，绝不裁切不拉伸。纯图无前景无圆角无描边（贴屏通栏）。
+    fileprivate func landscapeBanner(width: CGFloat) -> some View {
+        let capHeight: CGFloat = 260
+        let imageAspect = game.landscapeImage.map { $0.size.width / max($0.size.height, 1) } ?? (920.0 / 430.0)
+        let imageHeight = min(capHeight, width / max(imageAspect, 0.5))
+        return Group {
+            if let image = game.landscapeImage {
+                Image(appImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    // 超竖长图在框内等比缩小、默认居中留透明边（scaledToFit 行为即所需）。
+                    .frame(width: width, height: imageHeight)
+            }
+        }
+        .frame(width: width, height: imageHeight)
     }
     /// macOS 宽窗头部（2026-08-26 用户定稿）：封面单独在顶带（右移 48pt、左右全留白）；
     /// 名字/其他语言名/元数据行贴内容左缘；评分卡在名字块右侧、顶端与游戏名平齐；
@@ -833,27 +962,27 @@ struct GameDetailView: View {
     /// 信息块：主名/其他语言名/发售日/平台/分组/评分与条形图。
     private var infoBlock: some View {
         VStack(alignment: .leading, spacing: 10) {
+            // 大标题走词边界断行排版（iOS；U+2060 禁词内断行，见 lineBreakAwareTitle）。
+            #if os(iOS)
+            let titleText = lineBreakAwareTitle(game.displayName(for: language), language: language)
+            #else
+            let titleText = game.displayName(for: language)
+            #endif
             // 名字 + 平台图标：一行放得下就并排；放不下（尤其多平台+超宽字标）自动换行成两行，避免撑宽整页布局。
             // 图标行与名字中轴对齐（各平台放大系数不同，基线/底对齐会顶部参差，同宽窗 nameRow 口径）。
             ViewThatFits(in: .horizontal) {
                 HStack(alignment: .center, spacing: 6) {
-                    Text(verbatim: game.displayName(for: language))
+                    Text(verbatim: titleText)
                         .font(.system(size: 26, weight: .bold))
                     GamePlatformIcons(platforms: platforms, maxCount: 10, iconSize: 18)
                 }
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(verbatim: game.displayName(for: language))
+                    Text(verbatim: titleText)
                         .font(.system(size: 26, weight: .bold))
                     GamePlatformIcons(platforms: platforms, maxCount: 10, iconSize: 18)
                 }
             }
             LocalizedNamesSubtitle(game: game, currentLanguage: language)
-
-            // 状态机：自定义滑动条（offset 滑块），点击即切换本地选中态并即时动画。
-            // 模型写入延后到离开详情页（.onDisappear）才持久化，避免点击即同步写 SwiftData
-            // 触发整页 body 重算导致的滑块卡顿（§29.14 差异 A）。
-            // 图标 + 文字同显（含 iOS：只有图标用户会看不懂含义）。
-            DetailStatusPicker(status: $detailStatus)
 
             if !platforms.isEmpty {
                 Text(verbatim: platforms
@@ -903,6 +1032,12 @@ struct GameDetailView: View {
                 }
             }
             .padding(.top, 6)
+
+            // 状态机滑块：全局移到分数区下方（2026-08-27 用户定稿，双平台所有头部布局统一）。
+            // 自定义滑动条（offset 滑块），点击即切换本地选中态并即时动画；模型写入延后到
+            // 离开详情页（.onDisappear）才持久化，避免点击即同步写 SwiftData 触发整页 body
+            // 重算导致的滑块卡顿（§29.14 差异 A）。图标 + 文字同显。
+            DetailStatusPicker(status: $detailStatus)
         }
     }
 

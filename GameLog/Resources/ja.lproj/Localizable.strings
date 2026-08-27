@@ -14,6 +14,8 @@
 "library.sort" = "並び替え";
 "library.gridView" = "グリッド表示";
 "library.listView" = "リスト表示";
+"library.wideCardView" = "1列カード";
+"library.viewMode" = "表示";
 "library.addGame" = "ゲームを追加";
 "library.share" = "共有";
 "library.noGames" = "まだゲームがありません。右上の「ゲームを追加」から始めましょう";

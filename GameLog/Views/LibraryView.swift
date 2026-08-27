@@ -18,6 +18,25 @@ enum LibrarySort: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
+#if os(iOS)
+/// iOS 库视图三态：网格 / 单列横向卡 / 列表（macOS 不受影响，仍用 useGridView Bool）。
+enum IOSLibraryViewMode: String, CaseIterable, Identifiable {
+    case grid
+    case wideCard
+    case list
+
+    var id: String { rawValue }
+
+    var labelKey: String {
+        switch self {
+        case .grid: "library.gridView"
+        case .wideCard: "library.wideCardView"
+        case .list: "library.listView"
+        }
+    }
+}
+#endif
+
 /// 主界面：网格/列表切换、搜索、平台筛选、排序、分享、新建入口。
 struct LibraryView: View {
     @Environment(\.modelContext) private var context
@@ -31,6 +50,12 @@ struct LibraryView: View {
 
     @State private var searchText = ""
     @AppStorage("useGridView") private var useGridView = true
+    #if os(iOS)
+    // iOS 库视图三态（网格/单列横向卡/列表），与 macOS 的 Bool 键互不干扰。
+    // 旧值迁移：首次读取时无新键 → 按 useGridView 折算（onAppear 里 migratelibraryViewModeIfNeeded）。
+    @AppStorage(UserCustomization.iosLibraryViewModeKey) private var iosViewModeRaw = ""
+    @State private var didMigrateLibraryViewMode = false
+    #endif
     /// 分组视图内局部平台过滤（不持久化，切换分组即重置）。
     @State private var groupPlatformFilter = ""
     @AppStorage("librarySort") private var sortRaw = LibrarySort.recentEdit.rawValue
@@ -47,6 +72,14 @@ struct LibraryView: View {
     @State private var showingShare = false
 
     private var sortOption: LibrarySort { LibrarySort(rawValue: sortRaw) ?? .completionDate }
+
+    #if os(iOS)
+    /// 当前 iOS 视图模式（迁移未跑或值为空时兜底网格——onAppear 迁移会立即写上真实值）。
+    private var iosViewMode: IOSLibraryViewMode {
+        IOSLibraryViewMode(rawValue: iosViewModeRaw) ?? .grid
+    }
+    /// iOS 渲染分支判定：true = 网格；false = 横向卡或列表（由 iOS 渲染分支细化）。
+    #endif
 
     /// 分组模式下工具栏平台菜单的候选：本组内出现的平台（预设世代倒序 + 自定义排最后）。
     private var groupPlatforms: [String] {
@@ -153,10 +186,20 @@ struct LibraryView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 40)
-                } else if useGridView {
-                    gameGrid(visibleGames)
                 } else {
-                    gameList(visibleGames)
+                    #if os(iOS)
+                    switch iosViewMode {
+                    case .grid: gameGrid(visibleGames)
+                    case .wideCard: gameWideCards(visibleGames)
+                    case .list: gameList(visibleGames)
+                    }
+                    #else
+                    if useGridView {
+                        gameGrid(visibleGames)
+                    } else {
+                        gameList(visibleGames)
+                    }
+                    #endif
                 }
 
                 Divider()
@@ -190,6 +233,25 @@ struct LibraryView: View {
             }
         }
     }
+
+    #if os(iOS)
+    /// iOS 单列横向卡视图（间距 12 与网格一致）。
+    @ViewBuilder
+    private func gameWideCards(_ games: [Game]) -> some View {
+        LazyVStack(spacing: 12) {
+            ForEach(games) { game in
+                Button {
+                    selectedGame = game
+                } label: {
+                    GameWideCardView(game: game)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(PressFeedbackButtonStyle())
+                .contextMenu { cardMenu(for: game) }
+            }
+        }
+    }
+    #endif
 
     /// 排序菜单项（勾选态随 sortOption）。
     @ViewBuilder
@@ -352,6 +414,20 @@ struct LibraryView: View {
         .onChange(of: statusFilter) { _, _ in
             resetNavigationContext()
         }
+        #if os(iOS)
+        .onAppear {
+            // 旧键一次性迁移：无新键 → 按 useGridView（网格 true / 列表 false）折算三态值。
+            // 写入后旧键留着不动（无害；macOS 还在用）。
+            if !didMigrateLibraryViewMode {
+                didMigrateLibraryViewMode = true
+                if UserDefaults.standard.string(forKey: UserCustomization.iosLibraryViewModeKey) == nil {
+                    iosViewModeRaw = useGridView
+                        ? IOSLibraryViewMode.grid.rawValue
+                        : IOSLibraryViewMode.list.rawValue
+                }
+            }
+        }
+        #endif
         .sheet(isPresented: $showingNewGame) {
             #if os(macOS)
             GameEditView(game: nil)
@@ -415,17 +491,40 @@ struct LibraryView: View {
                 } description: {
                     LText("library.noResult")
                 }
-            } else if useGridView {
-                ScrollView {
-                    gameGrid(visibleGames)
-                        .padding()
-                }
             } else {
-                List {
-                    ForEach(visibleGames) { game in
-                        gameRow(game)
+                #if os(iOS)
+                switch iosViewMode {
+                case .grid:
+                    ScrollView {
+                        gameGrid(visibleGames)
+                            .padding()
+                    }
+                case .wideCard:
+                    ScrollView {
+                        gameWideCards(visibleGames)
+                            .padding()
+                    }
+                case .list:
+                    List {
+                        ForEach(visibleGames) { game in
+                            gameRow(game)
+                        }
                     }
                 }
+                #else
+                if useGridView {
+                    ScrollView {
+                        gameGrid(visibleGames)
+                            .padding()
+                    }
+                } else {
+                    List {
+                        ForEach(visibleGames) { game in
+                            gameRow(game)
+                        }
+                    }
+                }
+                #endif
             }
         }
         #if os(macOS)
@@ -601,6 +700,23 @@ struct LibraryView: View {
                         }
                     }
                     Divider()
+                    #if os(iOS)
+                    // 视图三选一（网格 / 单列横向卡 / 列表），勾选态随当前模式。
+                    Picker(selection: Binding(
+                        get: { iosViewMode },
+                        set: { iosViewModeRaw = $0.rawValue }
+                    )) {
+                        ForEach(IOSLibraryViewMode.allCases) { m in
+                            Label(
+                                L10n.tr(m.labelKey, lang: language),
+                                systemImage: m == .grid ? "square.grid.2x2" : (m == .wideCard ? "rectangle.ratio.16.to.9" : "list.bullet")
+                            )
+                            .tag(m)
+                        }
+                    } label: {
+                        Label(L10n.tr("library.viewMode", lang: language), systemImage: "rectangle.grid.1x2")
+                    }
+                    #else
                     Button {
                         useGridView.toggle()
                     } label: {
@@ -609,6 +725,7 @@ struct LibraryView: View {
                             systemImage: useGridView ? "list.bullet" : "square.grid.2x2"
                         )
                     }
+                    #endif
                     Button {
                         showingShare = true
                     } label: {
