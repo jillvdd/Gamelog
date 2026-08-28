@@ -293,66 +293,82 @@ struct GameRowView: View {
     }
 }
 
-/// iOS 库「单列横向卡」视图（2026-08-27 用户定稿卡片化）：SwiftUI 卡片形态——玻璃材质圆角
-/// 卡底（.regularMaterial + 细描边 + 投影，明暗模式自适应），左侧横版封面满高贴边
-/// （有横向封面按卡高裁切铺满；无则竖版封面等高缩放居中，左右透出卡底材质；全无图放占位图标），
-/// 右侧信息列（名字+平台图标 / 发售/通关日期 / 右上角液态玻璃评分胶囊或状态胶囊，
-/// 与网格卡同一 glassCapsuleBadge 口径）。字段口径与网格卡同一套，只是重排成横向构图。
+/// iOS 库「单列横向卡」视图（2026-08-27 第三稿定稿）：SwiftUI 卡片形态——玻璃材质圆角卡底
+/// （.regularMaterial + 细描边 + 投影，明暗模式自适应）。左列 = 封面区**顶贴卡顶无上边**、
+/// 填满名字区以外的剩余高度（横图完整展示零裁切、竖图等高居中透卡底），封面正下方固定
+/// 两行名字区（词边界断行，同详情页 lineBreakAwareTitle 口径）+ 平台图标行；右列 = 元数据
+/// 面板（发售日期 / 厂商·发行商 / 游戏类型，裸值不带前缀，缺项跳过）+ 底部通关日期 +
+/// 右上角液态玻璃评分/状态胶囊（与网格卡同一 glassCapsuleBadge）。
 struct GameWideCardView: View {
     @Environment(\.appLanguageCode) private var language
     let game: Game
 
     private var clearDateText: String? {
-        game.latestCompletionDate.map {
-            L10n.tr("card.cleared", [GameCardView.cardDate($0, language: language)], lang: language)
-        }
+        game.latestCompletionDate.map { GameCardView.cardDate($0, language: language) }
     }
 
     private var releaseDateText: String? {
-        game.releaseDate.map {
-            L10n.tr("card.released", [GameCardView.cardDate($0, language: language)], lang: language)
-        }
+        game.releaseDate.map { GameCardView.cardDate($0, language: language) }
+    }
+
+    private var genreText: String? {
+        let genre = game.genre?.trimmingCharacters(in: .whitespaces) ?? ""
+        return genre.isEmpty ? nil : genre
+    }
+
+    /// 卡内标题：套详情页同款词边界断行（U+2060 禁词内断行；iOS 专属函数，macOS 原样）。
+    private var titleText: String {
+        #if os(iOS)
+        lineBreakAwareTitle(game.displayName(for: language), language: language)
+        #else
+        game.displayName(for: language)
+        #endif
     }
 
     var body: some View {
         GeometryReader { geo in
-            // 图区按卡宽 50%（2026-08-27 用户反馈「裁切太严重」后定稿）：横图改 scaledToFit
-            // 完整展示零裁切，上下少量卡底材质透出（与竖图回落「透明留边」同一口径）；
-            // 50% 保文字列两行完整（56% 会把长名挤截断）。
-            let imageWidth = geo.size.width * 0.50
+            let columnWidth = geo.size.width * 0.55
             HStack(alignment: .top, spacing: 0) {
-                imageArea(width: imageWidth, height: geo.size.height)
+                // 左列：封面顶贴卡顶（无上边）+ 底部固定高度名字区。
+                VStack(alignment: .leading, spacing: 0) {
+                    imageArea
+                        .frame(width: columnWidth, height: geo.size.height - nameAreaHeight)
 
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(alignment: .top, spacing: 6) {
-                        Text(verbatim: game.displayName(for: language))
+                    VStack(alignment: .leading, spacing: 3) {
+                        // 固定两行预留（36pt）：1 行名留白、2 行名刚好——避免高度提案不足
+                        // 被压成单行截断（第二稿实测教训）；长名在词边界处截断省略。
+                        Text(verbatim: titleText)
                             .font(.system(size: 14, weight: .semibold))
-                            .lineLimit(3)
+                            .lineLimit(2)
                             .multilineTextAlignment(.leading)
-                        Spacer(minLength: 6)
+                            .frame(height: 36, alignment: .topLeading)
+                        GamePlatformIcons(platforms: game.platformList, maxCount: 5, iconSize: 12)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.top, 8)
+                    .frame(width: columnWidth, height: nameAreaHeight, alignment: .topLeading)
+                }
+
+                // 右列：元数据面板（微衬底区分）+ 底部通关日期 + 右上角评分/状态胶囊。
+                VStack(alignment: .leading, spacing: 0) {
+                    HStack(alignment: .top) {
+                        metaBlock
+                        Spacer(minLength: 8)
                         trailingBadge
                             .layoutPriority(1)
                     }
-                    GamePlatformIcons(platforms: game.platformList, maxCount: 5, iconSize: 13)
                     Spacer(minLength: 0)
-                    VStack(alignment: .leading, spacing: 2) {
-                        if let releaseDateText {
-                            Text(verbatim: releaseDateText)
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                        }
-                        if let clearDateText {
-                            Text(verbatim: clearDateText)
-                                .font(.caption2)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                        }
+                    if let clearDateText {
+                        Text(verbatim: clearDateText)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
                     }
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                .background(Color.semantic(.quaternarySystemFill).opacity(0.45))
             }
         }
         .frame(height: cardHeight)
@@ -363,14 +379,66 @@ struct GameWideCardView: View {
     }
 
     private static let cardShape = RoundedRectangle(cornerRadius: 14, style: .continuous)
-    /// 卡高：比初版 104 更高（用户定稿「封面尺寸更大一点」）。
-    private let cardHeight: CGFloat = 124
+    private let cardHeight: CGFloat = 190
+    /// 名字区固定预留：8 顶 + 两行 36 + 3 间距 + 图标 15 ≈ 72（封面高 = 卡高 − 72）。
+    private let nameAreaHeight: CGFloat = 72
 
-    /// 左侧图区：横向封面等比缩放完整展示（contain 零裁切，上下少量卡底透出——用户定稿
-    /// 「裁切太严重」修正）；无横向封面用竖版封面等高缩放居中（左右透出卡底材质，不垫灰底）；
-    /// 全无图显示游戏手柄占位。frame 定尺寸在 clip 之前，防止图铺出图区。
+    /// 右列元数据块（2026-08-27 用户追加定稿）：每项 = 小标题（game.releaseDate/developer/
+    /// publisher/genre，三语现成 key）+ 值；厂商与发行商**分两行**。各缺项整组跳过。
     @ViewBuilder
-    private func imageArea(width: CGFloat, height: CGFloat) -> some View {
+    private var metaBlock: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            if let releaseDateText {
+                metaItem(titleKey: "game.releaseDate", value: releaseDateText, valueLimit: 1)
+            }
+            if let developerText {
+                metaItem(titleKey: "game.developer", value: developerText, valueLimit: 2)
+            }
+            if let publisherText {
+                metaItem(titleKey: "game.publisher", value: publisherText, valueLimit: 2)
+            }
+            if let genreText {
+                metaItem(titleKey: "game.genre", value: genreText, valueLimit: 1)
+            }
+        }
+    }
+
+    private var developerText: String? {
+        let s = game.developer?.trimmingCharacters(in: .whitespaces) ?? ""
+        return s.isEmpty ? nil : s
+    }
+
+    private var publisherText: String? {
+        let s = game.publisher?.trimmingCharacters(in: .whitespaces) ?? ""
+        return s.isEmpty ? nil : s
+    }
+
+    /// 一条元数据：9pt 次要色标题 + 12pt 值（长值在词边界处截断省略）。
+    @ViewBuilder
+    private func metaItem(titleKey: String, value: String, valueLimit: Int) -> some View {
+        #if os(iOS)
+        let valueText = lineBreakAwareTitle(value, language: language)
+        #else
+        let valueText = value
+        #endif
+        return VStack(alignment: .leading, spacing: 1) {
+            Text(verbatim: L10n.tr(titleKey, lang: language))
+                .font(.system(size: 9, weight: .medium))
+                .foregroundStyle(.tertiary)
+                .textCase(.uppercase)
+            Text(verbatim: valueText)
+                .font(.system(size: 12))
+                .foregroundStyle(.secondary)
+                .lineLimit(valueLimit)
+                .multilineTextAlignment(.leading)
+        }
+    }
+
+    /// 封面区（顶贴卡顶无上边）：横向封面等比缩放完整展示（contain 零裁切，上下少量卡底
+    /// 透出）；无横向封面用竖版封面等高缩放居中（左右透出卡底材质，不垫灰底）；全无图
+    /// 手柄占位。frame 定尺寸在前、clipped 在后，防图铺出图区。
+    @ViewBuilder
+    private var imageArea: some View {
         Group {
             if let image = game.landscapeImage {
                 Image(appImage: image)
@@ -390,7 +458,6 @@ struct GameWideCardView: View {
                 }
             }
         }
-        .frame(width: width, height: height)
         .clipped()
     }
 
