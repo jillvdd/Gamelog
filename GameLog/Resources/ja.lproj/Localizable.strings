@@ -78,6 +78,7 @@
 "dimension.performance" = "パフォーマンス";
 "score.average" = "平均スコア";
 "score.unrated" = "未評価";
+"card.clearedDate" = "クリア日";
 "card.cleared" = "クリア %@";
 "card.released" = "発売 %@";
 "common.save" = "保存";

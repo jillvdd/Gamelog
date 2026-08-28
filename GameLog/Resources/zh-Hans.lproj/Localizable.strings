@@ -78,6 +78,7 @@
 "dimension.performance" = "性能";
 "score.average" = "平均分";
 "score.unrated" = "未评分";
+"card.clearedDate" = "通关日期";
 "card.cleared" = "通关日期 %@";
 "card.released" = "发售日期 %@";
 "common.save" = "保存";

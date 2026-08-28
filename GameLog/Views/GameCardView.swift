@@ -303,7 +303,7 @@ struct GameWideCardView: View {
     @Environment(\.appLanguageCode) private var language
     let game: Game
 
-    private var clearDateText: String? {
+    private var clearDateValue: String? {
         game.latestCompletionDate.map { GameCardView.cardDate($0, language: language) }
     }
 
@@ -349,7 +349,7 @@ struct GameWideCardView: View {
                     .frame(width: columnWidth, height: nameAreaHeight, alignment: .topLeading)
                 }
 
-                // 右列：元数据面板（微衬底区分）+ 底部通关日期 + 右上角评分/状态胶囊。
+                // 右列：元数据面板（含通关日期，同带标题；微衬底区分）+ 右上角评分/状态胶囊。
                 VStack(alignment: .leading, spacing: 0) {
                     HStack(alignment: .top) {
                         metaBlock
@@ -357,17 +357,10 @@ struct GameWideCardView: View {
                         trailingBadge
                             .layoutPriority(1)
                     }
-                    Spacer(minLength: 0)
-                    if let clearDateText {
-                        Text(verbatim: clearDateText)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
                 }
                 .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .background(Color.semantic(.quaternarySystemFill).opacity(0.45))
             }
         }
@@ -379,17 +372,20 @@ struct GameWideCardView: View {
     }
 
     private static let cardShape = RoundedRectangle(cornerRadius: 14, style: .continuous)
-    private let cardHeight: CGFloat = 190
-    /// 名字区固定预留：8 顶 + 两行 36 + 3 间距 + 图标 15 ≈ 72（封面高 = 卡高 − 72）。
-    private let nameAreaHeight: CGFloat = 72
+    private let cardHeight: CGFloat = 170
+    /// 名字区固定预留：8 顶 + 两行 36 + 3 间距 + 图标 15 ≈ 64（封面高 = 卡高 − 64）。
+    private let nameAreaHeight: CGFloat = 64
 
     /// 右列元数据块（2026-08-27 用户追加定稿）：每项 = 小标题（game.releaseDate/developer/
     /// publisher/genre，三语现成 key）+ 值；厂商与发行商**分两行**。各缺项整组跳过。
     @ViewBuilder
     private var metaBlock: some View {
-        VStack(alignment: .leading, spacing: 5) {
+        VStack(alignment: .leading, spacing: 3) {
             if let releaseDateText {
                 metaItem(titleKey: "game.releaseDate", value: releaseDateText, valueLimit: 1)
+            }
+            if let clearDateValue {
+                metaItem(titleKey: "card.clearedDate", value: clearDateValue, valueLimit: 1)
             }
             if let developerText {
                 metaItem(titleKey: "game.developer", value: developerText, valueLimit: 2)
@@ -413,7 +409,7 @@ struct GameWideCardView: View {
         return s.isEmpty ? nil : s
     }
 
-    /// 一条元数据：9pt 次要色标题 + 12pt 值（长值在词边界处截断省略）。
+    /// 一条元数据：8pt 次要色标题 + 12pt 紧凑值（长值在词边界处截断省略）。
     @ViewBuilder
     private func metaItem(titleKey: String, value: String, valueLimit: Int) -> some View {
         #if os(iOS)
@@ -421,9 +417,9 @@ struct GameWideCardView: View {
         #else
         let valueText = value
         #endif
-        return VStack(alignment: .leading, spacing: 1) {
+        return VStack(alignment: .leading, spacing: 0) {
             Text(verbatim: L10n.tr(titleKey, lang: language))
-                .font(.system(size: 9, weight: .medium))
+                .font(.system(size: 8, weight: .medium))
                 .foregroundStyle(.tertiary)
                 .textCase(.uppercase)
             Text(verbatim: valueText)

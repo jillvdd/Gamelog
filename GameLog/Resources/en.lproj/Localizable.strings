@@ -78,6 +78,7 @@
 "dimension.performance" = "Performance";
 "score.average" = "Average Score";
 "score.unrated" = "Unrated";
+"card.clearedDate" = "Cleared";
 "card.cleared" = "Cleared %@";
 "card.released" = "Released %@";
 "common.save" = "Save";
