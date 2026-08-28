@@ -34,7 +34,8 @@ struct GameDTO: Codable {
     var publisher: String?
     var genre: String?
     var coverBase64: String?
-    /// 横向封面/背景图/Logo（旧版备份缺字段 → nil，导入保持现状）。
+    /// 1:1 方形封面/横向封面/背景图/Logo（旧版备份缺字段 → nil，导入保持现状）。
+    var squareBase64: String?
     var landscapeBase64: String?
     var heroBase64: String?
     var logoBase64: String?
@@ -112,6 +113,7 @@ enum BackupManager {
                     publisher: game.publisher,
                     genre: game.genre,
                     coverBase64: game.coverData?.base64EncodedString(),
+                    squareBase64: game.squareData?.base64EncodedString(),
                     landscapeBase64: game.landscapeData?.base64EncodedString(),
                     heroBase64: game.heroData?.base64EncodedString(),
                     logoBase64: game.logoData?.base64EncodedString(),
@@ -233,6 +235,7 @@ enum BackupManager {
                 publisher: gameDTO.publisher,
                 genre: gameDTO.genre,
                 coverData: gameDTO.coverBase64.flatMap { Data(base64Encoded: $0) },
+                squareData: gameDTO.squareBase64.flatMap { Data(base64Encoded: $0) },
                 landscapeData: gameDTO.landscapeBase64.flatMap { Data(base64Encoded: $0) },
                 heroData: gameDTO.heroBase64.flatMap { Data(base64Encoded: $0) },
                 logoData: gameDTO.logoBase64.flatMap { Data(base64Encoded: $0) },

@@ -141,7 +141,7 @@
 "settings.removeAvatar" = "アバターを削除";
 "settings.restoreIcon" = "デフォルトアイコンに戻す";
 "settings.autoMatchCover" = "カバーを自動取得";
-"settings.autoMatchCoverHint" = "ゲーム名を入力すると SteamGridDB を検索し、最初に見つかったカバーを自動設定します。スイッチを開いていて未設定の横カバー／背景画像／ロゴも一緒に設定されます（下で API Key の設定が必要です）。";
+"settings.autoMatchCoverHint" = "ゲーム名を入力すると SteamGridDB を検索し、最初に見つかったカバーを自動設定します。スイッチを開いていて未設定のスクエアカバー（1:1）／横カバー／背景画像／ロゴも一緒に設定されます（下で API Key の設定が必要です）。";
 "settings.hideToolbarGlass" = "上部ツールバーの背景を隠す";
 "settings.hideToolbarGlassHint" = "すべてのページ（ライブラリ / 詳細 / 統計）の上部ツールバーにあるすりガラスの背景を隠し、すっきりした表示にします。（macOS 15 以降）";
 "settings.collectorMode" = "コレクターモード";
@@ -233,6 +233,7 @@
 "cover.loadMore" = "さらに読み込む";
 "cover.title" = "カバーを検索";
 "cover.close" = "閉じる";
+"game.square" = "スクエアカバー（1:1）";
 "game.landscape" = "横カバー";
 "game.hero" = "背景画像";
 "game.logo" = "ロゴ";
@@ -248,9 +249,11 @@
 "logo.horizontal.leading" = "左";
 "logo.horizontal.center" = "中央";
 "logo.horizontal.trailing" = "右";
+"cover.titleSquare" = "スクエアカバーを検索（1:1）";
 "cover.titleLandscape" = "横カバーを検索";
 "cover.titleHero" = "背景画像を検索";
 "cover.titleLogo" = "ロゴを検索";
+"cover.noSquare" = "このゲームのスクエアカバー（1:1）が見つかりません";
 "cover.noLandscape" = "このゲームの横カバーが見つかりません";
 "cover.noHero" = "このゲームの背景画像が見つかりません";
 "cover.noLogo" = "このゲームのロゴが見つかりません";

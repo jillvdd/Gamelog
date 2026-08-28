@@ -92,6 +92,8 @@ final class Game {
     /// 游戏类型（如 RPG / AVG，可选，自由文本）。
     var genre: String?
     var coverData: Data?
+    /// 1:1 方形封面（SteamGridDB 方形 grid；可选）。iOS 单列卡大图主格式。
+    var squareData: Data?
     /// 横向封面（SteamGridDB 920×430 横版 grid；可选）。展示位置待设计，先只做录入与存储。
     var landscapeData: Data?
     /// 背景图（SteamGridDB heroes 宽幅横图；可选）。展示位置待设计。
@@ -124,7 +126,7 @@ final class Game {
     init(name: String, nameZh: String? = nil, nameJa: String? = nil,
          aliases: [String] = [], platform: String = "", releaseDate: Date? = nil,
          developer: String? = nil, publisher: String? = nil, genre: String? = nil,
-         coverData: Data? = nil, landscapeData: Data? = nil, heroData: Data? = nil,
+         coverData: Data? = nil, squareData: Data? = nil, landscapeData: Data? = nil, heroData: Data? = nil,
          logoData: Data? = nil, logoSize: LogoBannerSize = .medium,
          logoVertical: LogoBannerVertical = .bottom, logoHorizontal: LogoBannerHorizontal = .leading,
          reviewTitle: String = "", reviewBody: String = "",
@@ -139,6 +141,7 @@ final class Game {
         self.publisher = publisher
         self.genre = genre
         self.coverData = coverData
+        self.squareData = squareData
         self.landscapeData = landscapeData
         self.heroData = heroData
         self.logoData = logoData

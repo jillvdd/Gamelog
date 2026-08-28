@@ -104,6 +104,7 @@ let exportGame = Game(name: "异度神剑3", aliases: ["XB3", "ゼノブレイ�
                       releaseDate: Date(timeIntervalSince1970: 1_650_000_000),
                       developer: "Monolith Soft", publisher: "Nintendo", genre: "JRPG",
                       coverData: "COVER_BASE64_MARKER".data(using: .utf8),
+                      squareData: "SQUARE_BASE64_MARKER".data(using: .utf8),
                       logoSize: .large, logoVertical: .bottom, logoHorizontal: .center,
                       reviewTitle: "RPG 天花板", reviewBody: "系统深度惊人")
 context.insert(exportGame)
@@ -144,6 +145,7 @@ check("发售日期保真", ig.releaseDate == originalRelease)
 check("厂商/发行商/类型备份往返", ig.developer == "Monolith Soft" && ig.publisher == "Nintendo" && ig.genre == "JRPG")
 check("Logo 三档备份往返", ig.logoSizeValue == .large && ig.logoVerticalValue == .bottom && ig.logoHorizontalValue == .center)
 check("封面 base64 往返", ig.coverData == "COVER_BASE64_MARKER".data(using: .utf8))
+check("1:1 封面 base64 往返", ig.squareData == "SQUARE_BASE64_MARKER".data(using: .utf8))
 check("评价标题往返", ig.reviewTitle == "RPG 天花板")
 check("评价正文往返", ig.reviewBody == "系统深度惊人")
 check("分组映射往返", ig.groups.map(\.name) == ["JRPG"])

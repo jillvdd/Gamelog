@@ -213,7 +213,9 @@ struct GameEditView: View {
     @State private var publisher = ""
     @State private var genre = ""
     @State private var coverData: Data?
-    // 三类附加图（可选，展示位置待设计，先只做录入与存储）：开关关 = 不使用该图（保存时清空）。
+    // 1:1 方形封面 + 三类附加图（可选，展示位置待设计，先只做录入与存储）：开关关 = 不使用该图（保存时清空）。
+    @State private var hasSquare = false
+    @State private var squareData: Data?
     @State private var hasLandscape = false
     @State private var landscapeData: Data?
     @State private var hasHero = false
@@ -221,6 +223,7 @@ struct GameEditView: View {
     @State private var hasLogo = false
     @State private var logoData: Data?
     // 附加图自动匹配进行中（各图独立 spinner；开关触发与改名触发共用）。
+    @State private var isAutoMatchingSquare = false
     @State private var isAutoMatchingLandscape = false
     @State private var isAutoMatchingHero = false
     @State private var isAutoMatchingLogo = false
@@ -229,11 +232,13 @@ struct GameEditView: View {
     @State private var logoVertical: LogoBannerVertical = .bottom
     @State private var logoHorizontal: LogoBannerHorizontal = .leading
     // 各图像的搜索面板开关。
+    @State private var showingSquareSearch = false
     @State private var showingLandscapeSearch = false
     // 照片图库选择器开关（macOS 走 photoLibraryPicker；iOS 走 imageSourcePicker 的相册分支）。
     @State private var showingLandscapePicker = false
     @State private var showingHeroPicker = false
     @State private var showingLogoPicker = false
+    @State private var showingSquarePicker = false
     @State private var showingHeroSearch = false
     @State private var showingLogoSearch = false
     @State private var reviewTitle = ""
@@ -419,7 +424,32 @@ struct GameEditView: View {
                     onDelete: { coverData = nil }
                 )
 
-                // 三类附加图像：各自开关，默认关；开 = 展开预览与录入按钮。
+                // 1:1 方形封面 + 三类附加图像：各自开关，默认关；开 = 展开预览与录入按钮。
+                Toggle(L10n.tr("game.square", lang: language), isOn: $hasSquare)
+                    .task(id: hasSquare) {
+                        await autoMatchOnToggle(kind: .square, enabled: hasSquare,
+                                                isSet: { squareData != nil },
+                                                assign: { squareData = $0 }, active: $isAutoMatchingSquare)
+                    }
+                if hasSquare {
+                    ArtworkRow(
+                        titleKey: "game.square",
+                        data: squareData,
+                        aspect: 1.0,
+                        thumbWidth: 96,
+                        isAutoMatching: isAutoMatchingSquare,
+                        onPick: {
+                            #if os(macOS)
+                            pickImageFromPanel { squareData = $0 }
+                            #else
+                            showingSquarePicker = true
+                            #endif
+                        },
+                        onPickFromLibrary: { showingSquarePicker = true },
+                        onSearch: { showingSquareSearch = true },
+                        onDelete: { squareData = nil }
+                    )
+                }
                 Toggle(L10n.tr("game.landscape", lang: language), isOn: $hasLandscape)
                     .task(id: hasLandscape) {
                         await autoMatchOnToggle(kind: .landscape, enabled: hasLandscape,
@@ -636,6 +666,9 @@ struct GameEditView: View {
         .sheet(isPresented: $showingCoverSearch) {
             CoverSearchSheet(kind: .poster, imageData: $coverData, initialTerm: name)
         }
+        .sheet(isPresented: $showingSquareSearch) {
+            CoverSearchSheet(kind: .square, imageData: $squareData, initialTerm: name)
+        }
         .sheet(isPresented: $showingLandscapeSearch) {
             CoverSearchSheet(kind: .landscape, imageData: $landscapeData, initialTerm: name)
         }
@@ -649,6 +682,11 @@ struct GameEditView: View {
         .imageSourcePicker(isPresented: $showingCoverPicker, onImages: { datas in
             if let data = datas.first {
                 coverData = data
+            }
+        })
+        .imageSourcePicker(isPresented: $showingSquarePicker, onImages: { datas in
+            if let data = datas.first {
+                squareData = data
             }
         })
         .imageSourcePicker(isPresented: $showingLandscapePicker, onImages: { datas in
@@ -672,6 +710,11 @@ struct GameEditView: View {
         .photoLibraryPicker(isPresented: $showingCoverPicker, onImages: { datas in
             if let data = datas.first {
                 coverData = data
+            }
+        })
+        .photoLibraryPicker(isPresented: $showingSquarePicker, onImages: { datas in
+            if let data = datas.first {
+                squareData = data
             }
         })
         .photoLibraryPicker(isPresented: $showingLandscapePicker, onImages: { datas in
@@ -720,9 +763,11 @@ struct GameEditView: View {
         publisher = game.publisher ?? ""
         genre = game.genre ?? ""
         coverData = game.coverData
+        squareData = game.squareData
         landscapeData = game.landscapeData
         heroData = game.heroData
         logoData = game.logoData
+        hasSquare = game.squareData != nil
         hasLandscape = game.landscapeData != nil
         hasHero = game.heroData != nil
         hasLogo = game.logoData != nil
@@ -785,6 +830,8 @@ struct GameEditView: View {
             }
         }
         // 三类附加图：开关开着且未设置的跟随改名一起匹配（防抖/静默降级与封面同款）。
+        await autoFillArtwork(kind: .square, term: term, enabled: hasSquare,
+                              isSet: { squareData != nil }, assign: { squareData = $0 }, active: $isAutoMatchingSquare)
         await autoFillArtwork(kind: .landscape, term: term, enabled: hasLandscape,
                               isSet: { landscapeData != nil }, assign: { landscapeData = $0 }, active: $isAutoMatchingLandscape)
         await autoFillArtwork(kind: .hero, term: term, enabled: hasHero,
@@ -869,6 +916,7 @@ struct GameEditView: View {
                 publisher: publisher.trimmingCharacters(in: .whitespaces).isEmpty ? nil : publisher.trimmingCharacters(in: .whitespaces),
                 genre: genre.trimmingCharacters(in: .whitespaces).isEmpty ? nil : genre.trimmingCharacters(in: .whitespaces),
                 coverData: coverData,
+                squareData: hasSquare ? squareData : nil,
                 landscapeData: hasLandscape ? landscapeData : nil,
                 heroData: hasHero ? heroData : nil,
                 logoData: hasLogo ? logoData : nil,
@@ -941,6 +989,7 @@ struct GameEditView: View {
             game.publisher = publisher.trimmingCharacters(in: .whitespaces).isEmpty ? nil : publisher.trimmingCharacters(in: .whitespaces)
             game.genre = genre.trimmingCharacters(in: .whitespaces).isEmpty ? nil : genre.trimmingCharacters(in: .whitespaces)
             game.coverData = coverData
+            game.squareData = hasSquare ? squareData : nil
             game.landscapeData = hasLandscape ? landscapeData : nil
             game.heroData = hasHero ? heroData : nil
             game.logoData = hasLogo ? logoData : nil
@@ -973,9 +1022,10 @@ struct ArtworkRow: View {
     let onSearch: () -> Void
     let onDelete: () -> Void
 
-    /// 搜索按钮文案按图类区分（复用搜索面板标题 key：搜索封面/搜索横向封面/搜索背景图/搜索 Logo）。
+    /// 搜索按钮文案按图类区分（复用搜索面板标题 key：搜索封面/搜索 1:1 封面/搜索横向封面/搜索背景图/搜索 Logo）。
     private var searchCoverTitleKey: String {
         switch titleKey {
+        case "game.square": return "cover.titleSquare"
         case "game.landscape": return "cover.titleLandscape"
         case "game.hero": return "cover.titleHero"
         case "game.logo": return "cover.titleLogo"

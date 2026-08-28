@@ -30,6 +30,12 @@ extension Game {
         return Self.cachedImage(forKey: data.hashValue, decode: { AppImage(data: $0) }, data: data)
     }
 
+    /// 1:1 方形封面（SteamGridDB 方形 grid）。iOS 单列卡大图主格式。
+    var squareImage: AppImage? {
+        guard let data = squareData else { return nil }
+        return Self.cachedImage(forKey: data.hashValue, decode: { AppImage(data: $0) }, data: data)
+    }
+
     /// 横向封面（SteamGridDB 920×430 横版 grid）。iOS 详情页横幅与库横向卡共用。
     var landscapeImage: AppImage? {
         guard let data = landscapeData else { return nil }
@@ -293,12 +299,12 @@ struct GameRowView: View {
     }
 }
 
-/// iOS 库「单列横向卡」视图（2026-08-27 第三稿定稿）：SwiftUI 卡片形态——玻璃材质圆角卡底
-/// （.regularMaterial + 细描边 + 投影，明暗模式自适应）。左列 = 封面区**顶贴卡顶无上边**、
-/// 填满名字区以外的剩余高度（横图完整展示零裁切、竖图等高居中透卡底），封面正下方固定
-/// 两行名字区（词边界断行，同详情页 lineBreakAwareTitle 口径）+ 平台图标行；右列 = 元数据
-/// 面板（发售日期 / 厂商·发行商 / 游戏类型，裸值不带前缀，缺项跳过）+ 底部通关日期 +
-/// 右上角液态玻璃评分/状态胶囊（与网格卡同一 glassCapsuleBadge）。
+/// iOS 库「单列横向卡」视图（2026-08-28 第四稿）：SwiftUI 卡片形态——玻璃材质圆角卡底
+/// （.regularMaterial + 细描边 + 投影，明暗模式自适应）。左列 = **1:1 方形封面**满卡高
+/// （上下左右全贴边无框，方形空间零裁切；无 1:1 图回落竖版封面等高居中透卡底）；右列 =
+/// 标题（词边界断行，同详情页 lineBreakAwareTitle 口径）+ 平台图标行在**顶端**，右上角
+/// 液态玻璃评分/状态胶囊（与网格卡同一 glassCapsuleBadge），元数据面板（发售日期 /
+/// 厂商·发行商 / 游戏类型 / 通关日期，裸值带小标题，缺项跳过）贴底。
 struct GameWideCardView: View {
     @Environment(\.appLanguageCode) private var language
     let game: Game
@@ -326,43 +332,32 @@ struct GameWideCardView: View {
     }
 
     var body: some View {
-        GeometryReader { geo in
-            let columnWidth = geo.size.width * 0.55
-            HStack(alignment: .top, spacing: 0) {
-                // 左列：封面顶贴卡顶（无上边）+ 底部固定高度名字区。
-                VStack(alignment: .leading, spacing: 0) {
-                    imageArea
-                        .frame(width: columnWidth, height: geo.size.height - nameAreaHeight)
+        HStack(alignment: .top, spacing: 0) {
+            // 左列：1:1 封面方形满卡高（宽 = 卡高），上下左右全贴边，左缘圆角由整卡 clipShape 裁出。
+            imageArea
+                .frame(width: cardHeight, height: cardHeight)
 
+            // 右列：标题+平台在顶端、胶囊右上角；元数据面板贴底（中段弹性空隙）。
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(alignment: .top, spacing: 8) {
                     VStack(alignment: .leading, spacing: 3) {
-                        // 固定两行预留（36pt）：1 行名留白、2 行名刚好——避免高度提案不足
-                        // 被压成单行截断（第二稿实测教训）；长名在词边界处截断省略。
                         Text(verbatim: titleText)
                             .font(.system(size: 14, weight: .semibold))
                             .lineLimit(2)
                             .multilineTextAlignment(.leading)
-                            .frame(height: 36, alignment: .topLeading)
                         GamePlatformIcons(platforms: game.platformList, maxCount: 5, iconSize: 12)
                     }
-                    .padding(.horizontal, 10)
-                    .padding(.top, 8)
-                    .frame(width: columnWidth, height: nameAreaHeight, alignment: .topLeading)
+                    Spacer(minLength: 8)
+                    trailingBadge
+                        .layoutPriority(1)
                 }
-
-                // 右列：元数据面板（含通关日期，同带标题；微衬底区分）+ 右上角评分/状态胶囊。
-                VStack(alignment: .leading, spacing: 0) {
-                    HStack(alignment: .top) {
-                        metaBlock
-                        Spacer(minLength: 8)
-                        trailingBadge
-                            .layoutPriority(1)
-                    }
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .background(Color.semantic(.quaternarySystemFill).opacity(0.45))
+                Spacer(minLength: 4)
+                metaBlock
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .background(Color.semantic(.quaternarySystemFill).opacity(0.45))
         }
         .frame(height: cardHeight)
         .background(.regularMaterial, in: Self.cardShape)
@@ -372,12 +367,12 @@ struct GameWideCardView: View {
     }
 
     private static let cardShape = RoundedRectangle(cornerRadius: 14, style: .continuous)
-    private let cardHeight: CGFloat = 170
-    /// 名字区固定预留：8 顶 + 两行 36 + 3 间距 + 图标 15 ≈ 64（封面高 = 卡高 − 64）。
-    private let nameAreaHeight: CGFloat = 64
+    /// 卡高 = 左列方形封面边长。标题块（两行 ~52）进右列后，为保元数据五项完整显示，
+    /// 从 170 加到 215（两行长名 + 五项面板 + 内距的临界预算）。
+    private let cardHeight: CGFloat = 215
 
     /// 右列元数据块（2026-08-27 用户追加定稿）：每项 = 小标题（game.releaseDate/developer/
-    /// publisher/genre，三语现成 key）+ 值；厂商与发行商**分两行**。各缺项整组跳过。
+    /// publisher/genre/card.clearedDate，三语现成 key）+ 值；厂商与发行商**分两行**。各缺项整组跳过。
     @ViewBuilder
     private var metaBlock: some View {
         VStack(alignment: .leading, spacing: 3) {
@@ -430,21 +425,24 @@ struct GameWideCardView: View {
         }
     }
 
-    /// 封面区（顶贴卡顶无上边）：横向封面等比缩放完整展示（contain 零裁切，上下少量卡底
-    /// 透出）；无横向封面用竖版封面等高缩放居中（左右透出卡底材质，不垫灰底）；全无图
-    /// 手柄占位。frame 定尺寸在前、clipped 在后，防图铺出图区。
+    /// 封面区（方形满卡高、上下左右全贴边）：1:1 图 scaledToFill 零裁切正好填满；
+    /// 无 1:1 图用竖版封面 scaledToFit 等高完整展示（左右透卡底材质，不垫灰底）；
+    /// 全无图手柄占位。frame 定尺寸在前、clipped 在后，防图铺出图区（§40.1 教训）。
     @ViewBuilder
     private var imageArea: some View {
         Group {
-            if let image = game.landscapeImage {
+            if let image = game.squareImage {
                 Image(appImage: image)
                     .resizable()
-                    .scaledToFit()
+                    .scaledToFill()
+                    .frame(width: cardHeight, height: cardHeight)
+                    .clipped()
             } else if let image = game.coverImage {
                 Image(appImage: image)
                     .resizable()
                     .scaledToFit()
-                    .padding(.horizontal, 10)
+                    .frame(width: cardHeight, height: cardHeight)
+                    .clipped()
             } else {
                 ZStack {
                     Rectangle().fill(Color.semantic(.quaternarySystemFill))
@@ -452,9 +450,9 @@ struct GameWideCardView: View {
                         .font(.system(size: 28))
                         .foregroundStyle(.tertiary)
                 }
+                .frame(width: cardHeight, height: cardHeight)
             }
         }
-        .clipped()
     }
 
     /// 右上角徽章：已通关/长线 → 评分液态玻璃胶囊（网格卡同款：深色玻璃白字，未评分不占位）；

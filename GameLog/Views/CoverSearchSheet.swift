@@ -1,10 +1,12 @@
 import SwiftUI
 
 /// 图像类型：本面板按类型决定走哪个 SGDB 端点与网格布局。
-/// poster = 2:3 竖版封面（主格式，分页浏览）；landscape = 920×430 横向封面（分页）；
+/// poster = 2:3 竖版封面（主格式，分页浏览）；square = 1:1 方形封面（分页，仅 width==height 结果）；
+/// landscape = 920×430 横向封面（分页）；
 /// hero = 宽幅背景图；logo = 透明 Logo（后两类一次全量返回，大图优先排列）。
 enum ArtworkKind: String, Identifiable {
     case poster
+    case square
     case landscape
     case hero
     case logo
@@ -15,6 +17,7 @@ enum ArtworkKind: String, Identifiable {
     var titleKey: String {
         switch self {
         case .poster: "cover.title"
+        case .square: "cover.titleSquare"
         case .landscape: "cover.titleLandscape"
         case .hero: "cover.titleHero"
         case .logo: "cover.titleLogo"
@@ -25,14 +28,15 @@ enum ArtworkKind: String, Identifiable {
     var noResultKey: String {
         switch self {
         case .poster: "cover.noGrids"
+        case .square: "cover.noSquare"
         case .landscape: "cover.noLandscape"
         case .hero: "cover.noHero"
         case .logo: "cover.noLogo"
         }
     }
 
-    /// 是否支持分页加载（grids 端点的两种尺寸过滤查询）。
-    var supportsPaging: Bool { self == .poster || self == .landscape }
+    /// 是否支持分页加载（grids 端点的尺寸过滤查询）。
+    var supportsPaging: Bool { self == .poster || self == .square || self == .landscape }
 }
 
 /// 图像搜索面板：SteamGridDB 按名字搜游戏 → 选游戏 → 选一张图。
@@ -117,6 +121,14 @@ struct CoverSearchSheet: View {
             downloadGeneration += 1
             searchTask?.cancel()
             thumbTask?.cancel()
+        }
+        // 打开面板时预填编辑页传来的游戏英文名（不覆盖用户已输入的内容），赋值即触发
+        // searchText onChange 的既有防抖自动搜索。挂根视图：面板一打开就生效（此前挂在
+        // gridsSection 上，面板刚打开时该分支不渲染，预填从未执行过）。
+        .onAppear {
+            if searchText.isEmpty && !initialTerm.isEmpty {
+                searchText = initialTerm
+            }
         }
     }
 
@@ -211,7 +223,7 @@ struct CoverSearchSheet: View {
                             gridCell(grid)
                         }
                     }
-                    // 分页加载（仅 2:3 / 920×430 两种尺寸过滤查询；heroes/logos 一次全量返回）。
+                    // 分页加载（尺寸过滤查询；heroes/logos 一次全量返回）。
                     if kind.supportsPaging && grids.count < gridTotal {
                         HStack(spacing: 8) {
                             Button {
@@ -239,20 +251,15 @@ struct CoverSearchSheet: View {
                 }
             }
         }
-        .onAppear {
-            // 打开面板时预填编辑页传来的游戏英文名（不覆盖用户已输入的内容），赋值即触发
-            // searchText onChange 的既有防抖自动搜索。
-            if searchText.isEmpty && !initialTerm.isEmpty {
-                searchText = initialTerm
-            }
-        }
     }
 
-    /// 网格列布局按类型：竖版封面窄格；横向/背景图宽格；Logo 透明图配衬底方格。
+    /// 网格列布局按类型：竖版封面窄格；1:1 方形封面中格；横向/背景图宽格；Logo 透明图配衬底方格。
     private var columns: [GridItem] {
         switch kind {
         case .poster:
             [GridItem(.adaptive(minimum: 90, maximum: 120), spacing: 10)]
+        case .square:
+            [GridItem(.adaptive(minimum: 120, maximum: 160), spacing: 10)]
         case .landscape, .hero:
             [GridItem(.adaptive(minimum: 200, maximum: 280), spacing: 10)]
         case .logo:
@@ -450,6 +457,12 @@ struct CoverSearchSheet: View {
                     guard gen == downloadGeneration else { return }
                     grids = SteamGridDBClient.sorted(page.grids)
                     gridTotal = page.total
+                case .square:
+                    // 1:1 方形：squaresPage 已按 width==height 过滤，只出 1:1 结果。
+                    let page = try await client.squaresPage(for: game.id, page: 0)
+                    guard gen == downloadGeneration else { return }
+                    grids = page.grids
+                    gridTotal = page.total
                 case .landscape:
                     let page = try await client.landscapesPage(for: game.id, page: 0)
                     guard gen == downloadGeneration else { return }
@@ -488,6 +501,7 @@ struct CoverSearchSheet: View {
                 let page: SteamGridDBClient.GridPage
                 switch kind {
                 case .poster: page = try await client.gridsPage(for: selectedGame?.id ?? 0, page: nextPage)
+                case .square: page = try await client.squaresPage(for: selectedGame?.id ?? 0, page: nextPage)
                 case .landscape: page = try await client.landscapesPage(for: selectedGame?.id ?? 0, page: nextPage)
                 case .hero, .logo: return // 不分页的类型不会走到这里（supportsPaging 已挡）。
                 }

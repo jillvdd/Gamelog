@@ -106,6 +106,18 @@ struct SteamGridDBClient {
                         page: response.page ?? page)
     }
 
+    /// 1:1 方形封面浏览分页结果（**只取 512×512 方形**——单列卡大图主格式；API 每页 50 条，`page` 从 0 起。
+    /// 再按 width == height 客户端过滤一遍，兑现「只给 1:1 结果」）。
+    func squaresPage(for gameID: Int, page: Int) async throws -> GridPage {
+        let url = URL(string: "\(Self.base)/grids/game/\(gameID)?dimensions=512x512&page=\(page)")!
+        let data = try await requestData(url)
+        let response = try JSONDecoder().decode(SteamGridDBResponse<[SteamGridDBGrid]>.self, from: data)
+        let all = response.success ? response.data : []
+        return GridPage(grids: all.filter { $0.width == $0.height },
+                        total: response.total ?? 0,
+                        page: response.page ?? page)
+    }
+
     /// 下载图片数据。
     func fetchImage(urlString: String) async throws -> Data {
         guard let url = URL(string: urlString) else { throw URLError(.badURL) }
@@ -123,13 +135,15 @@ struct SteamGridDBClient {
         return try await fetchImage(urlString: grid.url)
     }
 
-    /// 自动匹配附加图（横向封面/背景图/Logo）：搜索第一个命中 → 对应端点第一张 → 下载。
-    /// heroes/logos 一次全量返回、按像素面积大图优先；landscape 用 920×430 端点第一页。
+    /// 自动匹配附加图（1:1 方形封面/横向封面/背景图/Logo）：搜索第一个命中 → 对应端点第一张 → 下载。
+    /// heroes/logos 一次全量返回、按像素面积大图优先；square/landscape 用尺寸过滤端点第一页（square 额外按 width==height 过滤）。
     func autoArtwork(for term: String, kind: ArtworkKind) async throws -> Data? {
         let hits = try await search(term: term)
         guard let first = hits.first else { return nil }
         let candidates: [SteamGridDBGrid]
         switch kind {
+        case .square:
+            candidates = try await squaresPage(for: first.id, page: 0).grids
         case .landscape:
             candidates = try await landscapesPage(for: first.id, page: 0).grids
         case .hero:

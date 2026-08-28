@@ -141,7 +141,7 @@
 "settings.removeAvatar" = "Remove Avatar";
 "settings.restoreIcon" = "Restore Default Icon";
 "settings.autoMatchCover" = "Automatically Match Cover";
-"settings.autoMatchCoverHint" = "When you enter a game name, automatically searches SteamGridDB and sets the first cover found; landscape covers / hero images / logos whose toggle is on and unset are matched too (requires an API key below).";
+"settings.autoMatchCoverHint" = "When you enter a game name, automatically searches SteamGridDB and sets the first cover found; square (1:1) / landscape covers / hero images / logos whose toggle is on and unset are matched too (requires an API key below).";
 "settings.hideToolbarGlass" = "Hide Top Toolbar Background";
 "settings.hideToolbarGlassHint" = "Hides the frosted-glass background of the top toolbar on all pages (Library / Detail / Stats) for a cleaner look. (macOS 15 and later)";
 "settings.collectorMode" = "Collector Mode";
@@ -233,6 +233,7 @@
 "cover.loadMore" = "Load More";
 "cover.title" = "Search Covers";
 "cover.close" = "Close";
+"game.square" = "Square Cover (1:1)";
 "game.landscape" = "Landscape Cover";
 "game.hero" = "Hero Image";
 "game.logo" = "Logo";
@@ -248,9 +249,11 @@
 "logo.horizontal.leading" = "Left";
 "logo.horizontal.center" = "Center";
 "logo.horizontal.trailing" = "Right";
+"cover.titleSquare" = "Search Square Covers (1:1)";
 "cover.titleLandscape" = "Search Landscape Covers";
 "cover.titleHero" = "Search Hero Images";
 "cover.titleLogo" = "Search Logos";
+"cover.noSquare" = "No Square Covers (1:1) Found for This Game";
 "cover.noLandscape" = "No Landscape Covers Found for This Game";
 "cover.noHero" = "No Hero Images Found for This Game";
 "cover.noLogo" = "No Logos Found for This Game";
