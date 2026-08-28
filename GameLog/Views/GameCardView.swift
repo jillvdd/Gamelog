@@ -299,12 +299,12 @@ struct GameRowView: View {
     }
 }
 
-/// iOS 库「单列横向卡」视图（2026-08-28 第四稿）：SwiftUI 卡片形态——玻璃材质圆角卡底
-/// （.regularMaterial + 细描边 + 投影，明暗模式自适应）。左列 = **1:1 方形封面**满卡高
-/// （上下左右全贴边无框，方形空间零裁切；无 1:1 图回落竖版封面等高居中透卡底）；右列 =
-/// 标题（词边界断行，同详情页 lineBreakAwareTitle 口径）+ 平台图标行在**顶端**，右上角
-/// 液态玻璃评分/状态胶囊（与网格卡同一 glassCapsuleBadge），元数据面板（发售日期 /
-/// 厂商·发行商 / 游戏类型 / 通关日期，裸值带小标题，缺项跳过）贴底。
+/// iOS 库「单列横向卡」视图（2026-08-28 第五稿）：SwiftUI 卡片形态——玻璃材质圆角卡底
+/// （.regularMaterial + 细描边 + 投影，明暗模式自适应）。左列 = **方形封面**满卡高
+/// （上下左右全贴边无框，方形空间零裁切；无方图回落竖版封面等高居中透卡底），封面右上角
+/// 覆盖液态玻璃评分/状态胶囊（与网格卡同一 glassCapsuleBadge）；右列整块 = 可显示文字区：
+/// 标题（词边界断行，同详情页 lineBreakAwareTitle 口径）+ 平台图标行在顶端，元数据面板
+/// （发售日期 / 厂商·发行商 / 游戏类型 / 通关日期，裸值带小标题，缺项跳过）贴底。
 struct GameWideCardView: View {
     @Environment(\.appLanguageCode) private var language
     let game: Game
@@ -333,23 +333,22 @@ struct GameWideCardView: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
-            // 左列：1:1 封面方形满卡高（宽 = 卡高），上下左右全贴边，左缘圆角由整卡 clipShape 裁出。
+            // 左列：方形封面满卡高（宽 = 卡高），上下左右全贴边，左缘圆角由整卡 clipShape 裁出；
+            // 右上角评分/状态胶囊（覆盖在图上，网格卡同款 padding 6）。
             imageArea
                 .frame(width: cardHeight, height: cardHeight)
+                .overlay(alignment: .topTrailing) {
+                    trailingBadge.padding(6)
+                }
 
-            // 右列：标题+平台在顶端、胶囊右上角；元数据面板贴底（中段弹性空隙）。
+            // 右列：整块可显示文字区——标题+平台在顶端，元数据面板贴底（中段弹性空隙）。
             VStack(alignment: .leading, spacing: 0) {
-                HStack(alignment: .top, spacing: 8) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(verbatim: titleText)
-                            .font(.system(size: 14, weight: .semibold))
-                            .lineLimit(2)
-                            .multilineTextAlignment(.leading)
-                        GamePlatformIcons(platforms: game.platformList, maxCount: 5, iconSize: 12)
-                    }
-                    Spacer(minLength: 8)
-                    trailingBadge
-                        .layoutPriority(1)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(verbatim: titleText)
+                        .font(.system(size: 14, weight: .semibold))
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                    GamePlatformIcons(platforms: game.platformList, maxCount: 5, iconSize: 12)
                 }
                 Spacer(minLength: 4)
                 metaBlock

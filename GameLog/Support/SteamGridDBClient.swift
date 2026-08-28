@@ -106,10 +106,10 @@ struct SteamGridDBClient {
                         page: response.page ?? page)
     }
 
-    /// 1:1 方形封面浏览分页结果（**只取 512×512 方形**——单列卡大图主格式；API 每页 50 条，`page` 从 0 起。
-    /// 再按 width == height 客户端过滤一遍，兑现「只给 1:1 结果」）。
+    /// 方形封面浏览分页结果（**只取 1:1 方形**——SGDB 方形有 512×512 与 1024×1024 两档，双档都查；
+    /// 客户端再按 width == height 过滤兜住未来新增的方图尺寸。API 每页 50 条，`page` 从 0 起）。
     func squaresPage(for gameID: Int, page: Int) async throws -> GridPage {
-        let url = URL(string: "\(Self.base)/grids/game/\(gameID)?dimensions=512x512&page=\(page)")!
+        let url = URL(string: "\(Self.base)/grids/game/\(gameID)?dimensions=512x512,1024x1024&page=\(page)")!
         let data = try await requestData(url)
         let response = try JSONDecoder().decode(SteamGridDBResponse<[SteamGridDBGrid]>.self, from: data)
         let all = response.success ? response.data : []
