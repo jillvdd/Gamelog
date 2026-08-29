@@ -1,55 +1,38 @@
 import SwiftUI
 import SwiftData
 
-/// 封面解码缓存：按 coverData 哈希缓存 AppImage，避免每次视图 body 重算时重新解码
-/// （状态切换、滚动、网格重排时卡顿的根因）。NSCache 自动清理内存。
-private let coverImageCache = NSCache<NSNumber, AppImage>()
-
+/// 五类图解码缓存已抽到 Support/ImageDecodeCache.swift（key = persistentModelID+字段，
+/// 不再对整段图片 Data 做 O(n) 哈希）。此处保留清空入口供「清除缓存」调用。
 extension GameCardView {
     /// 清空封面解码缓存（「清除缓存」功能调用；NSCache 内存态，正常也会自动清理）。
     static func clearCoverCache() {
-        coverImageCache.removeAllObjects()
+        ImageDecodeCache.bump()
     }
 }
 
 extension Game {
     var coverImage: AppImage? {
-        guard let data = coverData else { return nil }
-        return Self.cachedImage(forKey: data.hashValue, decode: { AppImage(data: $0) }, data: data)
+        ImageDecodeCache.image(for: self, field: "cover", data: coverData)
     }
 
-    /// 详情页横幅背景图（与封面共用同一解码缓存，key 用各自 data 哈希不会冲突）。
+    /// 详情页横幅背景图。
     var heroImage: AppImage? {
-        guard let data = heroData else { return nil }
-        return Self.cachedImage(forKey: data.hashValue, decode: { AppImage(data: $0) }, data: data)
+        ImageDecodeCache.image(for: self, field: "hero", data: heroData)
     }
 
     /// 游戏 Logo（透明 PNG）。详情页在「背景图 + Logo 同时设置」时替代 2:3 封面。
     var logoImage: AppImage? {
-        guard let data = logoData else { return nil }
-        return Self.cachedImage(forKey: data.hashValue, decode: { AppImage(data: $0) }, data: data)
+        ImageDecodeCache.image(for: self, field: "logo", data: logoData)
     }
 
     /// 1:1 方形封面（SteamGridDB 方形 grid）。iOS 单列卡大图主格式。
     var squareImage: AppImage? {
-        guard let data = squareData else { return nil }
-        return Self.cachedImage(forKey: data.hashValue, decode: { AppImage(data: $0) }, data: data)
+        ImageDecodeCache.image(for: self, field: "square", data: squareData)
     }
 
     /// 横向封面（SteamGridDB 920×430 横版 grid）。iOS 详情页横幅与库横向卡共用。
     var landscapeImage: AppImage? {
-        guard let data = landscapeData else { return nil }
-        return Self.cachedImage(forKey: data.hashValue, decode: { AppImage(data: $0) }, data: data)
-    }
-
-    /// 共用解码路径：查缓存 → 未命中解码 → 回填。文件级私有缓存由「清除缓存」统一清空。
-    private static func cachedImage(forKey key: Int, decode: (Data) -> AppImage?, data: Data) -> AppImage? {
-        if let cached = coverImageCache.object(forKey: NSNumber(value: key)) {
-            return cached
-        }
-        guard let image = decode(data) else { return nil }
-        coverImageCache.setObject(image, forKey: NSNumber(value: key))
-        return image
+        ImageDecodeCache.image(for: self, field: "landscape", data: landscapeData)
     }
 }
 

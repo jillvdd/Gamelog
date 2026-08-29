@@ -488,6 +488,7 @@ private struct CopyGridCellView: View {
         var images = copy.images
         images.append(contentsOf: datas)
         copy.images = images
+        ImageDecodeCache.bump()
         try? context.save()
         #endif
     }
@@ -497,6 +498,7 @@ private struct CopyGridCellView: View {
         var images = copy.images
         images.remove(at: index)
         copy.images = images
+        ImageDecodeCache.bump()
         try? context.save()
     }
 
@@ -509,6 +511,7 @@ private struct CopyGridCellView: View {
             }
         }
         copy.images = images
+        ImageDecodeCache.bump()
         try? context.save()
     }
 }
@@ -730,6 +733,7 @@ private struct CopyCardView: View {
         var images = copy.images
         images.append(contentsOf: datas)
         copy.images = images
+        ImageDecodeCache.bump()
         try? context.save()
         #endif
     }
@@ -739,6 +743,7 @@ private struct CopyCardView: View {
         var images = copy.images
         images.remove(at: index)
         copy.images = images
+        ImageDecodeCache.bump()
         try? context.save()
     }
 
@@ -751,6 +756,7 @@ private struct CopyCardView: View {
             }
         }
         copy.images = images
+        ImageDecodeCache.bump()
         try? context.save()
     }
 }

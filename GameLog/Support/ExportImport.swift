@@ -294,5 +294,7 @@ enum BackupManager {
                 }
             }
         }
+        // 全库重建：解码缓存按 persistentModelID 做 key，全部失效（旧 ID 的旧图不再命中）。
+        ImageDecodeCache.bump()
     }
 }

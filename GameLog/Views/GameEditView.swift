@@ -1001,6 +1001,8 @@ struct GameEditView: View {
             game.groups = allGroups.filter { groupIDs.contains($0.persistentModelID) }
             game.updatedAt = .now
         }
+        // 图片可能已变更（编辑写回 / 新建带图），解码缓存按模型 ID 做 key，需全量失效。
+        ImageDecodeCache.bump()
         dismiss()
     }
 }

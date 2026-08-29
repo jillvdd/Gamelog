@@ -125,7 +125,8 @@ final class PhysicalCopy {
     /// 该版本持有数量（≥1）。
     var count: Int
     /// 收藏照片（最多 6 张）。「保存原图」关时存压缩 JPEG，开时存原图数据。
-    var images: [Data]
+    /// .externalStorage 同 Game 五类图——照片是持有页 BLOB 大头，内联会拖垮整表查询。
+    @Attribute(.externalStorage) var images: [Data]
     /// 添加先后（持有列表排序用）。
     var createdAt: Date
 

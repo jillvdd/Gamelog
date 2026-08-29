@@ -185,7 +185,8 @@ struct DateMenuPickerMac: View {
 /// 单列滚轮：5 行高、选中项居中，滚动吸附到最近一项，复刻 iOS 日期滚轮手感。
 /// 基于原生 NSScrollView：
 /// - 不创建滚动条（hasVerticalScroller = false），悬停不再出现白色滚动条；
-/// - 吸附在滚动结束后（didEndLiveScroll）精确对齐到最近整行，不会跳偏 1–2 行；
+/// - 吸附用弹性动画对齐到最近整行（NSAnimationContext spring），复刻系统滚轮的
+///   「惯性结束后被轻柔拉回」而非瞬移；
 /// - 滚到边界后滚动事件沿 AppKit 响应链交给外层页面（原生 scroll chaining）。
 private struct WheelColumn: NSViewRepresentable {
     let items: [Int]
@@ -234,15 +235,9 @@ private struct WheelColumn: NSViewRepresentable {
         } else {
             doc.label = label
         }
-        // 外部 selection 变化（clampDay / sync / load）→ 滚动到对应项。
-        if let idx = items.firstIndex(of: selection) {
-            let target = CGFloat(idx) * wheelRowHeight
-            if abs(scroll.contentView.bounds.origin.y - target) > 0.5 {
-                scroll.contentView.setBoundsOrigin(NSPoint(x: 0, y: target))
-                doc.centerIndex = idx
-                doc.needsDisplay = true
-            }
-        }
+        // 外部 selection 变化（clampDay / sync / load）→ 弹性滚动到对应项。
+        // 用户滚动驱动本视图写回 selection 时，coordinator.isProgrammatic 会挡住重复动画。
+        context.coordinator.scrollTo(selection: selection, animated: false)
     }
 
     final class Coordinator: NSObject {
@@ -251,6 +246,12 @@ private struct WheelColumn: NSViewRepresentable {
         private var document: WheelDocumentView?
         private var boundsObserver: NSObjectProtocol?
         private var liveScrollObserver: NSObjectProtocol?
+        /// 惯性结束后的吸附动画定时器（新的滚动/动画开始时取消，防止互抢）。
+        private var snapTimer: Timer?
+        /// 吸附动画进行中：动画帧自身触发的 bounds 通知不得取消动画（否则第一帧即自杀）。
+        private var isSnapping = false
+        /// 最近一次写回的 selection（回环抑制：外部同步到达时不重复滚动/动画）。
+        private var lastWrittenValue: Int?
 
         init(_ parent: WheelColumn) { self.parent = parent }
 
@@ -258,6 +259,7 @@ private struct WheelColumn: NSViewRepresentable {
             // 观察者 token 不清理会随每次打开编辑页永久累积（闭包 weak self 不致悬挂，但纯泄漏）。
             if let boundsObserver { NotificationCenter.default.removeObserver(boundsObserver) }
             if let liveScrollObserver { NotificationCenter.default.removeObserver(liveScrollObserver) }
+            snapTimer?.invalidate()
         }
 
         func attach(scroll: NSScrollView, document: WheelDocumentView) {
@@ -276,25 +278,74 @@ private struct WheelColumn: NSViewRepresentable {
         }
 
         /// 实时跟随滚动：更新选中项（视口中心行）并重绘。
+        /// 手指/滚轮新的滚动开始时取消吸附动画（防互抢）；惯性中每帧写回 selection，
+        /// SwiftUI 回环由 lastWrittenValue 抑制（同值不重滚）。
         private func onBoundsChanged() {
             guard let scroll, let document else { return }
+            if !isSnapping {
+                snapTimer?.invalidate()
+                snapTimer = nil
+            }
             let y = scroll.contentView.bounds.origin.y
             let idx = min(max(Int((y / wheelRowHeight).rounded()), 0), parent.items.count - 1)
             document.centerIndex = idx
             document.needsDisplay = true
             let value = parent.items[idx]
-            if value != parent.selection {
+            if value != lastWrittenValue {
+                lastWrittenValue = value
                 parent.selection = value
             }
         }
 
-        /// 滚动结束后瞬时对齐到最近整行（目标偏移 = 行号 × 行高）。
+        /// 滚动结束后弹性吸附到最近整行（目标偏移 = 行号 × 行高）。
+        /// easeOutCubic 短程插值（120ms），复刻系统滚轮「松手后轻轻落定」而非瞬移。
         private func snap() {
             guard let scroll, let document else { return }
             let target = CGFloat(document.centerIndex) * wheelRowHeight
             let current = scroll.contentView.bounds.origin.y
             guard abs(target - current) > 0.5 else { return }
+            startSnapAnimation(from: current, to: target)
+        }
+
+        /// 程序化滚动到 selection 对应行（外部 load / clampDay 触发；瞬移，与旧行为一致）。
+        func scrollTo(selection: Int, animated: Bool) {
+            guard let scroll, let document else { return }
+            guard let idx = parent.items.firstIndex(of: selection) else { return }
+            // 回环抑制：这个值正是滚轮自己刚写出去的，不需要再滚。
+            if lastWrittenValue == selection { return }
+            let target = CGFloat(idx) * wheelRowHeight
+            let current = scroll.contentView.bounds.origin.y
+            guard abs(target - current) > 0.5 else {
+                document.centerIndex = idx
+                document.needsDisplay = true
+                return
+            }
+            lastWrittenValue = selection
             scroll.contentView.setBoundsOrigin(NSPoint(x: 0, y: target))
+            document.centerIndex = idx
+            document.needsDisplay = true
+        }
+
+        /// 弹性吸附：Timer 高频插值 easeOutCubic，帧间直接 setBoundsOrigin。
+        /// 动画期间视口扫过的中间行会照常写回 selection（与 iOS 滚轮落定时的连动一致）。
+        private func startSnapAnimation(from: CGFloat, to: CGFloat) {
+            snapTimer?.invalidate()
+            let duration = 0.12
+            let startTime = CACurrentMediaTime()
+            isSnapping = true
+            let timer = Timer(timeInterval: 1.0 / 120.0, repeats: true) { [weak self] t in
+                guard let self else { t.invalidate(); return }
+                let p = min(1, (CACurrentMediaTime() - startTime) / duration)
+                let eased = 1 - pow(1 - p, 3)
+                self.scroll?.contentView.setBoundsOrigin(NSPoint(x: 0, y: from + (to - from) * eased))
+                if p >= 1 {
+                    t.invalidate()
+                    self.snapTimer = nil
+                    self.isSnapping = false
+                }
+            }
+            RunLoop.main.add(timer, forMode: .common)
+            snapTimer = timer
         }
     }
 }

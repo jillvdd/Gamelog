@@ -11,6 +11,10 @@ import UIKit
 /// 自动备份管理器：监听 SwiftData 保存事件，防抖 3 秒后把完整备份（与手动导出同格式）
 /// 原子写入本地滚动文件。附带版本升级前快照、恢复/导入前快照、启动空库检测恢复。
 ///
+/// 2026-08-29 性能改造：编码与写盘全部移到 BackupWriter（ModelActor 后台上下文），
+/// 逐游戏分片流式写——主线程只剩事件转发。启动检查不再同步写盘（后台进行，
+/// 完成后更新「最后备份」元数据）；iOS 退后台不再同步编码（等回到前台/下次启动补写）。
+///
 /// 文件布局（backupDir）：
 ///   GameLog-autobackup.json                   滚动备份（每次覆盖）
 ///   GameLog-autobackup-pre-<版本号>.json      版本升级前快照，保留最近 3 份
@@ -36,9 +40,12 @@ final class AutoBackup: ObservableObject {
     @Published var emptyRestoreInfo: EmptyRestoreInfo?
 
     private var container: ModelContainer?
+    private var writer: BackupWriter?
     private var didSetup = false
     private var didStartupCheck = false
     private var needsWrite = false
+    /// 后台写盘进行中（期间新触发的防抖在写完后补一轮）。
+    private var isWriting = false
     private var debounceTask: Task<Void, Never>?
     private var didSaveObserver: NSObjectProtocol?
     private var lifecycleObserver: NSObjectProtocol?
@@ -79,11 +86,14 @@ final class AutoBackup: ObservableObject {
     // MARK: - 生命周期接入
 
     /// 注册监听（幂等）：挂 ModelContext.didSave（每次保存触发防抖备份）。
-    /// macOS 额外挂 willTerminate、iOS 挂 didEnterBackground 做退出兜底。
+    /// macOS 额外挂 willTerminate 做退出兜底（只标记，下次启动补写——终止时刻
+    /// 后台编码已来不及）；iOS 改挂 willEnterForeground 补写（退后台同步编码
+    /// 771MB 会被系统终止，正是「编辑后卡死需重启」的元凶之一）。
     func setup(container: ModelContainer) {
         guard !didSetup else { return }
         didSetup = true
         self.container = container
+        writer = BackupWriter(modelContainer: container)
 
         didSaveObserver = NotificationCenter.default.addObserver(
             forName: ModelContext.didSave,
@@ -102,16 +112,19 @@ final class AutoBackup: ObservableObject {
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            // queue 是主队列 = MainActor；同步兜底写（任务在此刻不可靠）。
-            MainActor.assumeIsolated { self?.flushNow() }
+            // 终止时刻只标记；下次启动检查会把这笔补上（needsWrite 持久化在 UserDefaults）。
+            MainActor.assumeIsolated { self?.markPending() }
         }
         #else
         lifecycleObserver = NotificationCenter.default.addObserver(
-            forName: UIApplication.didEnterBackgroundNotification,
+            forName: UIApplication.willEnterForegroundNotification,
             object: nil,
             queue: .main
         ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.flushNow() }
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                if self.needsWrite || Self.pendingFlag { self.performWrite() }
+            }
         }
         #endif
     }
@@ -130,99 +143,161 @@ final class AutoBackup: ObservableObject {
         }
     }
 
-    /// 立即写入（设置页「立即备份」/ 启动检查用）。返回是否真正写盘成功。
-    @discardableResult
-    func writeNow() -> Bool {
+    /// 「立即备份」（设置页按钮，异步版本；完成后据实回填状态消息）。
+    func writeNowAsync(completion: ((Bool) -> Void)? = nil) {
         needsWrite = true
         debounceTask?.cancel()
         debounceTask = nil
-        return performWrite()
-    }
-
-    /// 退出/后台兜底：有未落盘的改动才写（避免每次后台都重编码）。
-    func flushNow() {
-        debounceTask?.cancel()
-        debounceTask = nil
-        if needsWrite {
-            performWrite()
+        performWrite { ok in
+            completion?(ok)
         }
     }
 
-    @discardableResult
-    private func performWrite() -> Bool {
-        guard Self.isEnabled else { return false }
+    /// 退出兜底（macOS willTerminate）：只持久化「有待写」标记。
+    /// 备份数据本身自上次成功写盘起未变（滚动文件仍是完整的旧状态），可安全回退。
+    func markPending() {
+        guard needsWrite else { return }
+        Self.setPendingFlag(true)
+    }
+
+    // MARK: - 写入（后台）
+
+    /// 空库保护判定：主上下文快速数游戏/分组（轻量，无 BLOB 物化风险——
+    /// 仅取行存在性；图片字段在对象物化时才读）。
+    private func libraryIsNonEmpty() -> Bool {
         guard let container else { return false }
-        guard let games = try? container.mainContext.fetch(FetchDescriptor<Game>()),
-              let groups = try? container.mainContext.fetch(FetchDescriptor<GameGroup>()) else { return false }
-        // 防空库覆盖：库为空时不写滚动备份——避免把上一份好的备份覆盖成空
-        // （对应「store 被清空但 app 数据丢了」的场景，见 HANDOVER §25.5）。
-        guard !games.isEmpty || !groups.isEmpty else { return false }
-        do {
-            let data = try BackupManager.encode(games: games, groups: groups)
-            let url = Self.backupFileURL
-            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try data.write(to: url, options: .atomic)
-            needsWrite = false
-            UserDefaults.standard.set(Date(), forKey: Self.lastBackupDateKey)
-            UserDefaults.standard.set(data.count, forKey: Self.lastBackupSizeKey)
-            return true
-        } catch {
-            // 写盘失败（磁盘满等罕见）：needsWrite 保持，下次保存仍重试。
-            return false
+        var desc = FetchDescriptor<Game>()
+        desc.fetchLimit = 1
+        let hasGames = ((try? container.mainContext.fetch(desc))?.isEmpty == false)
+        var gdesc = FetchDescriptor<GameGroup>()
+        gdesc.fetchLimit = 1
+        let hasGroups = ((try? container.mainContext.fetch(gdesc))?.isEmpty == false)
+        return hasGames || hasGroups
+    }
+
+    /// 后台流式写滚动备份。completion 回主线程；ok = 是否成功写盘。
+    private func performWrite(completion: ((Bool) -> Void)? = nil) {
+        guard Self.isEnabled else { completion?(false); return }
+        guard let writer else { completion?(false); return }
+        guard !isWriting else { completion?(false); return }
+        guard libraryIsNonEmpty() else { needsWrite = false; completion?(false); return }
+
+        isWriting = true
+        needsWrite = false
+        Self.setPendingFlag(false)
+        let url = Self.backupFileURL
+        let username = UserDefaults.standard.string(forKey: UserCustomization.usernameKey)
+        let avatarPNG = UserCustomization.avatarImageData()
+        let iconPNG = UserCustomization.iconImageData()
+
+        Task.detached(priority: .utility) { [writer] in
+            let result: Int?
+            do {
+                result = try await writer.writeStreamingBackup(
+                    to: url, username: username, avatarPNG: avatarPNG, iconPNG: iconPNG
+                )
+            } catch {
+                // 写盘失败：保持旧文件不动（流式写在临时名 → 成功才换名，见下）。
+                result = nil
+            }
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                self.isWriting = false
+                let ok = result.map { $0 >= 0 } ?? false
+                if ok {
+                    UserDefaults.standard.set(Date(), forKey: Self.lastBackupDateKey)
+                    UserDefaults.standard.set(result!, forKey: Self.lastBackupSizeKey)
+                } else {
+                    // 失败重试标记：下次前台/启动补写。
+                    Self.setPendingFlag(true)
+                }
+                completion?(ok)
+            }
         }
     }
 
     // MARK: - 启动检查（启动备份 / 版本快照 / 空库检测）
 
-    /// 启动时调用一次：版本变化时先复制「上次会话的滚动备份（升级前数据）」为 pre- 快照，
-    /// 再刷新启动备份；库为空且备份非空时记下恢复询问。
+    /// 启动时调用一次：版本变化时先把上次会话留下的滚动备份复制为 pre- 快照；
+    /// 空库且有备份 → 弹恢复询问；有待写标记或版本变化 → 后台刷新滚动备份。
+    /// **全部即时返回**（旧实现在这里同步编码 771MB，正是「启动要等一会儿」的主因）。
     func performStartupCheck(context: ModelContext, currentVersion: String) {
         guard !didStartupCheck else { return }
         didStartupCheck = true
 
-        let games = (try? context.fetch(FetchDescriptor<Game>())) ?? []
-        let groups = (try? context.fetch(FetchDescriptor<GameGroup>())) ?? []
-
-        // 1. 版本升级保护：先复制「上次会话留下的滚动备份」（升级前数据）为 pre-<旧版本> 快照，
-        //    再刷新启动备份。顺序不能反——先覆盖再复制会把 pre 快照也变成迁移后的新内容。
+        // 1. 版本升级保护：先把「上次会话留下的滚动备份」（升级前数据）复制为 pre-<旧版本> 快照。
+        //    大文件拷贝挪后台（771MB 要数秒，不能在主线程）；启动备份在拷贝完成后执行，
+        //    保证「先快照旧内容、再覆盖滚动文件」的顺序（顺序反了 pre 快照会变成新内容）。
         let lastVersion = UserDefaults.standard.string(forKey: Self.lastVersionKey)
-        if let lastVersion, lastVersion != currentVersion {
-            let src = Self.backupFileURL
-            if FileManager.default.fileExists(atPath: src.path) {
-                let dst = Self.backupDir.appendingPathComponent("GameLog-autobackup-pre-\(lastVersion).json")
-                try? FileManager.default.removeItem(at: dst)
-                try? FileManager.default.copyItem(at: src, to: dst)
-            }
-            trimPreVersionFiles(keep: 3)
-        }
+        let versionChanged = lastVersion != currentVersion
         UserDefaults.standard.set(currentVersion, forKey: Self.lastVersionKey)
-
-        // 2. 启动备份（当前数据）——非空才写，避免空库/坏库覆盖上一份好的滚动备份。
-        if !games.isEmpty || !groups.isEmpty {
-            writeNow()
-        }
-
-        // 3. 空库检测：库为空 + 备份里有数据 → 弹窗询问是否恢复（取消保留空库，不强行恢复）。
-        if games.isEmpty && groups.isEmpty {
-            if let data = try? Data(contentsOf: Self.backupFileURL),
-               let dto = try? JSONDecoder().decode(BackupDTO.self, from: data),
-               !dto.games.isEmpty {
-                emptyRestoreInfo = EmptyRestoreInfo(gameCount: dto.games.count)
+        if Self.isEnabled, versionChanged || Self.pendingFlag {
+            let pendingVersion = lastVersion
+            let url = Self.backupFileURL
+            let dir = Self.backupDir
+            needsWrite = true
+            Task.detached(priority: .utility) { [weak self] in
+                if versionChanged, let pendingVersion {
+                    if FileManager.default.fileExists(atPath: url.path) {
+                        let dst = dir.appendingPathComponent("GameLog-autobackup-pre-\(pendingVersion).json")
+                        try? FileManager.default.removeItem(at: dst)
+                        try? FileManager.default.copyItem(at: url, to: dst)
+                    }
+                }
+                await MainActor.run { [weak self] in
+                    self?.trimPreVersionFilesOnVersionChange(changed: versionChanged)
+                    self?.performWrite()
+                }
             }
         }
+
+        // 2. 空库检测：库为空 + 备份里有数据 → 弹窗询问是否恢复（取消保留空库，不强行恢复）。
+        //    库空判定用 fetchLimit=1 的轻量探测；备份游戏数统计（流式扫全文件）也挪后台。
+        var desc = FetchDescriptor<Game>()
+        desc.fetchLimit = 1
+        let hasGames = ((try? context.fetch(desc))?.isEmpty == false)
+        var gdesc = FetchDescriptor<GameGroup>()
+        gdesc.fetchLimit = 1
+        let hasGroups = ((try? context.fetch(gdesc))?.isEmpty == false)
+        if !hasGames && !hasGroups {
+            let url = Self.backupFileURL
+            Task.detached(priority: .utility) { [weak self] in
+                let count = BackupWriter.countGames(at: url)
+                await MainActor.run { [weak self] in
+                    guard let self, self.emptyRestoreInfo == nil, count > 0 else { return }
+                    self.emptyRestoreInfo = EmptyRestoreInfo(gameCount: count)
+                }
+            }
+        }
+    }
+
+    /// 版本变化时修剪 pre- 快照（仅此时调用，语义与旧实现一致）。
+    private func trimPreVersionFilesOnVersionChange(changed: Bool) {
+        guard changed else { return }
+        trimPreVersionFiles(keep: 3)
     }
 
     func dismissEmptyRestore() {
         emptyRestoreInfo = nil
     }
 
+    /// 跨会话「有待写」标记（退出兜底 / 写盘失败重试用）。
+    private static var pendingFlag: Bool {
+        UserDefaults.standard.bool(forKey: "backup.pendingWrite")
+    }
+
+    private static func setPendingFlag(_ value: Bool) {
+        UserDefaults.standard.set(value, forKey: "backup.pendingWrite")
+    }
+
     // MARK: - 恢复与快照
 
-    /// 从自动备份恢复：先写当前状态快照（可后悔），再整体替换。返回是否成功。
+    /// 从自动备份恢复：**先**后台写当前状态快照（可后悔），快照落盘**后**才整体替换。
+    /// 返回是否恢复成功。
     @discardableResult
     func restoreFromAutoBackup(context: ModelContext) -> Bool {
         guard let data = try? Data(contentsOf: Self.backupFileURL) else { return false }
-        writeSnapshot(context: context)
+        guard writeSnapshot(context: context) else { return false }
         do {
             try BackupManager.decodeAndReplace(data, into: context)
             try context.save()
@@ -235,15 +310,67 @@ final class AutoBackup: ObservableObject {
 
     /// 恢复/导入前快照：把当前数据写为带时间戳的文件（不参与滚动覆盖）。
     /// 每次「整体替换」操作（恢复、手动导入、AirDrop 导入）前调用，误恢复时能找回。
-    func writeSnapshot(context: ModelContext) {
-        let games = (try? context.fetch(FetchDescriptor<Game>())) ?? []
-        let groups = (try? context.fetch(FetchDescriptor<GameGroup>())) ?? []
-        guard !games.isEmpty || !groups.isEmpty else { return }
-        guard let data = try? BackupManager.encode(games: games, groups: groups) else { return }
+    /// 编码与写盘在 ModelActor 后台执行、本调用**同步等待**完成（主线程不被
+    /// 771MB 编码阻塞，只是等待；调用点语义与旧实现一致：返回时快照已落盘或失败）。
+    /// 返回是否成功（空库无可快照视为成功）。
+    @discardableResult
+    func writeSnapshot(context: ModelContext) -> Bool {
+        let container = context.container
+        var desc = FetchDescriptor<Game>()
+        desc.fetchLimit = 1
+        let hasGames = ((try? context.fetch(desc))?.isEmpty == false)
+        var gdesc = FetchDescriptor<GameGroup>()
+        gdesc.fetchLimit = 1
+        let hasGroups = ((try? context.fetch(gdesc))?.isEmpty == false)
+        guard hasGames || hasGroups else { return true }
+
+        let writer = writer ?? BackupWriter(modelContainer: container)
         let url = Self.backupDir.appendingPathComponent("GameLog-autobackup-snapshot-\(Self.snapshotTimestamp()).json")
-        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try? data.write(to: url, options: .atomic)
-        trimSnapshotFiles(keep: 10)
+        let username = UserDefaults.standard.string(forKey: UserCustomization.usernameKey)
+        let avatarPNG = UserCustomization.avatarImageData()
+        let iconPNG = UserCustomization.iconImageData()
+
+        let semaphore = DispatchSemaphore(value: 0)
+        nonisolated(unsafe) var ok = false
+        Task.detached(priority: .utility) { [writer] in
+            var bytes = -1
+            do {
+                bytes = try await writer.writeStreamingBackup(
+                    to: url, username: username, avatarPNG: avatarPNG, iconPNG: iconPNG
+                )
+            } catch { }
+            ok = bytes >= 0
+            if ok { AutoBackup.trimSnapshotFilesStatic(keep: 10) }
+            semaphore.signal()
+        }
+        semaphore.wait()
+        return ok
+    }
+
+    /// trimSnapshotFiles 的静态包装（后台 Task 闭包内用）。
+    /// 目录推导与 MainActor 版 backupDir 一致（纯文件系统路径，无隔离需求）。
+    nonisolated private static func trimSnapshotFilesStatic(keep: Int) {
+        #if os(macOS)
+        let dir = UserCustomization.supportDirectory
+        #else
+        let dir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Backups", isDirectory: true)
+        #endif
+        let fm = FileManager.default
+        guard let files = try? fm.contentsOfDirectory(
+            at: dir,
+            includingPropertiesForKeys: [.contentModificationDateKey]
+        ) else { return }
+        let matches = files
+            .filter { $0.lastPathComponent.hasPrefix("GameLog-autobackup-snapshot-") && $0.pathExtension == "json" }
+            .sorted { lhs, rhs in
+                let l = (try? lhs.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantPast
+                let r = (try? rhs.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantPast
+                return l < r
+            }
+        if matches.count > keep {
+            matches.prefix(matches.count - keep).forEach { try? fm.removeItem(at: $0) }
+        }
     }
 
     /// 只保留最近 keep 份恢复前快照（按修改时间，删除更旧的）。

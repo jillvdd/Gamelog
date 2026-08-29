@@ -91,15 +91,18 @@ final class Game {
     var publisher: String?
     /// 游戏类型（如 RPG / AVG，可选，自由文本）。
     var genre: String?
-    var coverData: Data?
+    /// 五类图片一律 .externalStorage：数据落行外文件、按需懒加载。
+    /// 内联 BLOB 在库上数百 MB 时，任何 @Query 重取/保存都会把全部图片一起物化，
+    /// 是整页卡顿的结构性根因（2026-08-29 性能修复，改前 store 已快照）。
+    @Attribute(.externalStorage) var coverData: Data?
     /// 1:1 方形封面（SteamGridDB 方形 grid；可选）。iOS 单列卡大图主格式。
-    var squareData: Data?
+    @Attribute(.externalStorage) var squareData: Data?
     /// 横向封面（SteamGridDB 920×430 横版 grid；可选）。展示位置待设计，先只做录入与存储。
-    var landscapeData: Data?
+    @Attribute(.externalStorage) var landscapeData: Data?
     /// 背景图（SteamGridDB heroes 宽幅横图；可选）。展示位置待设计。
-    var heroData: Data?
+    @Attribute(.externalStorage) var heroData: Data?
     /// 游戏 Logo（SteamGridDB logos 透明 PNG；可选）。详情页横幅在背景图之上展示。
-    var logoData: Data?
+    @Attribute(.externalStorage) var logoData: Data?
     /// Logo 横幅展示三档调节（源图尺寸/比例各异，用户按游戏微调；默认 = 基线观感）。
     var logoSize: String = LogoBannerSize.medium.rawValue
     var logoVertical: String = LogoBannerVertical.bottom.rawValue

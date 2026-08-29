@@ -23,21 +23,27 @@ struct GameLogApp: App {
 
     var body: some Scene {
         WindowGroup {
-            // AutoBackupContainer：启动时执行自动备份的启动检查（启动备份/版本快照/空库检测恢复）。
-            AutoBackupContainer {
-                Group {
+            // LaunchGate：开屏界面（品牌图标 + app 名 + 进度条），主界面就绪后淡出接管。
+            // iOS 另有系统 UILaunchScreen 静态开屏（点图标瞬间显示，底色一致无缝衔接）。
+            LaunchGate {
+                // AutoBackupContainer：启动时执行自动备份的启动检查（启动备份/版本快照/空库检测恢复）。
+                AutoBackupContainer {
+                    Group {
+                        #if os(macOS)
+                        RootView()
+                        #else
+                        iOSRootView()
+                        #endif
+                    }
+                    .environment(\.appLanguageCode, languageCode)
+                    .environment(\.locale, Locale(identifier: languageCode))
                     #if os(macOS)
-                    RootView()
-                    #else
-                    iOSRootView()
+                    .onAppear { UserCustomization.applyDockIcon() }
                     #endif
                 }
-                .environment(\.appLanguageCode, languageCode)
-                .environment(\.locale, Locale(identifier: languageCode))
-                #if os(macOS)
-                .onAppear { UserCustomization.applyDockIcon() }
-                #endif
             }
+            .environment(\.appLanguageCode, languageCode)
+            .environment(\.locale, Locale(identifier: languageCode))
         }
         .modelContainer(container)
         #if os(macOS)
