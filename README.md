@@ -68,7 +68,7 @@ xcrun simctl launch booted com.abcleg.GameLog
 
 本仓库提供一份真机用 Release IPA（`dist/`），未签名，需自行签名（eSign 等工具）后安装：
 
-- `GameLog-beta-2.6-device.ipa` — 真机 arm64 无签名包，适合用 eSign 等工具重签后装机
+- `GameLog-beta-2.6.ipa` — 真机 arm64 无签名包，适合用 eSign 等工具重签后装机
 
 > 提示：模拟器与日常开发调试直接用 Xcode Run 即可，不出也不需要模拟器 IPA；macOS 直接用 DMG 安装。
 

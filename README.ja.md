@@ -68,7 +68,7 @@ xcrun simctl launch booted com.abcleg.GameLog
 
 リポジトリには実機用の Release IPA（`dist/`）が 1 本あります。未署名のため、eSign などのツールで自分で署名してからインストールしてください：
 
-- `GameLog-beta-2.6-device.ipa` — 実機 arm64 無署名ビルド。eSign などのツールで再署名して実機インストールする向け
+- `GameLog-beta-2.6.ipa` — 実機 arm64 無署名ビルド。eSign などのツールで再署名して実機インストールする向け
 
 > ヒント：シミュレータや開発中のデバッグは Xcode で Run するだけで十分で、シミュレータ用 IPA は作成もし配布もしません；macOS は DMG から直接インストールします。
 
