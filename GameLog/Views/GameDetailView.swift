@@ -298,6 +298,24 @@ private struct DetailStatusPicker: View {
         GameStatus.allCases.firstIndex(of: status) ?? 0
     }
 
+    /// 单个状态格（图标 + 非紧凑时的文字标签）。抽出为方法降低 body 表达式复杂度。
+    private func statusCell(_ s: GameStatus, cellWidth: CGFloat, height: CGFloat, compact: Bool) -> some View {
+        VStack(spacing: 3) {
+            let iconFont = Font.system(size: compact ? 13 : 14, weight: .semibold)
+            Image(systemName: s.statusIcon)
+                .font(iconFont)
+            if !compact {
+                Text(verbatim: L10n.tr(s.labelKey, lang: language))
+                    .font(.system(size: 10))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+            }
+        }
+        .foregroundStyle(status == s ? Color.accentColor : Color.secondary)
+        .frame(width: cellWidth, height: height)
+        .contentShape(Rectangle())
+    }
+
     var body: some View {
         GeometryReader { geo in
             let all = GameStatus.allCases
@@ -320,19 +338,7 @@ private struct DetailStatusPicker: View {
                             guard status != s else { return }
                             status = s
                         } label: {
-                            VStack(spacing: 3) {
-                                Image(systemName: s.statusIcon)
-                                    .font(.system(size: compact ? 13 : 14, weight: .semibold))
-                                if !compact {
-                                    Text(verbatim: L10n.tr(s.labelKey, lang: language))
-                                        .font(.system(size: 10))
-                                        .lineLimit(1)
-                                        .minimumScaleFactor(0.6)
-                                }
-                            }
-                            .foregroundStyle(status == s ? Color.accentColor : Color.secondary)
-                            .frame(width: cellWidth, height: geo.size.height)
-                            .contentShape(Rectangle())
+                            statusCell(s, cellWidth: cellWidth, height: geo.size.height, compact: compact)
                         }
                         .buttonStyle(PressFeedbackButtonStyle(pressedScale: 0.94, pressedOpacity: 0.55))
                         .help(L10n.tr(s.labelKey, lang: language))
@@ -344,20 +350,6 @@ private struct DetailStatusPicker: View {
         .background {
             RoundedRectangle(cornerRadius: 12)
                 .fill(.thinMaterial)
-        }
-    }
-}
-
-/// 状态图标（状态条用）。
-private extension GameStatus {
-    var statusIcon: String {
-        switch self {
-        case .backlog: "bookmark"
-        case .playing: "play.circle"
-        case .paused: "pause.circle"
-        case .dropped: "xmark.circle"
-        case .longRunning: "infinity"
-        case .completed: "checkmark.circle"
         }
     }
 }

@@ -8,9 +8,10 @@ import SwiftData
 /// （DTO 树 + base64 膨胀 + JSON 缓冲，峰值 ~2GB），大库下编辑保存后 3 秒必卡死、
 /// iOS 退后台兜底写盘直接被系统终止。本类型把这些全部移出主线程。
 ///
-/// 输出格式与 BackupDTO 完全兼容（标准 JSON、字段一一对应、日期 ISO8601），
-/// JSONDecoder / decodeAndReplace 可直接读取；差异仅在无 prettyPrinted 空白
-/// （JSON 语义无影响，文件更小）。
+/// 输出格式与 BackupDTO 完全兼容（标准 JSON、日期 ISO8601），JSONDecoder /
+/// decodeAndReplace 可直接读取；差异仅在无 prettyPrinted 空白（JSON 语义无影响，文件更小）。
+/// 字段映射与 BackupManager.encode 共用 GameDTO(from:)（Support/Game+Backup.swift），
+/// 由构造保证一致——DataSmokeTest 的「双路径输出一致」断言兜底。
 @ModelActor
 actor BackupWriter {
 
@@ -62,65 +63,8 @@ actor BackupWriter {
         let games = try modelContext.fetch(FetchDescriptor<Game>(sortBy: [SortDescriptor(\.createdAt)]))
         for (index, game) in games.enumerated() {
             if index > 0 { try write(Data(",".utf8)) }
-            let dto = GameDTO(
-                name: game.name,
-                nameZh: game.nameZh,
-                nameJa: game.nameJa,
-                aliases: game.aliases,
-                platform: game.platform,
-                releaseDate: game.releaseDate,
-                developer: game.developer,
-                publisher: game.publisher,
-                genre: game.genre,
-                coverBase64: game.coverData?.base64EncodedString(),
-                squareBase64: game.squareData?.base64EncodedString(),
-                landscapeBase64: game.landscapeData?.base64EncodedString(),
-                heroBase64: game.heroData?.base64EncodedString(),
-                logoBase64: game.logoData?.base64EncodedString(),
-                logoSizeRaw: game.logoSize,
-                logoVerticalRaw: game.logoVertical,
-                logoHorizontalRaw: game.logoHorizontal,
-                reviewTitle: game.reviewTitle,
-                reviewBody: game.reviewBody,
-                groupNames: game.groups.map(\.name),
-                completions: game.sortedCompletions.map { c in
-                    CompletionDTO(
-                        platform: c.platform,
-                        date: c.date,
-                        degree: c.degree,
-                        playtime: c.playtime,
-                        notes: c.notes,
-                        scoreGameplay: c.scoreGameplay,
-                        scoreDesign: c.scoreDesign,
-                        scoreStory: c.scoreStory,
-                        scoreArt: c.scoreArt,
-                        scoreMusic: c.scoreMusic,
-                        scorePerformance: c.scorePerformance
-                    )
-                },
-                copies: game.copies.map { copy in
-                    CopyDTO(
-                        version: copy.version,
-                        count: copy.count,
-                        images: copy.images.map { $0.base64EncodedString() },
-                        mediaRaw: copy.mediaRaw,
-                        regionalRaw: copy.regionalRaw,
-                        conditionRaw: copy.conditionRaw,
-                        acquisitionRaw: copy.acquisitionRaw,
-                        platform: copy.platform.isEmpty ? nil : copy.platform,
-                        priceZh: copy.priceZh,
-                        priceJa: copy.priceJa,
-                        priceEn: copy.priceEn,
-                        estValueZh: copy.estValueZh,
-                        estValueJa: copy.estValueJa,
-                        estValueEn: copy.estValueEn,
-                        purchaseDate: copy.purchaseDate,
-                        notes: copy.notes.isEmpty ? nil : copy.notes
-                    )
-                },
-                status: game.status
-            )
-            try write(try encoder.encode(dto))
+            // 字段映射唯一入口 = GameDTO(from:)（与 BackupManager.encode 同一构造器，永不漂移）。
+            try write(try encoder.encode(GameDTO(from: game)))
         }
         try write(Data("]".utf8))
 

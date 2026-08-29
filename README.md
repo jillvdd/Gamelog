@@ -16,7 +16,7 @@
 - **评价（Markdown 长评）**：一句话评价（tagline）作为大号引言「题眼」展示；长评正文支持 Markdown 子集（标题 `#` / 加粗 `**` / 斜体 `*` / 列表 `-`），像排版考究的文章。**macOS = 富文本所见即所得编辑器**（独立「写字台」窗口，工具条直接改样式，存盘转回 Markdown；中文斜体在绘制层合成倾斜）；**iOS = 编辑 sheet（TextEditor）**。分端编辑、共享同一份 Markdown 渲染，双端观感一致。
 - **六维评分**：玩法 / 设计 / 剧情 / 美术 / 音乐 / 性能，1–10、0.1 步进滑块。整体 = 六维均值；首条通关记录评分必填，之后的记录可勾选跳过评分。
 - **通关记录**：平台、通关日期（可「无」）、通关程度（主线通关 / 全支线 / 全结局 / 全收集白金 / 多周目 / 速通 / 自定义）、时长（可「无」）、通关内容备注。
-- **日期选择**：macOS 三列滚轮（年 / 月 / 日，自动处理闰年 2 月 29 日与月末钳位）；iOS 用系统日期选择器。
+- **日期选择**：macOS 三列滚轮（年 / 月 / 日，自动处理闰年 2 月 29 日与月末钳位；弹性吸附落定、惯性滚动手感对齐系统滚轮）；iOS 用系统日期选择器。
 - **分组**：新建 / 重命名 / 删除；右键（macOS）或菜单（iOS）选择游戏加入；分组统计与分组评价（Markdown 渲染，macOS 可用「写字台」编辑）。
 - **收藏家模式**（设置开关）：详情页「详情 / 持有」分段切换；每个游戏可有多个持有版本（介质 11 档 / 地区 10 档 / 品相 7 档 / 来源 11 档 / 三语价格与估值 / 购买日 / 备注 + 最多 6 张照片），构成**藏品档案**。新建游戏默认**不**建持有档案，须勾选才展开填写并建档。持有页支持网格 / 列表双视图、顶部总览（版本数 / 总数量 / 总花费 / 总估值）、胶囊式元数据展示、完整编辑弹窗；照片用系统查看器查看；随备份导出。
 - **封面与图像**：本地选图（iOS 弹「相册 / 文件 / 拍照」菜单），或通过 [SteamGridDB](https://www.steamgriddb.com) API 搜索下载（需在设置里填 API Key，即输即搜）；五类图各配**自动匹配**开关（竖版封面 / 方形封面 / 横版封面 / 背景图 / Logo，输入名字停顿约 0.6 秒自动取首条命中，不覆盖已有图，失败静默；改名也会触发补抓）；方形封面只出 1:1 结果（512×512 与 1024×1024 两档都搜）；搜索面板按图类区分文案并预填当前游戏英文名；搜索结果带缩略图。
@@ -30,6 +30,8 @@
 - **备份**：整个库导出为单个 JSON（封面以 base64 内嵌），用户名 / 头像 / 图标一并导出、可整体还原，兼容旧版备份；导入带确认弹窗。iOS 导出走系统分享单（AirDrop / 存储到文件等），导出文件名带时间戳。
 - **自动备份**：每次数据改动后自动在本地写完整备份（覆盖式单文件）；版本升级前自动留存旧版快照；库为空但备份有数据时启动弹窗询问恢复；恢复 / 导入前自动留快照可反悔。iOS 备份存 Documents/Backups（「文件」App 可见），签名过期等打不开 app 时也能取走文件。
 - **清除缓存**：设置 → 存储与缓存 显示当前缓存占用并可一键清除（封面/图片解码缓存、网络缓存、临时文件），不影响任何游戏数据与备份。
+- **开屏界面**：启动即显示品牌开屏（图标 + 应用名 + 进度条），主界面就绪后淡入接管；iOS 额外有同色系统静态开屏，点图标瞬间有画面。
+- **大库性能**：图片以外部文件存储、按需懒加载（数百 MB 库不再随编辑/切页整体卡顿）；备份在后台流式写出（逐游戏分片编码，主线程零阻塞，编辑保存不再引发卡顿）。
 
 ## 平台
 
@@ -68,7 +70,7 @@ xcrun simctl launch booted com.abcleg.GameLog
 
 本仓库提供一份真机用 Release IPA（`dist/`），未签名，需自行签名（eSign 等工具）后安装：
 
-- `GameLog-beta-2.6.ipa` — 真机 arm64 无签名包，适合用 eSign 等工具重签后装机
+- `GameLog-beta-2.7.ipa` — 真机 arm64 无签名包，适合用 eSign 等工具重签后装机
 
 > 提示：模拟器与日常开发调试直接用 Xcode Run 即可，不出也不需要模拟器 IPA；macOS 直接用 DMG 安装。
 
@@ -96,9 +98,12 @@ GameLog/
 ├── GameLogApp.swift       # macOS 入口：WindowGroup + Settings/About/写字台 场景共享 ModelContainer
 ├── iOSRootView.swift      # iOS 入口：底部 TabBar（库 / 统计 / 设置）+ AirDrop 备份导入
 ├── Models/                # SwiftData 模型（Game / Completion / GameGroup / PhysicalCopy / Presets）
-├── Support/               # 平台抽象 PlatformImage、评分逻辑 ScoreMath、备份 ExportImport/AutoBackup、
-│                          #   个性化 UserCustomization、L10n、SteamGridDB、PriceFormat、
-│                          #   PlatformIcon（平台图标）、PlatformButton（跨平台按钮样式）、
+├── Support/               # 平台抽象 PlatformImage、评分逻辑 ScoreMath、备份 ExportImport/BackupWriter/AutoBackup、
+│                          #   Game+Backup（Game↔DTO 唯一映射）、个性化 UserCustomization、L10n、SteamGridDB、PriceFormat、
+│                          #   Artwork.swift 在 Models/（五类图 kind 表）、ImageImport（图片导入管线）、
+│                          #   LibraryStats（库统计聚合）、LibraryQuery（库过滤+稳定排序+排序菜单）、
+│                          #   StatusStyle（状态色/图标/游戏徽章）、ImageDecodeCache（图片解码缓存）、
+│                          #   LaunchGate（开屏）、PlatformIcon（平台图标）、PlatformButton（跨平台按钮样式）、
 │                          #   PlatformConfirmDialog（底部 action sheet）、ImageSourcePicker（加图菜单）、
 │                          #   DocumentPicker（iOS 文件选择）、ShareSheetPresenter（iOS 系统分享单）、
 │                          #   MarkdownReview（Markdown 解析/渲染）、MarkdownRichEditor（macOS 写字台）

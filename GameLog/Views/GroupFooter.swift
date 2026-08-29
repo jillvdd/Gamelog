@@ -77,20 +77,9 @@ struct GroupStatsSection: View {
         return ScoreMath.roundScore(gameScores.reduce(0, +) / Double(gameScores.count))
     }
 
-    /// 平台分布：按游戏×平台计数（每游戏每平台计 1，与全局统计页/分享卡同口径）。
-    /// 此前按通关记录逐条计数——同一游戏多条同平台记录会被重复计、未通关游戏漏计。
+    /// 平台分布：按游戏×平台计数（每游戏每平台计 1，含稳定平级裁决）——唯一归属 LibraryStats。
     private var platformCounts: [(platform: String, count: Int)] {
-        var counts: [String: Int] = [:]
-        for game in group.games {
-            for platform in game.platformList {
-                counts[platform, default: 0] += 1
-            }
-        }
-        // 计数降序；数量相同时按平台名升序，保证排序稳定、相同数量不反复横跳。
-        return counts.sorted {
-            $0.value == $1.value ? $0.key < $1.key : $0.value > $1.value
-        }
-        .map { (platform: $0.key, count: $0.value) }
+        LibraryStats.platformDistribution(Array(group.games))
     }
 
     private var maxPlatformCount: Int {

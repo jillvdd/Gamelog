@@ -65,21 +65,9 @@ struct RootView: View {
     @State private var deleteGroup: GameGroup?
     @State private var pickingGamesGroup: GameGroup?
 
-    /// 平台 → 去重游戏数（含游戏级平台，未通关游戏计入；一款游戏在多个平台各计一次）。
-    private var platformCounts: [String: Int] {
-        var counts: [String: Int] = [:]
-        for game in games {
-            for platform in game.platformList {
-                counts[platform, default: 0] += 1
-            }
-        }
-        return counts
-    }
-
-    /// 库里出现过的平台，按预设世代倒序 + 自定义按字母排最后。
-    private var platformsInUse: [String] {
-        Presets.ordered(Array(platformCounts.keys))
-    }
+    /// 平台 → 去重游戏数 / 在用平台：唯一归属 LibraryStats。
+    private var platformCounts: [String: Int] { LibraryStats.platformCounts(games) }
+    private var platformsInUse: [String] { LibraryStats.platformsInUse(games) }
 
     /// 分组行「选择游戏」的 popover 绑定：只在该行分组被选中时弹出，锚定到该行。
     private func popoverBinding(for group: GameGroup) -> Binding<GameGroup?> {

@@ -13,49 +13,21 @@ struct StatsView: View {
 
     private var totalGames: Int { games.count }
 
-    // MARK: - 收藏价值（全库汇总，与 HoldingsView 同名计算按「全库」vs「按游戏」各自实现）
+    // MARK: - 派生统计（唯一归属 = Support/LibraryStats.swift）
 
-    private var allCopies: [PhysicalCopy] {
-        games.flatMap(\.copies)
+    private var collectorTotals: LibraryStats.CollectorTotals {
+        LibraryStats.collectorTotals(games.flatMap(\.copies), language: language)
     }
-    private var totalCopyCount: Int { allCopies.count }
-    private var totalCopyQuantity: Int { allCopies.reduce(0) { $0 + $1.count } }
-    private var totalSpent: Double? {
-        let vals = allCopies.compactMap { $0.price(for: language) }
-        return vals.isEmpty ? nil : vals.reduce(0, +)
-    }
-    private var totalEstimate: Double? {
-        let vals = allCopies.compactMap { $0.estValue(for: language) }
-        return vals.isEmpty ? nil : vals.reduce(0, +)
-    }
+    private var totalCopyCount: Int { collectorTotals.editionCount }
+    private var totalCopyQuantity: Int { collectorTotals.totalQuantity }
+    private var totalSpent: Double? { collectorTotals.totalSpent }
+    private var totalEstimate: Double? { collectorTotals.totalEstimate }
 
-    /// 想玩清单数量（状态机：status == backlog 的游戏数）。
-    private var backlogCount: Int {
-        games.filter { $0.statusValue == .backlog }.count
-    }
-
-    /// 库平均分：库内每条已评分通关记录的六维平均分之均值，取整到 0.5。
-    /// 单条记录按现有六维评分求均值，一条通关记录计一次。
-    private var avgScore: Double? {
-        let averages = games
-            .flatMap(\.completions)
-            .compactMap(\.recordAverage)
-        guard !averages.isEmpty else { return nil }
-        return ScoreMath.roundScore(averages.reduce(0, +) / Double(averages.count))
-    }
+    private var backlogCount: Int { LibraryStats.backlogCount(games) }
+    private var avgScore: Double? { LibraryStats.averageScore(games) }
 
     private var platformCounts: [(platform: String, count: Int)] {
-        var counts: [String: Int] = [:]
-        for game in games {
-            for platform in game.platformList {
-                counts[platform, default: 0] += 1
-            }
-        }
-        // 计数降序；数量相同时按平台名升序，保证排序稳定、相同数量不反复横跳。
-        return counts.sorted {
-            $0.value == $1.value ? $0.key < $1.key : $0.value > $1.value
-        }
-        .map { (platform: $0.key, count: $0.value) }
+        LibraryStats.platformDistribution(games)
     }
 
     private var maxPlatformCount: Int {

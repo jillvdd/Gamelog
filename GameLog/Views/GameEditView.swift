@@ -212,35 +212,19 @@ struct GameEditView: View {
     @State private var developer = ""
     @State private var publisher = ""
     @State private var genre = ""
-    @State private var coverData: Data?
-    // 1:1 方形封面 + 三类附加图（可选，展示位置待设计，先只做录入与存储）：开关关 = 不使用该图（保存时清空）。
-    @State private var hasSquare = false
-    @State private var squareData: Data?
-    @State private var hasLandscape = false
-    @State private var landscapeData: Data?
-    @State private var hasHero = false
-    @State private var heroData: Data?
-    @State private var hasLogo = false
-    @State private var logoData: Data?
-    // 附加图自动匹配进行中（各图独立 spinner；开关触发与改名触发共用）。
-    @State private var isAutoMatchingSquare = false
-    @State private var isAutoMatchingLandscape = false
-    @State private var isAutoMatchingHero = false
-    @State private var isAutoMatchingLogo = false
-    // Logo 横幅展示三档调节（详情页背景图之上的位置/大小；仅 hasLogo 开时有意义）。
+    // 五类图（封面/方形/横向/背景图/Logo）：kind 字典化状态（2026-08-29 深化，接线塌缩为 ForEach）。
+    // data[kind] = 当前图；gated[kind] = 门控开关（仅 isToggleGated 类型有意义，关 = 保存时清空）；
+    // matching[kind] = 自动匹配进行中（spinner）。封面数据恒在、无开关。
+    @State private var artworkData: [ArtworkKind: Data] = [:]
+    @State private var artworkGated: [ArtworkKind: Bool] = [:]
+    @State private var artworkMatching: Set<ArtworkKind> = []
+    // Logo 横幅展示三档调节（详情页背景图之上的位置/大小；仅 Logo 开时有意义）。
     @State private var logoSize: LogoBannerSize = .medium
     @State private var logoVertical: LogoBannerVertical = .bottom
     @State private var logoHorizontal: LogoBannerHorizontal = .leading
-    // 各图像的搜索面板开关。
-    @State private var showingSquareSearch = false
-    @State private var showingLandscapeSearch = false
-    // 照片图库选择器开关（macOS 走 photoLibraryPicker；iOS 走 imageSourcePicker 的相册分支）。
-    @State private var showingLandscapePicker = false
-    @State private var showingHeroPicker = false
-    @State private var showingLogoPicker = false
-    @State private var showingSquarePicker = false
-    @State private var showingHeroSearch = false
-    @State private var showingLogoSearch = false
+    // 搜索面板 / 选图器当前服务的图类（nil = 关闭；单一 sheet/modifier 由 kind 驱动）。
+    @State private var activeSearchKind: ArtworkKind?
+    @State private var activePickerKind: ArtworkKind?
     @State private var reviewTitle = ""
     @State private var reviewBody = ""
     @State private var groupIDs: Set<PersistentIdentifier> = []
@@ -286,13 +270,10 @@ struct GameEditView: View {
     @State private var createHolding = false
 
     @State private var validationError: String?
-    @State private var showingCoverSearch = false
-    @State private var showingCoverPicker = false
     @AppStorage("steamGridDBKey") private var steamGridDBKey = ""
     @AppStorage(UserCustomization.autoMatchCoverKey) private var autoMatchCover = false
     @AppStorage(UserCustomization.collectorModeKey) private var collectorMode = false
 
-    @State private var isAutoMatching = false
     @State private var didFinishLoading = false
     /// 加载时的游戏名：自动匹配只在名字被用户改动后才触发（避免编辑打开时误匹配）。
     @State private var nameAtLoad = ""
@@ -405,132 +386,28 @@ struct GameEditView: View {
                     }
                 }
 
-                // 封面（2:3 主格式，恒显示）
-                ArtworkRow(
-                    titleKey: "game.cover",
-                    data: coverData,
-                    aspect: 0.75,
-                    thumbWidth: 72,
-                    isAutoMatching: isAutoMatching,
-                    onPick: {
-                        #if os(macOS)
-                        pickImageFromPanel { coverData = $0 }
-                        #else
-                        showingCoverPicker = true
-                        #endif
-                    },
-                    onPickFromLibrary: { showingCoverPicker = true },
-                    onSearch: { showingCoverSearch = true },
-                    onDelete: { coverData = nil }
-                )
-
-                // 1:1 方形封面 + 三类附加图像：各自开关，默认关；开 = 展开预览与录入按钮。
-                Toggle(L10n.tr("game.square", lang: language), isOn: $hasSquare)
-                    .task(id: hasSquare) {
-                        await autoMatchOnToggle(kind: .square, enabled: hasSquare,
-                                                isSet: { squareData != nil },
-                                                assign: { squareData = $0 }, active: $isAutoMatchingSquare)
-                    }
-                if hasSquare {
-                    ArtworkRow(
-                        titleKey: "game.square",
-                        data: squareData,
-                        aspect: 1.0,
-                        thumbWidth: 96,
-                        isAutoMatching: isAutoMatchingSquare,
-                        onPick: {
-                            #if os(macOS)
-                            pickImageFromPanel { squareData = $0 }
-                            #else
-                            showingSquarePicker = true
-                            #endif
-                        },
-                        onPickFromLibrary: { showingSquarePicker = true },
-                        onSearch: { showingSquareSearch = true },
-                        onDelete: { squareData = nil }
-                    )
+                // 五类图：kind 表驱动（封面恒显示；其余 Toggle 门控，关 = 保存时清空）。
+                // 接线（开关触发/改名触发自动匹配、面板与选图器、删除）全部由 kind 参数化。
+                ForEach(ArtworkKind.allCases.filter { !$0.isToggleGated }) { kind in
+                    artworkRow(kind)
                 }
-                Toggle(L10n.tr("game.landscape", lang: language), isOn: $hasLandscape)
-                    .task(id: hasLandscape) {
-                        await autoMatchOnToggle(kind: .landscape, enabled: hasLandscape,
-                                                isSet: { landscapeData != nil },
-                                                assign: { landscapeData = $0 }, active: $isAutoMatchingLandscape)
+                ForEach(ArtworkKind.allCases.filter(\.isToggleGated)) { kind in
+                    Toggle(L10n.tr(kind.labelKey, lang: language), isOn: gatedBinding(kind))
+                        .task(id: artworkGated[kind] ?? false) {
+                            await autoMatchOnToggle(kind)
+                        }
+                    if artworkGated[kind] == true {
+                        artworkRow(kind)
+                        if kind == .logo {
+                            // Logo 源图尺寸比例各异：详情页横幅内的大小/位置三档可调。
+                            EnumPickerRow(title: L10n.tr("game.logoSize", lang: language),
+                                          cases: LogoBannerSize.allCases, selection: $logoSize, language: language)
+                            EnumPickerRow(title: L10n.tr("game.logoVertical", lang: language),
+                                          cases: LogoBannerVertical.allCases, selection: $logoVertical, language: language)
+                            EnumPickerRow(title: L10n.tr("game.logoHorizontal", lang: language),
+                                          cases: LogoBannerHorizontal.allCases, selection: $logoHorizontal, language: language)
+                        }
                     }
-                if hasLandscape {
-                    ArtworkRow(
-                        titleKey: "game.landscape",
-                        data: landscapeData,
-                        aspect: 2.14,
-                        thumbWidth: 128,
-                        isAutoMatching: isAutoMatchingLandscape,
-                        onPick: {
-                            #if os(macOS)
-                            pickImageFromPanel { landscapeData = $0 }
-                            #else
-                            showingLandscapePicker = true
-                            #endif
-                        },
-                        onPickFromLibrary: { showingLandscapePicker = true },
-                        onSearch: { showingLandscapeSearch = true },
-                        onDelete: { landscapeData = nil }
-                    )
-                }
-                Toggle(L10n.tr("game.hero", lang: language), isOn: $hasHero)
-                    .task(id: hasHero) {
-                        await autoMatchOnToggle(kind: .hero, enabled: hasHero,
-                                                isSet: { heroData != nil },
-                                                assign: { heroData = $0 }, active: $isAutoMatchingHero)
-                    }
-                if hasHero {
-                    ArtworkRow(
-                        titleKey: "game.hero",
-                        data: heroData,
-                        aspect: 3.1,
-                        thumbWidth: 168,
-                        isAutoMatching: isAutoMatchingHero,
-                        onPick: {
-                            #if os(macOS)
-                            pickImageFromPanel { heroData = $0 }
-                            #else
-                            showingHeroPicker = true
-                            #endif
-                        },
-                        onPickFromLibrary: { showingHeroPicker = true },
-                        onSearch: { showingHeroSearch = true },
-                        onDelete: { heroData = nil }
-                    )
-                }
-                Toggle(L10n.tr("game.logo", lang: language), isOn: $hasLogo)
-                    .task(id: hasLogo) {
-                        await autoMatchOnToggle(kind: .logo, enabled: hasLogo,
-                                                isSet: { logoData != nil },
-                                                assign: { logoData = $0 }, active: $isAutoMatchingLogo)
-                    }
-                if hasLogo {
-                    ArtworkRow(
-                        titleKey: "game.logo",
-                        data: logoData,
-                        aspect: nil,
-                        thumbWidth: 128,
-                        isAutoMatching: isAutoMatchingLogo,
-                        onPick: {
-                            #if os(macOS)
-                            pickImageFromPanel { logoData = $0 }
-                            #else
-                            showingLogoPicker = true
-                            #endif
-                        },
-                        onPickFromLibrary: { showingLogoPicker = true },
-                        onSearch: { showingLogoSearch = true },
-                        onDelete: { logoData = nil }
-                    )
-                    // Logo 源图尺寸比例各异：详情页横幅内的大小/位置三档可调。
-                    EnumPickerRow(title: L10n.tr("game.logoSize", lang: language),
-                                  cases: LogoBannerSize.allCases, selection: $logoSize, language: language)
-                    EnumPickerRow(title: L10n.tr("game.logoVertical", lang: language),
-                                  cases: LogoBannerVertical.allCases, selection: $logoVertical, language: language)
-                    EnumPickerRow(title: L10n.tr("game.logoHorizontal", lang: language),
-                                  cases: LogoBannerHorizontal.allCases, selection: $logoHorizontal, language: language)
                 }
             }
 
@@ -663,77 +540,73 @@ struct GameEditView: View {
         } message: {
             Text(verbatim: validationError ?? "")
         }
-        .sheet(isPresented: $showingCoverSearch) {
-            CoverSearchSheet(kind: .poster, imageData: $coverData, initialTerm: name)
-        }
-        .sheet(isPresented: $showingSquareSearch) {
-            CoverSearchSheet(kind: .square, imageData: $squareData, initialTerm: name)
-        }
-        .sheet(isPresented: $showingLandscapeSearch) {
-            CoverSearchSheet(kind: .landscape, imageData: $landscapeData, initialTerm: name)
-        }
-        .sheet(isPresented: $showingHeroSearch) {
-            CoverSearchSheet(kind: .hero, imageData: $heroData, initialTerm: name)
-        }
-        .sheet(isPresented: $showingLogoSearch) {
-            CoverSearchSheet(kind: .logo, imageData: $logoData, initialTerm: name)
+        .sheet(item: $activeSearchKind) { kind in
+            CoverSearchSheet(kind: kind, imageData: artworkBinding(kind), initialTerm: name)
         }
         #if !os(macOS)
-        .imageSourcePicker(isPresented: $showingCoverPicker, onImages: { datas in
-            if let data = datas.first {
-                coverData = data
-            }
-        })
-        .imageSourcePicker(isPresented: $showingSquarePicker, onImages: { datas in
-            if let data = datas.first {
-                squareData = data
-            }
-        })
-        .imageSourcePicker(isPresented: $showingLandscapePicker, onImages: { datas in
-            if let data = datas.first {
-                landscapeData = data
-            }
-        })
-        .imageSourcePicker(isPresented: $showingHeroPicker, onImages: { datas in
-            if let data = datas.first {
-                heroData = data
-            }
-        })
-        .imageSourcePicker(isPresented: $showingLogoPicker, onImages: { datas in
-            if let data = datas.first {
-                logoData = data
+        .imageSourcePicker(isPresented: pickerPresented, onImages: { datas in
+            if let kind = activePickerKind, let data = datas.first {
+                artworkData[kind] = data
             }
         })
         #endif
         #if os(macOS)
         // macOS 照片图库选择器：与 iOS 相册分支同口径——取 first 原样入库，不压缩。
-        .photoLibraryPicker(isPresented: $showingCoverPicker, onImages: { datas in
-            if let data = datas.first {
-                coverData = data
-            }
-        })
-        .photoLibraryPicker(isPresented: $showingSquarePicker, onImages: { datas in
-            if let data = datas.first {
-                squareData = data
-            }
-        })
-        .photoLibraryPicker(isPresented: $showingLandscapePicker, onImages: { datas in
-            if let data = datas.first {
-                landscapeData = data
-            }
-        })
-        .photoLibraryPicker(isPresented: $showingHeroPicker, onImages: { datas in
-            if let data = datas.first {
-                heroData = data
-            }
-        })
-        .photoLibraryPicker(isPresented: $showingLogoPicker, onImages: { datas in
-            if let data = datas.first {
-                logoData = data
+        .photoLibraryPicker(isPresented: pickerPresented, onImages: { datas in
+            if let kind = activePickerKind, let data = datas.first {
+                artworkData[kind] = data
             }
         })
         #endif
         .onAppear(perform: load)
+    }
+
+    // MARK: - 五类图接线（kind 表驱动）
+
+    /// 单类图的录入行（预览比例/缩略宽/按钮列全部查 kind 表）。
+    @ViewBuilder
+    private func artworkRow(_ kind: ArtworkKind) -> some View {
+        ArtworkRow(
+            titleKey: kind.labelKey,
+            data: artworkData[kind],
+            aspect: kind.previewAspect,
+            thumbWidth: kind.previewThumbWidth,
+            isAutoMatching: artworkMatching.contains(kind),
+            onPick: {
+                if ImageImport.supportsPanel {
+                    pickImageFromPanel { artworkData[kind] = $0 }
+                } else {
+                    activePickerKind = kind
+                }
+            },
+            onPickFromLibrary: { activePickerKind = kind },
+            onSearch: { activeSearchKind = kind },
+            onDelete: { artworkData[kind] = nil }
+        )
+    }
+
+    /// 门控开关的双向绑定（关 = 保存时清空，数据先保留在字典里供开关重开恢复）。
+    private func gatedBinding(_ kind: ArtworkKind) -> Binding<Bool> {
+        Binding(
+            get: { artworkGated[kind] ?? false },
+            set: { artworkGated[kind] = $0 }
+        )
+    }
+
+    /// 编辑页图数据的双向绑定（搜索面板直接写回对应 kind）。
+    private func artworkBinding(_ kind: ArtworkKind) -> Binding<Data?> {
+        Binding(
+            get: { artworkData[kind] },
+            set: { artworkData[kind] = $0 }
+        )
+    }
+
+    /// 选图器呈现绑定：以 activePickerKind 非 nil 驱动；关闭时清 kind。
+    private var pickerPresented: Binding<Bool> {
+        Binding(
+            get: { activePickerKind != nil },
+            set: { if !$0 { activePickerKind = nil } }
+        )
     }
 
     private var savedKey: String {
@@ -762,15 +635,10 @@ struct GameEditView: View {
         developer = game.developer ?? ""
         publisher = game.publisher ?? ""
         genre = game.genre ?? ""
-        coverData = game.coverData
-        squareData = game.squareData
-        landscapeData = game.landscapeData
-        heroData = game.heroData
-        logoData = game.logoData
-        hasSquare = game.squareData != nil
-        hasLandscape = game.landscapeData != nil
-        hasHero = game.heroData != nil
-        hasLogo = game.logoData != nil
+        for kind in ArtworkKind.allCases {
+            artworkData[kind] = game.artwork(kind)
+            artworkGated[kind] = game.artwork(kind) != nil
+        }
         logoSize = game.logoSizeValue
         logoVertical = game.logoVerticalValue
         logoHorizontal = game.logoHorizontalValue
@@ -792,17 +660,11 @@ struct GameEditView: View {
 
     // MARK: - 自动匹配封面
 
-    /// macOS 本地选图（iOS 走 imageSourcePicker modifier，回调里写对应 @State）。
+    /// macOS 本地选图（统一走 ImageImport seam；iOS 走 imageSourcePicker modifier + activePickerKind）。
     private func pickImageFromPanel(apply: @escaping (Data) -> Void) {
-        #if os(macOS)
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.image]
-        panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = false
-        if panel.runModal() == .OK, let url = panel.url, let data = try? Data(contentsOf: url) {
+        if let data = ImageImport.pickOneFromPanel() {
             apply(data)
         }
-        #endif
     }
 
     /// 输入游戏名 → 防抖后自动匹配封面与已开开关且未设置的附加图（仅当开关开、已配 key）。
@@ -815,42 +677,27 @@ struct GameEditView: View {
         guard term.count >= 2 else { return }
         try? await Task.sleep(nanoseconds: 600_000_000)
         guard !Task.isCancelled else { return }
-        let client = SteamGridDBClient(apiKey: steamGridDBKey)
-        // 封面（原有路径）。
-        if coverData == nil {
-            isAutoMatching = true
-            defer { isAutoMatching = false }
-            do {
-                // 复查 isCancelled：快速连续改名时旧名字的响应若已在取消生效前返回，不能写入。
-                if let data = try await client.autoCover(for: term), !Task.isCancelled, coverData == nil {
-                    coverData = data
-                }
-            } catch {
-                // 匹配失败静默降级：不打断录入，封面保持为空，可随时手动搜索。
-            }
+        // 封面（原有路径，kind=.poster 特例：无门控、恒匹配）。
+        await autoFillArtwork(.poster, term: term)
+        // 其余四类：开关开着且未设置的跟随改名一起匹配（防抖/静默降级与封面同款）。
+        for kind in ArtworkKind.allCases where kind.isToggleGated {
+            await autoFillArtwork(kind, term: term)
         }
-        // 三类附加图：开关开着且未设置的跟随改名一起匹配（防抖/静默降级与封面同款）。
-        await autoFillArtwork(kind: .square, term: term, enabled: hasSquare,
-                              isSet: { squareData != nil }, assign: { squareData = $0 }, active: $isAutoMatchingSquare)
-        await autoFillArtwork(kind: .landscape, term: term, enabled: hasLandscape,
-                              isSet: { landscapeData != nil }, assign: { landscapeData = $0 }, active: $isAutoMatchingLandscape)
-        await autoFillArtwork(kind: .hero, term: term, enabled: hasHero,
-                              isSet: { heroData != nil }, assign: { heroData = $0 }, active: $isAutoMatchingHero)
-        await autoFillArtwork(kind: .logo, term: term, enabled: hasLogo,
-                              isSet: { logoData != nil }, assign: { logoData = $0 }, active: $isAutoMatchingLogo)
     }
 
-    /// 单类附加图的自动匹配：开关开 + 未设置才搜；静默降级；写入前经 isSet 复查实时值
+    /// 单类图的自动匹配：门控开 + 未设置才搜；静默降级；写入前复查实时值
     /// （await 期间用户可能已手动选图，不能覆盖）。
-    private func autoFillArtwork(kind: ArtworkKind, term: String, enabled: Bool,
-                                 isSet: () -> Bool, assign: @escaping (Data) -> Void, active: Binding<Bool>) async {
-        guard enabled, !isSet() else { return }
-        active.wrappedValue = true
-        defer { active.wrappedValue = false }
+    private func autoFillArtwork(_ kind: ArtworkKind, term: String) async {
+        // 封面无门控恒匹配；其余类型须开关已开。
+        if kind.isToggleGated && artworkGated[kind] != true { return }
+        guard artworkData[kind] == nil else { return }
+        artworkMatching.insert(kind)
+        defer { artworkMatching.remove(kind) }
         let client = SteamGridDBClient(apiKey: steamGridDBKey)
         do {
-            if let data = try await client.autoArtwork(for: term, kind: kind), !Task.isCancelled, !isSet() {
-                assign(data)
+            if let data = try await client.autoArtwork(for: term, kind: kind), !Task.isCancelled,
+               artworkData[kind] == nil {
+                artworkData[kind] = data
             }
         } catch {
             // 静默降级，与封面同口径。
@@ -858,15 +705,15 @@ struct GameEditView: View {
     }
 
     /// 「未设置时打开某类附加图开关」→ 立即触发该类图的自动匹配（防抖 600ms 同改名路径）。
-    /// 由三处 `.task(id: hasXxx)` 驱动；false→true 且数据为 nil 才匹配。
-    private func autoMatchOnToggle(kind: ArtworkKind, enabled: Bool,
-                                   isSet: @escaping () -> Bool, assign: @escaping (Data) -> Void, active: Binding<Bool>) async {
-        guard enabled, !isSet(), autoMatchCover, !steamGridDBKey.isEmpty, didFinishLoading else { return }
+    /// 由 `.task(id: gated[kind])` 驱动；false→true 且数据为 nil 才匹配。
+    private func autoMatchOnToggle(_ kind: ArtworkKind) async {
+        guard (artworkGated[kind] ?? false), artworkData[kind] == nil,
+              autoMatchCover, !steamGridDBKey.isEmpty, didFinishLoading else { return }
         let term = name.trimmingCharacters(in: .whitespaces)
         guard term.count >= 2 else { return }
         try? await Task.sleep(nanoseconds: 600_000_000)
         guard !Task.isCancelled else { return }
-        await autoFillArtwork(kind: kind, term: term, enabled: enabled, isSet: isSet, assign: assign, active: active)
+        await autoFillArtwork(kind, term: term)
     }
 
     private var parsedPlaytime: Double? {
@@ -915,11 +762,11 @@ struct GameEditView: View {
                 developer: developer.trimmingCharacters(in: .whitespaces).isEmpty ? nil : developer.trimmingCharacters(in: .whitespaces),
                 publisher: publisher.trimmingCharacters(in: .whitespaces).isEmpty ? nil : publisher.trimmingCharacters(in: .whitespaces),
                 genre: genre.trimmingCharacters(in: .whitespaces).isEmpty ? nil : genre.trimmingCharacters(in: .whitespaces),
-                coverData: coverData,
-                squareData: hasSquare ? squareData : nil,
-                landscapeData: hasLandscape ? landscapeData : nil,
-                heroData: hasHero ? heroData : nil,
-                logoData: hasLogo ? logoData : nil,
+                coverData: artworkData[.poster],
+                squareData: artworkGated[.square] == true ? artworkData[.square] : nil,
+                landscapeData: artworkGated[.landscape] == true ? artworkData[.landscape] : nil,
+                heroData: artworkGated[.hero] == true ? artworkData[.hero] : nil,
+                logoData: artworkGated[.logo] == true ? artworkData[.logo] : nil,
                 logoSize: logoSize,
                 logoVertical: logoVertical,
                 logoHorizontal: logoHorizontal,
@@ -988,11 +835,10 @@ struct GameEditView: View {
             game.developer = developer.trimmingCharacters(in: .whitespaces).isEmpty ? nil : developer.trimmingCharacters(in: .whitespaces)
             game.publisher = publisher.trimmingCharacters(in: .whitespaces).isEmpty ? nil : publisher.trimmingCharacters(in: .whitespaces)
             game.genre = genre.trimmingCharacters(in: .whitespaces).isEmpty ? nil : genre.trimmingCharacters(in: .whitespaces)
-            game.coverData = coverData
-            game.squareData = hasSquare ? squareData : nil
-            game.landscapeData = hasLandscape ? landscapeData : nil
-            game.heroData = hasHero ? heroData : nil
-            game.logoData = hasLogo ? logoData : nil
+            for kind in ArtworkKind.allCases {
+                let gated = kind.isToggleGated ? (artworkGated[kind] == true) : true
+                game.setArtwork(kind, gated ? artworkData[kind] : nil)
+            }
             game.logoSizeValue = logoSize
             game.logoVerticalValue = logoVertical
             game.logoHorizontalValue = logoHorizontal

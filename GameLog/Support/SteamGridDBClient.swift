@@ -140,21 +140,36 @@ struct SteamGridDBClient {
     func autoArtwork(for term: String, kind: ArtworkKind) async throws -> Data? {
         let hits = try await search(term: term)
         guard let first = hits.first else { return nil }
-        let candidates: [SteamGridDBGrid]
-        switch kind {
-        case .square:
-            candidates = try await squaresPage(for: first.id, page: 0).grids
-        case .landscape:
-            candidates = try await landscapesPage(for: first.id, page: 0).grids
-        case .hero:
-            candidates = try await heroes(for: first.id)
-        case .logo:
-            candidates = try await logos(for: first.id)
-        case .poster:
-            candidates = try await grids(for: first.id)
-        }
-        guard let grid = candidates.first else { return nil }
+        guard let grid = try await artworkResults(for: first.id, kind: kind).first else { return nil }
         return try await fetchImage(urlString: grid.url)
+    }
+
+    /// 按图类取某游戏的候选图列表（kind→端点的唯一 switch；搜索面板与自动匹配共用）。
+    /// poster 首页竖版优先排序；square/landscape 用尺寸过滤端点第 0 页；hero/logo 全量大图优先。
+    func artworkResults(for gameId: Int, kind: ArtworkKind) async throws -> [SteamGridDBGrid] {
+        switch kind {
+        case .poster:
+            let page = try await gridsPage(for: gameId, page: 0)
+            return SteamGridDBClient.sorted(page.grids)
+        case .square:
+            return try await squaresPage(for: gameId, page: 0).grids
+        case .landscape:
+            return try await landscapesPage(for: gameId, page: 0).grids
+        case .hero:
+            return try await heroes(for: gameId).sorted { $0.width * $0.height > $1.width * $1.height }
+        case .logo:
+            return try await logos(for: gameId).sorted { $0.width * $0.height > $1.width * $1.height }
+        }
+    }
+
+    /// 按图类取分页查询（仅 supportsPaging 类型；hero/logo 不分页返回 nil）。
+    func artworkPage(for gameId: Int, kind: ArtworkKind, page: Int) async throws -> GridPage? {
+        switch kind {
+        case .poster: try await gridsPage(for: gameId, page: page)
+        case .square: try await squaresPage(for: gameId, page: page)
+        case .landscape: try await landscapesPage(for: gameId, page: page)
+        case .hero, .logo: nil
+        }
     }
 
     /// 竖版优先、大尺寸优先的封面排序（CoverSearchSheet 与自动匹配共用）。

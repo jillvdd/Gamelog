@@ -14,24 +14,15 @@ struct GroupGamePickerView: View {
     /// 平台筛选，nil = 全部平台。
     @State private var platformFilter: String?
 
-    /// 整库出现过的平台（预设世代倒序 + 自定义排最后；含游戏级平台，未通关游戏也有平台）。
-    private var platforms: [String] {
-        Presets.ordered(games.flatMap(\.platformList))
-    }
+    /// 整库出现过的平台：唯一归属 LibraryStats。
+    private var platforms: [String] { LibraryStats.platformsInUse(games) }
 
     private var visibleGames: [Game] {
-        var result = games
-        if let platformFilter {
-            result = result.filter { game in
-                game.platformList.contains(platformFilter)
-            }
-        }
-        if !searchText.isEmpty {
-            result = result.filter { $0.matches(search: searchText) }
-        }
-        return result.sorted {
-            $0.displayName(for: language).localizedCaseInsensitiveCompare($1.displayName(for: language)) == .orderedAscending
-        }
+        // 过滤+排序统一走 LibraryQuery（按名排序 + 稳定平级裁决——修复并列游戏重渲染换位）。
+        let result = LibraryQuery.filter(
+            games: games, group: nil, platform: platformFilter, status: nil, search: searchText
+        )
+        return LibraryQuery.sorted(result, by: .name, language: language)
     }
 
     private func isInGroup(_ game: Game) -> Bool {

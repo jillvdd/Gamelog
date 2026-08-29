@@ -5,19 +5,6 @@ import SwiftData
 import AppKit
 #endif
 
-/// 库排序选项。
-enum LibrarySort: String, CaseIterable, Identifiable {
-    case name
-    case releaseDate
-    case completionDate
-    case scoreAscending
-    case scoreDescending
-    case recentEdit
-    case valueDescending
-
-    var id: String { rawValue }
-}
-
 #if os(iOS)
 /// iOS 库视图三态：网格 / 单列横向卡 / 列表（macOS 不受影响，仍用 useGridView Bool）。
 enum IOSLibraryViewMode: String, CaseIterable, Identifiable {
@@ -88,65 +75,17 @@ struct LibraryView: View {
     }
 
     private var visibleGames: [Game] {
-        var result: [Game]
-        if let groupFilter {
-            // 分组视图直接以双向关系为准：关系变化（右键移出/加入）立即反映
-            result = groupFilter.games
-            #if os(macOS)
-            if !groupPlatformFilter.isEmpty {
-                result = result.filter { game in
-                    game.platformList.contains(groupPlatformFilter)
-                }
-            }
-            #endif
-        } else {
-            result = games
+        // 平台过滤在分组/非分组两种模式下都生效（iOS 由分组/平台两个菜单驱动；macOS 分组模式叠加 groupPlatformFilter）。
+        var result = LibraryQuery.filter(
+            games: games, group: groupFilter,
+            platform: platform, status: statusFilter, search: searchText
+        )
+        #if os(macOS)
+        if let groupFilter, !groupPlatformFilter.isEmpty {
+            result = result.filter { $0.platformList.contains(groupPlatformFilter) }
         }
-        // 平台过滤在分组/非分组两种模式下都生效（iOS 由分组/平台两个菜单驱动；macOS 分组模式用 groupPlatformFilter）。
-        if let platform {
-            result = result.filter { game in
-                game.platformList.contains(platform)
-            }
-        }
-        if let statusFilter {
-            result = result.filter { $0.statusValue == statusFilter }
-        }
-        if !searchText.isEmpty {
-            result = result.filter { $0.matches(search: searchText) }
-        }
-        // 主比较器 + 稳定裁决键：Swift sort 非稳定、分组关系数组顺序也不保证，
-        // 并列条目（同名/同分/同日期）每次 body 重算可能互换跳动，统一以显示名→创建时间裁决。
-        func stableSort(by areInOrder: (Game, Game) -> Bool) {
-            result.sort { a, b in
-                if areInOrder(a, b) { return true }
-                if areInOrder(b, a) { return false }
-                let an = a.displayName(for: language), bn = b.displayName(for: language)
-                if an.caseInsensitiveCompare(bn) == .orderedAscending { return true }
-                if bn.caseInsensitiveCompare(an) == .orderedAscending { return false }
-                return a.createdAt < b.createdAt
-            }
-        }
-        switch sortOption {
-        case .name:
-            stableSort { $0.displayName(for: language).localizedCaseInsensitiveCompare($1.displayName(for: language)) == .orderedAscending }
-        case .releaseDate:
-            stableSort { ($0.releaseDate ?? .distantPast) > ($1.releaseDate ?? .distantPast) }
-        case .completionDate:
-            stableSort { ($0.latestCompletionDate ?? .distantPast) > ($1.latestCompletionDate ?? .distantPast) }
-        case .scoreAscending:
-            // 未评分（nil）按无穷大处理，排在已评分之后。
-            stableSort { ($0.rawLibraryScore(platform: nil) ?? .greatestFiniteMagnitude) < ($1.rawLibraryScore(platform: nil) ?? .greatestFiniteMagnitude) }
-        case .scoreDescending:
-            // 未评分（nil）按 -1 处理，排在已评分之后。
-            stableSort { ($0.rawLibraryScore(platform: nil) ?? -1) > ($1.rawLibraryScore(platform: nil) ?? -1) }
-        case .recentEdit:
-            // 最近编辑：无编辑记录退回创建时间；越新越靠前。
-            stableSort { $0.lastEditedAt > $1.lastEditedAt }
-        case .valueDescending:
-            // 价值最高（总估值，按当前语言）；无估值（nil）排最后。
-            stableSort { ($0.totalEstimate(for: language) ?? -1) > ($1.totalEstimate(for: language) ?? -1) }
-        }
-        return result
+        #endif
+        return LibraryQuery.sorted(result, by: sortOption, language: language)
     }
 
     private var navigationTitleText: String {
@@ -253,72 +192,9 @@ struct LibraryView: View {
     }
     #endif
 
-    /// 排序菜单项（勾选态随 sortOption）。
-    @ViewBuilder
+    /// 排序菜单项：LibrarySortMenuItems 共享组件（iOS 更多菜单同源）。
     private var sortMenuItems: some View {
-        Button {
-            sortRaw = LibrarySort.recentEdit.rawValue
-        } label: {
-            if sortOption == .recentEdit {
-                Label(L10n.tr("library.sortByRecentEdit", lang: language), systemImage: "checkmark")
-            } else {
-                Text(verbatim: L10n.tr("library.sortByRecentEdit", lang: language))
-            }
-        }
-        Button {
-            sortRaw = LibrarySort.name.rawValue
-        } label: {
-            if sortOption == .name {
-                Label(L10n.tr("library.sortByName", lang: language), systemImage: "checkmark")
-            } else {
-                Text(verbatim: L10n.tr("library.sortByName", lang: language))
-            }
-        }
-        Button {
-            sortRaw = LibrarySort.releaseDate.rawValue
-        } label: {
-            if sortOption == .releaseDate {
-                Label(L10n.tr("library.sortByRelease", lang: language), systemImage: "checkmark")
-            } else {
-                Text(verbatim: L10n.tr("library.sortByRelease", lang: language))
-            }
-        }
-        Button {
-            sortRaw = LibrarySort.completionDate.rawValue
-        } label: {
-            if sortOption == .completionDate {
-                Label(L10n.tr("library.sortByCompletion", lang: language), systemImage: "checkmark")
-            } else {
-                Text(verbatim: L10n.tr("library.sortByCompletion", lang: language))
-            }
-        }
-        Button {
-            sortRaw = LibrarySort.scoreAscending.rawValue
-        } label: {
-            if sortOption == .scoreAscending {
-                Label(L10n.tr("library.sortByScoreAsc", lang: language), systemImage: "checkmark")
-            } else {
-                Text(verbatim: L10n.tr("library.sortByScoreAsc", lang: language))
-            }
-        }
-        Button {
-            sortRaw = LibrarySort.scoreDescending.rawValue
-        } label: {
-            if sortOption == .scoreDescending {
-                Label(L10n.tr("library.sortByScoreDesc", lang: language), systemImage: "checkmark")
-            } else {
-                Text(verbatim: L10n.tr("library.sortByScoreDesc", lang: language))
-            }
-        }
-        Button {
-            sortRaw = LibrarySort.valueDescending.rawValue
-        } label: {
-            if sortOption == .valueDescending {
-                Label(L10n.tr("library.sortByValueDesc", lang: language), systemImage: "checkmark")
-            } else {
-                Text(verbatim: L10n.tr("library.sortByValueDesc", lang: language))
-            }
-        }
+        LibrarySortMenuItems(sortRaw: $sortRaw)
     }
 
     @ViewBuilder
@@ -636,69 +512,7 @@ struct LibraryView: View {
             }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
-                    Button {
-                        sortRaw = LibrarySort.recentEdit.rawValue
-                    } label: {
-                        if sortOption == .recentEdit {
-                            Label(L10n.tr("library.sortByRecentEdit", lang: language), systemImage: "checkmark")
-                        } else {
-                            Text(verbatim: L10n.tr("library.sortByRecentEdit", lang: language))
-                        }
-                    }
-                    Button {
-                        sortRaw = LibrarySort.name.rawValue
-                    } label: {
-                        if sortOption == .name {
-                            Label(L10n.tr("library.sortByName", lang: language), systemImage: "checkmark")
-                        } else {
-                            Text(verbatim: L10n.tr("library.sortByName", lang: language))
-                        }
-                    }
-                    Button {
-                        sortRaw = LibrarySort.releaseDate.rawValue
-                    } label: {
-                        if sortOption == .releaseDate {
-                            Label(L10n.tr("library.sortByRelease", lang: language), systemImage: "checkmark")
-                        } else {
-                            Text(verbatim: L10n.tr("library.sortByRelease", lang: language))
-                        }
-                    }
-                    Button {
-                        sortRaw = LibrarySort.completionDate.rawValue
-                    } label: {
-                        if sortOption == .completionDate {
-                            Label(L10n.tr("library.sortByCompletion", lang: language), systemImage: "checkmark")
-                        } else {
-                            Text(verbatim: L10n.tr("library.sortByCompletion", lang: language))
-                        }
-                    }
-                    Button {
-                        sortRaw = LibrarySort.scoreAscending.rawValue
-                    } label: {
-                        if sortOption == .scoreAscending {
-                            Label(L10n.tr("library.sortByScoreAsc", lang: language), systemImage: "checkmark")
-                        } else {
-                            Text(verbatim: L10n.tr("library.sortByScoreAsc", lang: language))
-                        }
-                    }
-                    Button {
-                        sortRaw = LibrarySort.scoreDescending.rawValue
-                    } label: {
-                        if sortOption == .scoreDescending {
-                            Label(L10n.tr("library.sortByScoreDesc", lang: language), systemImage: "checkmark")
-                        } else {
-                            Text(verbatim: L10n.tr("library.sortByScoreDesc", lang: language))
-                        }
-                    }
-                    Button {
-                        sortRaw = LibrarySort.valueDescending.rawValue
-                    } label: {
-                        if sortOption == .valueDescending {
-                            Label(L10n.tr("library.sortByValueDesc", lang: language), systemImage: "checkmark")
-                        } else {
-                            Text(verbatim: L10n.tr("library.sortByValueDesc", lang: language))
-                        }
-                    }
+                    LibrarySortMenuItems(sortRaw: $sortRaw)
                     Divider()
                     #if os(iOS)
                     // 视图三选一（网格 / 单列横向卡 / 列表），勾选态随当前模式。

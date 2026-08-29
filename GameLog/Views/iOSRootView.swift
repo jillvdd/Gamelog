@@ -83,10 +83,8 @@ struct iOSLibraryTab: View {
     @State private var statusFilter: GameStatus?
     @State private var showingGroupManager = false
 
-    /// 库里出现过的平台（预设世代倒序 + 自定义排最后；含游戏级平台，未通关游戏也有）。
-    private var platformsInUse: [String] {
-        Presets.ordered(games.flatMap(\.platformList))
-    }
+    /// 库里出现过的平台：唯一归属 LibraryStats。
+    private var platformsInUse: [String] { LibraryStats.platformsInUse(games) }
 
     var body: some View {
         NavigationStack {

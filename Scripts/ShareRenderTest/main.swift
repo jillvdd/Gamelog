@@ -9,7 +9,8 @@
 //     GameLog/Support/ScoreMath.swift GameLog/Support/AppLanguage.swift GameLog/Support/L10n.swift \
 //     GameLog/Support/UserCustomization.swift GameLog/Support/PlatformImage.swift \
 //     GameLog/Support/EnumPickerRow.swift GameLog/Support/PriceFormat.swift \
-//     GameLog/Support/MarkdownReview.swift GameLog/Support/LiquidGlassToolbar.swift \
+//     GameLog/Support/MarkdownReview.swift GameLog/Support/LiquidGlassToolbar.swift GameLog/Support/StatusStyle.swift \
+//     GameLog/Models/Artwork.swift \
 //     GameLog/Share/ShareCardView.swift GameLog/Share/ShareCardRenderer.swift \
 //     -plugin-path <Xcode-beta 插件路径>
 //   /tmp/gamelog_sharetest

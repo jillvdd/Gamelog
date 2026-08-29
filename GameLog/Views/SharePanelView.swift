@@ -92,7 +92,7 @@ struct SharePanelView: View {
     private var groupTitleBinding: Binding<String> {
         Binding(
             get: { groupTitle },
-            set: { groupTitle = String(Array($0).prefix(UserCustomization.usernameMaxLength)) }
+            set: { groupTitle = UserCustomization.truncateUsername($0) }
         )
     }
 
@@ -100,7 +100,7 @@ struct SharePanelView: View {
     private var overviewTitleBinding: Binding<String> {
         Binding(
             get: { overviewTitle },
-            set: { overviewTitle = String(Array($0).prefix(UserCustomization.usernameMaxLength)) }
+            set: { overviewTitle = UserCustomization.truncateUsername($0) }
         )
     }
 

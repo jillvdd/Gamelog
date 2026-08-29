@@ -74,20 +74,14 @@ struct HoldingsView: View {
         game.copies.sorted { $0.createdAt < $1.createdAt }
     }
 
-    /// 版本数（持有档案条数；同名版本是各自独立的档案，各计一条）。
-    private var editionCount: Int { sortedCopies.count }
-    /// 总数量。
-    private var totalQuantity: Int { sortedCopies.reduce(0) { $0 + $1.count } }
-    /// 总花费（按当前语言，缺值忽略）。
-    private var totalSpent: Double? {
-        let vals = sortedCopies.compactMap { $0.price(for: language) }
-        return vals.isEmpty ? nil : vals.reduce(0, +)
+    /// 四格汇总：唯一归属 LibraryStats（全库/按游戏同一份口径）。
+    private var collectorTotals: LibraryStats.CollectorTotals {
+        LibraryStats.collectorTotals(sortedCopies, language: language)
     }
-    /// 总估值（按当前语言，缺值忽略）。
-    private var totalEstimate: Double? {
-        let vals = sortedCopies.compactMap { $0.estValue(for: language) }
-        return vals.isEmpty ? nil : vals.reduce(0, +)
-    }
+    private var editionCount: Int { collectorTotals.editionCount }
+    private var totalQuantity: Int { collectorTotals.totalQuantity }
+    private var totalSpent: Double? { collectorTotals.totalSpent }
+    private var totalEstimate: Double? { collectorTotals.totalEstimate }
 
     /// 用系统 Quick Look 查看一张收藏照片（原生缩放/平移/旋转/全屏）。
     private func showQuickLook(_ data: Data) {
@@ -472,25 +466,7 @@ private struct CopyGridCellView: View {
     }
 
     private func pickImages() {
-        #if os(macOS)
-        let panel = NSOpenPanel()
-        panel.allowsMultipleSelection = true
-        panel.canChooseDirectories = false
-        panel.allowedContentTypes = [.image]
-        panel.prompt = L10n.tr("copy.addImage", lang: language)
-        guard panel.runModal() == .OK else { return }
-        let remaining = 6 - copy.images.count
-        guard remaining > 0 else { return }
-        let datas = panel.urls.prefix(remaining).compactMap {
-            UserCustomization.collectionImageData(from: $0, keepOriginal: keepOriginal)
-        }
-        guard !datas.isEmpty else { return }
-        var images = copy.images
-        images.append(contentsOf: datas)
-        copy.images = images
-        ImageDecodeCache.bump()
-        try? context.save()
-        #endif
+        ImageImport.importCollectionPhotos(into: copy, keepOriginal: keepOriginal, context: context)
     }
 
     private func removeImage(at index: Int) {
@@ -503,16 +479,7 @@ private struct CopyGridCellView: View {
     }
 
     private func processImages(_ datas: [Data]) {
-        var images = copy.images
-        for data in datas {
-            guard images.count < 6 else { break }
-            if let processed = UserCustomization.collectionImageData(from: data, keepOriginal: keepOriginal) {
-                images.append(processed)
-            }
-        }
-        copy.images = images
-        ImageDecodeCache.bump()
-        try? context.save()
+        ImageImport.appendCollectionPhotos(datas: datas, into: copy, keepOriginal: keepOriginal, context: context)
     }
 }
 
@@ -717,25 +684,7 @@ private struct CopyCardView: View {
     }
 
     private func pickImages() {
-        #if os(macOS)
-        let panel = NSOpenPanel()
-        panel.allowsMultipleSelection = true
-        panel.canChooseDirectories = false
-        panel.allowedContentTypes = [.image]
-        panel.prompt = L10n.tr("copy.addImage", lang: language)
-        guard panel.runModal() == .OK else { return }
-        let remaining = 6 - copy.images.count
-        guard remaining > 0 else { return }
-        let datas = panel.urls.prefix(remaining).compactMap {
-            UserCustomization.collectionImageData(from: $0, keepOriginal: keepOriginal)
-        }
-        guard !datas.isEmpty else { return }
-        var images = copy.images
-        images.append(contentsOf: datas)
-        copy.images = images
-        ImageDecodeCache.bump()
-        try? context.save()
-        #endif
+        ImageImport.importCollectionPhotos(into: copy, keepOriginal: keepOriginal, context: context)
     }
 
     private func removeImage(at index: Int) {
@@ -748,16 +697,7 @@ private struct CopyCardView: View {
     }
 
     private func processImages(_ datas: [Data]) {
-        var images = copy.images
-        for data in datas {
-            guard images.count < 6 else { break }
-            if let processed = UserCustomization.collectionImageData(from: data, keepOriginal: keepOriginal) {
-                images.append(processed)
-            }
-        }
-        copy.images = images
-        ImageDecodeCache.bump()
-        try? context.save()
+        ImageImport.appendCollectionPhotos(datas: datas, into: copy, keepOriginal: keepOriginal, context: context)
     }
 }
 

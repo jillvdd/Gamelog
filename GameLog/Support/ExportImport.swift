@@ -96,74 +96,17 @@ struct CompletionDTO: Codable {
 enum BackupManager {
 
     /// 导出：所有游戏 + 分组 → JSON。
+    /// 字段映射唯一入口 = GameDTO(from:)（Support/Game+Backup.swift）。
     static func encode(games: [Game], groups: [GameGroup]) throws -> Data {
+        let customization = UserCustomization.encodedCustomization()
         let dto = BackupDTO(
             version: 1,
             exportedAt: .now,
             groups: groups.map { GroupDTO(name: $0.name, review: $0.review) },
-            games: games.map { game in
-                GameDTO(
-                    name: game.name,
-                    nameZh: game.nameZh,
-                    nameJa: game.nameJa,
-                    aliases: game.aliases,
-                    platform: game.platform,
-                    releaseDate: game.releaseDate,
-                    developer: game.developer,
-                    publisher: game.publisher,
-                    genre: game.genre,
-                    coverBase64: game.coverData?.base64EncodedString(),
-                    squareBase64: game.squareData?.base64EncodedString(),
-                    landscapeBase64: game.landscapeData?.base64EncodedString(),
-                    heroBase64: game.heroData?.base64EncodedString(),
-                    logoBase64: game.logoData?.base64EncodedString(),
-                    logoSizeRaw: game.logoSize,
-                    logoVerticalRaw: game.logoVertical,
-                    logoHorizontalRaw: game.logoHorizontal,
-                    reviewTitle: game.reviewTitle,
-                    reviewBody: game.reviewBody,
-                    groupNames: game.groups.map(\.name),
-                    completions: game.sortedCompletions.map { completion in
-                        CompletionDTO(
-                            platform: completion.platform,
-                            date: completion.date,
-                            degree: completion.degree,
-                            playtime: completion.playtime,
-                            notes: completion.notes,
-                            scoreGameplay: completion.scoreGameplay,
-                            scoreDesign: completion.scoreDesign,
-                            scoreStory: completion.scoreStory,
-                            scoreArt: completion.scoreArt,
-                            scoreMusic: completion.scoreMusic,
-                            scorePerformance: completion.scorePerformance
-                        )
-                    },
-                    copies: game.copies.map { copy in
-                        CopyDTO(
-                            version: copy.version,
-                            count: copy.count,
-                            images: copy.images.map { $0.base64EncodedString() },
-                            mediaRaw: copy.mediaRaw,
-                            regionalRaw: copy.regionalRaw,
-                            conditionRaw: copy.conditionRaw,
-                            acquisitionRaw: copy.acquisitionRaw,
-                            platform: copy.platform.isEmpty ? nil : copy.platform,
-                            priceZh: copy.priceZh,
-                            priceJa: copy.priceJa,
-                            priceEn: copy.priceEn,
-                            estValueZh: copy.estValueZh,
-                            estValueJa: copy.estValueJa,
-                            estValueEn: copy.estValueEn,
-                            purchaseDate: copy.purchaseDate,
-                            notes: copy.notes.isEmpty ? nil : copy.notes
-                        )
-                    },
-                    status: game.status
-                )
-            },
-            username: UserDefaults.standard.string(forKey: UserCustomization.usernameKey),
-            avatarBase64: UserCustomization.avatarImageData()?.base64EncodedString(),
-            iconBase64: UserCustomization.iconImageData()?.base64EncodedString()
+            games: games.map { GameDTO(from: $0) },
+            username: customization.username,
+            avatarBase64: customization.avatarBase64,
+            iconBase64: customization.iconBase64
         )
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
@@ -177,26 +120,12 @@ enum BackupManager {
         decoder.dateDecodingStrategy = .iso8601
         let dto = try decoder.decode(BackupDTO.self, from: data)
 
-        // 自定义三项：先写可能抛错的文件（头像/图标），最后写 UserDefaults（用户名）。
-        // 用户名写盘不可回滚，若先写用户名、后写文件失败，会出现「提示导入失败但用户名已变更」；
-        // 文件写盘失败时（磁盘满等）用户名保持原值，与「失败时原库保持完好」口径一致。
-        // 旧版备份缺字段 → 保持现状不覆盖。
-        if let avatar = dto.avatarBase64.flatMap({ Data(base64Encoded: $0) }) {
-            try UserCustomization.saveAvatarPNG(avatar)
-        }
-        if let icon = dto.iconBase64.flatMap({ Data(base64Encoded: $0) }) {
-            try UserCustomization.saveIconPNG(icon)
-        }
-        if let name = dto.username {
-            if name.isEmpty {
-                UserDefaults.standard.removeObject(forKey: UserCustomization.usernameKey)
-            } else {
-                UserDefaults.standard.set(
-                    String(Array(name).prefix(UserCustomization.usernameMaxLength)),
-                    forKey: UserCustomization.usernameKey
-                )
-            }
-        }
+        // 自定义三项：写序不变量（文件先、用户名最后）在 UserCustomization.applyCustomization 内。
+        try UserCustomization.applyCustomization(
+            username: dto.username,
+            avatarBase64: dto.avatarBase64,
+            iconBase64: dto.iconBase64
+        )
 
         // 再清空现有（删除游戏会级联删除通关记录与持有记录；以下重建均不抛错，不会中途失败）
         if let existingGames = try? context.fetch(FetchDescriptor<Game>()) {

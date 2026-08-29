@@ -1,46 +1,9 @@
 import SwiftUI
 
-/// 图像类型：本面板按类型决定走哪个 SGDB 端点与网格布局。
-/// poster = 2:3 竖版封面（主格式，分页浏览）；square = 1:1 方形封面（分页，仅 width==height 结果）；
-/// landscape = 920×430 横向封面（分页）；
-/// hero = 宽幅背景图；logo = 透明 Logo（后两类一次全量返回，大图优先排列）。
-enum ArtworkKind: String, Identifiable {
-    case poster
-    case square
-    case landscape
-    case hero
-    case logo
-
-    var id: String { rawValue }
-
-    /// 面板标题 key。
-    var titleKey: String {
-        switch self {
-        case .poster: "cover.title"
-        case .square: "cover.titleSquare"
-        case .landscape: "cover.titleLandscape"
-        case .hero: "cover.titleHero"
-        case .logo: "cover.titleLogo"
-        }
-    }
-
-    /// 空结果提示 key。
-    var noResultKey: String {
-        switch self {
-        case .poster: "cover.noGrids"
-        case .square: "cover.noSquare"
-        case .landscape: "cover.noLandscape"
-        case .hero: "cover.noHero"
-        case .logo: "cover.noLogo"
-        }
-    }
-
-    /// 是否支持分页加载（grids 端点的尺寸过滤查询）。
-    var supportsPaging: Bool { self == .poster || self == .square || self == .landscape }
-}
+// 图像类型枚举 ArtworkKind 已深化为 Models/Artwork.swift（端点/比例/L10n key/门控/存储接口全表驱动）。
 
 /// 图像搜索面板：SteamGridDB 按名字搜游戏 → 选游戏 → 选一张图。
-/// 按 `kind` 服务四种类型（2:3 封面 / 横向封面 / 背景图 / Logo），下载结果写进 `imageData`。
+/// 按 `kind` 服务五类图（2:3 封面/方形/横向/背景图/Logo），下载结果写进 `imageData`。
 struct CoverSearchSheet: View {
     let kind: ArtworkKind
     @Binding var imageData: Data?
@@ -75,7 +38,7 @@ struct CoverSearchSheet: View {
     var body: some View {
         VStack(spacing: 14) {
             HStack {
-                LText(kind.titleKey)
+                LText(kind.searchTitleKey)
                     .font(.headline)
                 Spacer()
                 Button(L10n.tr("cover.close", lang: language)) { downloadGeneration += 1; searchTask?.cancel(); thumbTask?.cancel(); dismiss() }
@@ -253,19 +216,10 @@ struct CoverSearchSheet: View {
         }
     }
 
-    /// 网格列布局按类型：竖版封面窄格；1:1 方形封面中格；横向/背景图宽格；Logo 透明图配衬底方格。
+    /// 网格列布局按类型（表驱动：kind.searchColumnRange；Logo 透明图垫浅灰衬底见 gridCell）。
     private var columns: [GridItem] {
-        switch kind {
-        case .poster:
-            [GridItem(.adaptive(minimum: 90, maximum: 120), spacing: 10)]
-        case .square:
-            [GridItem(.adaptive(minimum: 120, maximum: 160), spacing: 10)]
-        case .landscape, .hero:
-            [GridItem(.adaptive(minimum: 200, maximum: 280), spacing: 10)]
-        case .logo:
-            // Logo 是透明 PNG，深浅色下可能看不清 → 每格垫浅灰衬底（见 gridCell）。
-            [GridItem(.adaptive(minimum: 140, maximum: 200), spacing: 10)]
-        }
+        [GridItem(.adaptive(minimum: kind.searchColumnRange.lowerBound,
+                            maximum: kind.searchColumnRange.upperBound), spacing: 10)]
     }
 
     private func gridCell(_ grid: SteamGridDBGrid) -> some View {
@@ -450,36 +404,11 @@ struct CoverSearchSheet: View {
         isLoading = true
         Task {
             do {
-                switch kind {
-                case .poster:
-                    // 首页按「竖版优先」排序(2:3 是本 app 封面主格式);后续页按 API 原序追加。
-                    let page = try await client.gridsPage(for: game.id, page: 0)
-                    guard gen == downloadGeneration else { return }
-                    grids = SteamGridDBClient.sorted(page.grids)
-                    gridTotal = page.total
-                case .square:
-                    // 1:1 方形：squaresPage 已按 width==height 过滤，只出 1:1 结果。
-                    let page = try await client.squaresPage(for: game.id, page: 0)
-                    guard gen == downloadGeneration else { return }
-                    grids = page.grids
-                    gridTotal = page.total
-                case .landscape:
-                    let page = try await client.landscapesPage(for: game.id, page: 0)
-                    guard gen == downloadGeneration else { return }
-                    grids = page.grids
-                    gridTotal = page.total
-                case .hero:
-                    let heroes = try await client.heroes(for: game.id)
-                    guard gen == downloadGeneration else { return }
-                    // 无尺寸过滤参数，直接按大图优先排列。
-                    grids = heroes.sorted { $0.width * $0.height > $1.width * $1.height }
-                    gridTotal = heroes.count
-                case .logo:
-                    let logos = try await client.logos(for: game.id)
-                    guard gen == downloadGeneration else { return }
-                    grids = logos.sorted { $0.width * $0.height > $1.width * $1.height }
-                    gridTotal = logos.count
-                }
+                // kind→端点的唯一分派在 SteamGridDBClient.artworkResults。
+                let candidates = try await client.artworkResults(for: game.id, kind: kind)
+                guard gen == downloadGeneration else { return }
+                grids = candidates
+                gridTotal = candidates.count
                 gridPage = 0
                 isLoading = false
             } catch {
@@ -498,12 +427,8 @@ struct CoverSearchSheet: View {
         let nextPage = gridPage + 1
         Task {
             do {
-                let page: SteamGridDBClient.GridPage
-                switch kind {
-                case .poster: page = try await client.gridsPage(for: selectedGame?.id ?? 0, page: nextPage)
-                case .square: page = try await client.squaresPage(for: selectedGame?.id ?? 0, page: nextPage)
-                case .landscape: page = try await client.landscapesPage(for: selectedGame?.id ?? 0, page: nextPage)
-                case .hero, .logo: return // 不分页的类型不会走到这里（supportsPaging 已挡）。
+                guard let page = try await client.artworkPage(for: selectedGame?.id ?? 0, kind: kind, page: nextPage) else {
+                    return // 不分页的类型不会走到这里（supportsPaging 已挡）。
                 }
                 guard gen == downloadGeneration else { return }
                 grids.append(contentsOf: page.grids)

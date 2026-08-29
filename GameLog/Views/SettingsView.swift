@@ -35,7 +35,7 @@ struct SettingsView: View {
     private var usernameBinding: Binding<String> {
         Binding(
             get: { username },
-            set: { username = String(Array($0).prefix(UserCustomization.usernameMaxLength)) }
+            set: { username = UserCustomization.truncateUsername($0) }
         )
     }
 
@@ -429,8 +429,9 @@ struct SettingsView: View {
 
     private func pickImage(for kind: CropKind) {
         #if os(macOS)
+        // 类型统一走 ImageImport.allowedTypes（历史四类型收紧遗留，放宽无副作用：裁切链转 PNG 落盘）。
         let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.png, .jpeg, .tiff, .heic]
+        panel.allowedContentTypes = ImageImport.allowedTypes
         panel.allowsMultipleSelection = false
         panel.canChooseDirectories = false
         guard panel.runModal() == .OK, let url = panel.url else { return }

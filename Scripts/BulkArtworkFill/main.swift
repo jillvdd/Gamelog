@@ -14,14 +14,12 @@
 //     GameLog/Support/ScoreMath.swift GameLog/Support/ExportImport.swift \
 //     GameLog/Support/UserCustomization.swift GameLog/Support/PlatformImage.swift \
 //     GameLog/Support/EnumPickerRow.swift GameLog/Support/L10n.swift GameLog/Support/AppLanguage.swift \
-//     GameLog/Support/SteamGridDBClient.swift
+//     GameLog/Support/SteamGridDBClient.swift \
+//     GameLog/Models/Artwork.swift \
+//     GameLog/Support/ImageDecodeCache.swift
 // 注意：写真实 store 前先退 app 并快照 store（GameLog-backups/<日期>-pre-bulk-artwork）。
 import Foundation
 import SwiftData
-
-/// 最小同构枚举：真定义在 CoverSearchSheet.swift（SwiftUI 视图文件，CLI 不引入），
-/// 这里只满足 SteamGridDBClient.autoArtwork 的类型签名；本脚本直接调各端点，不走 autoArtwork。
-enum ArtworkKind: String { case poster, square, landscape, hero, logo }
 
 func say(_ s: String) { print(s); fflush(stdout) }
 
@@ -76,44 +74,25 @@ func searchGameID(for game: Game) async -> (id: Int, term: String)? {
     return nil
 }
 
-/// 单类图：端点第一张 → 下载（校验图片 magic bytes，防错误页当图入库）→ 写入模型。返回 nil = 成功。
+/// 单类图：端点第一张 → 下载（校验图片 magic bytes，防错误页当图入库）→ 经 Game.setArtwork 写入。
+/// kind→端点的分派复用 app 的 SteamGridDBClient.artworkResults（不再手抄映射）。返回 nil = 成功。
 @MainActor
-func fill(kind: String, game: Game, sgdbID: Int) async -> String? {
+func fill(kind: ArtworkKind, game: Game, sgdbID: Int) async -> String? {
     let grid: SteamGridDBGrid?
     do {
-        switch kind {
-        case "square":    grid = try await client.squaresPage(for: sgdbID, page: 0).grids.first
-        case "landscape": grid = try await client.landscapesPage(for: sgdbID, page: 0).grids.first
-        case "hero":      grid = try await client.heroes(for: sgdbID).first
-        case "logo":      grid = try await client.logos(for: sgdbID).first
-        case "poster":    grid = SteamGridDBClient.sorted(try await client.grids(for: sgdbID)).first
-        default:          return "unknown kind"
-        }
+        grid = try await client.artworkResults(for: sgdbID, kind: kind).first
     } catch { return "endpoint error: \(error)" }
     guard let g = grid else { return "no candidate" }
     let data: Data
     do { data = try await client.fetchImage(urlString: g.url) } catch { return "download error: \(error)" }
     guard data.count > 100, looksLikeImage(data) else { return "not an image (\(data.count)B)" }
-    switch kind {
-    case "square":    game.squareData = data
-    case "landscape": game.landscapeData = data
-    case "hero":      game.heroData = data
-    case "logo":      game.logoData = data
-    case "poster":    game.coverData = data
-    default: break
-    }
+    game.setArtwork(kind, data)
     return nil
 }
 
 @MainActor
-func missingKinds(of game: Game) -> [String] {
-    var kinds: [String] = []
-    if game.coverData == nil { kinds.append("poster") }
-    if game.squareData == nil { kinds.append("square") }
-    if game.landscapeData == nil { kinds.append("landscape") }
-    if game.heroData == nil { kinds.append("hero") }
-    if game.logoData == nil { kinds.append("logo") }
-    return kinds
+func missingKinds(of game: Game) -> [ArtworkKind] {
+    ArtworkKind.allCases.filter { game.artwork($0) == nil }
 }
 
 var gamesTouched = 0, kindsFilled = 0, noHit = 0, failedKinds = 0
@@ -121,17 +100,17 @@ var gamesTouched = 0, kindsFilled = 0, noHit = 0, failedKinds = 0
 for (idx, game) in games.enumerated() {
     let missing = missingKinds(of: game)
     guard !missing.isEmpty else { continue }
-    say("[\(idx + 1)/\(games.count)] \(game.name) — 补 \(missing.joined(separator: ","))")
+    say("[\(idx + 1)/\(games.count)] \(game.name) — 补 \(missing.map(\.rawValue).joined(separator: ","))")
     guard let hit = await searchGameID(for: game) else {
         noHit += 1
         say("  ✗ SGDB 无命中（主名/别名/中文名/日文名都试过）")
         continue
     }
     say("  → SGDB #\(hit.id)（搜索词「\(hit.term)」）")
-    var ok: [String] = [], fail: [String] = []
+    var ok: [ArtworkKind] = [], fail: [ArtworkKind] = []
     for kind in missing {
         if let reason = await fill(kind: kind, game: game, sgdbID: hit.id) {
-            fail.append("\(kind)(\(reason))")
+            fail.append(kind)
         } else {
             ok.append(kind)
         }
@@ -140,11 +119,11 @@ for (idx, game) in games.enumerated() {
         do { try context.save() } catch { say("  save error: \(error)") }
         gamesTouched += 1
         kindsFilled += ok.count
-        say("  ✓ 已填 \(ok.joined(separator: ","))")
+        say("  ✓ 已填 \(ok.map(\.rawValue).joined(separator: ","))")
     }
     if !fail.isEmpty {
         failedKinds += fail.count
-        say("  △ 未填 \(fail.joined(separator: ", "))")
+        say("  △ 未填 \(fail.map(\.rawValue).joined(separator: ", "))")
     }
 }
 

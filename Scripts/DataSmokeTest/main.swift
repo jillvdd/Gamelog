@@ -6,8 +6,9 @@
 //   xcrun swiftc -o /tmp/gamelog_datasmoke \
 //     Scripts/DataSmokeTest/main.swift \
 //     GameLog/Models/Game.swift GameLog/Models/Completion.swift GameLog/Models/GameGroup.swift \
-//     GameLog/Models/PhysicalCopy.swift GameLog/Models/Presets.swift \
-//     GameLog/Support/ScoreMath.swift GameLog/Support/ExportImport.swift \
+//     GameLog/Models/PhysicalCopy.swift GameLog/Models/Presets.swift GameLog/Models/Artwork.swift \
+//     GameLog/Support/ScoreMath.swift GameLog/Support/ExportImport.swift GameLog/Support/Game+Backup.swift \
+//     GameLog/Support/BackupWriter.swift \
 //     GameLog/Support/UserCustomization.swift GameLog/Support/PlatformImage.swift \
 //     GameLog/Support/EnumPickerRow.swift GameLog/Support/L10n.swift GameLog/Support/AppLanguage.swift \
 //     -plugin-path <Xcode-beta 插件路径>
@@ -394,6 +395,178 @@ if let platImported = (try? context.fetch(FetchDescriptor<Game>()))?.first(where
     check("持有: 平台备份往返", platCopy2.platform == "PS5")
 } else {
     check("持有: 平台备份往返", false)
+}
+
+// MARK: - ArtworkKind 深模块（表驱动 + Game.artwork/setArtwork 接口）
+
+do {
+    let g = Game(name: "ArtworkKindProbe")
+    // 每类图经 kind 接口写入 = 直连字段（同一存储）。
+    for kind in ArtworkKind.allCases {
+        let payload = Data("img-\(kind.rawValue)".utf8)
+        g.setArtwork(kind, payload)
+        check("ArtworkKind: setArtwork(\(kind.rawValue)) → artwork() 读回", g.artwork(kind) == payload)
+    }
+    // nil = 清空。
+    g.setArtwork(.logo, nil)
+    check("ArtworkKind: setArtwork(nil) 清空", g.artwork(.logo) == nil)
+    // kind 表自检：key 约定与门控例外。
+    check("ArtworkKind: labelKey 约定", ArtworkKind.square.labelKey == "game.square")
+    check("ArtworkKind: searchTitleKey poster 沿用 cover.title",
+          ArtworkKind.poster.searchTitleKey == "cover.title" && ArtworkKind.logo.searchTitleKey == "cover.titleLogo")
+    check("ArtworkKind: noResultKey 约定",
+          ArtworkKind.poster.noResultKey == "cover.noGrids" && ArtworkKind.square.noResultKey == "cover.noSquare")
+    check("ArtworkKind: 封面唯一非门控", ArtworkKind.allCases.filter { !$0.isToggleGated } == [.poster])
+    check("ArtworkKind: 分页集合正确", Set(ArtworkKind.allCases.filter(\.supportsPaging)) == [.poster, .square, .landscape])
+    // 备份往返：五类图字段不因深化丢失。
+    let probeJSON = try BackupManager.encode(games: [g], groups: [])
+    try BackupManager.decodeAndReplace(probeJSON, into: context)
+    try context.save()
+    if let roundTrip = (try? context.fetch(FetchDescriptor<Game>()))?.first(where: { $0.name == "ArtworkKindProbe" }) {
+        check("ArtworkKind: 五类图备份往返",
+              roundTrip.artwork(.poster) == Data("img-poster".utf8)
+                  && roundTrip.artwork(.square) == Data("img-square".utf8)
+                  && roundTrip.artwork(.landscape) == Data("img-landscape".utf8)
+                  && roundTrip.artwork(.hero) == Data("img-hero".utf8)
+                  && roundTrip.artwork(.logo) == nil)
+    } else {
+        check("ArtworkKind: 五类图备份往返", false)
+    }
+}
+
+// MARK: - 备份双路径一致性（手动导出 vs 自动备份流式输出）
+
+do {
+    let g1 = Game(name: "DualPathProbe", aliases: ["DPP"],
+                  releaseDate: Date(timeIntervalSince1970: 1_600_000_000),
+                  coverData: Data("dualpath-cover".utf8),
+                  reviewTitle: "双路径", reviewBody: "一致性")
+    let g1c = Completion(platform: "PS5", date: Date(timeIntervalSince1970: 1_700_000_000),
+                         degree: "主线通关", playtime: 40, notes: "n",
+                         scoreGameplay: 8, scoreDesign: 8, scoreStory: 7,
+                         scoreArt: 8, scoreMusic: 7, scorePerformance: 9)
+    g1c.game = g1
+    context.insert(g1)
+    context.insert(g1c)
+    try? context.save()
+
+    // 手动导出（BackupManager.encode）与自动备份（BackupWriter 流式写盘）经同一 GameDTO(from:)，
+    // decode 后语义字段必须一致（逐字节比对不可行：prettyPrinted 差异是既定兼容口径）。
+    let manualJSON = try BackupManager.encode(games: [g1], groups: [])
+    let tmpURL = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("datasmoke-stream.json")
+    let writer = BackupWriter(modelContainer: context.container)
+    let bytes = try await writer.writeStreamingBackup(to: tmpURL, username: nil, avatarPNG: nil, iconPNG: nil)
+    check("备份双路径: 流式写出非空", bytes > 0)
+
+    let isoDecoder = JSONDecoder()
+    isoDecoder.dateDecodingStrategy = .iso8601
+    let manualDTO = try isoDecoder.decode(BackupDTO.self, from: manualJSON)
+    let streamDTO = try isoDecoder.decode(BackupDTO.self, from: Data(contentsOf: tmpURL))
+    // 流式备份写的是整个库（此前断言段残留的游戏在内），按名字取 probe。
+    guard let m = manualDTO.games.first(where: { $0.name == "DualPathProbe" }),
+          let s = streamDTO.games.first(where: { $0.name == "DualPathProbe" }) else {
+        print("FAIL 备份双路径: probe 游戏未在输出中找到")
+        failures += 1
+        exit(1)
+    }
+    check("备份双路径: 名称/别名/日期一致", m.name == s.name && m.aliases == s.aliases && m.releaseDate == s.releaseDate)
+    check("备份双路径: 封面 base64 一致", m.coverBase64 == s.coverBase64)
+    check("备份双路径: 记录字段一致", m.completions[0].platform == s.completions[0].platform
+          && m.completions[0].scoreGameplay == s.completions[0].scoreGameplay
+          && m.completions[0].date == s.completions[0].date)
+    try? FileManager.default.removeItem(at: tmpURL)
+}
+
+// MARK: - LibraryStats（平台聚合 / 收藏汇总 / 瓦片）
+
+do {
+    var statGames: [Game] = []
+    let played1 = Game(name: "StatsPlayed1", platform: "PS5", reviewTitle: "t")
+    let c1 = Completion(platform: "PS5", date: Date(timeIntervalSince1970: 1_700_000_000),
+                        degree: "主线通关", playtime: 10, notes: "",
+                        scoreGameplay: 8, scoreDesign: 8, scoreStory: 8,
+                        scoreArt: 8, scoreMusic: 8, scorePerformance: 8)
+    c1.game = played1
+    context.insert(played1); context.insert(c1)
+
+    let backlogGame = Game(name: "StatsBacklog", platform: "Switch", reviewTitle: "t", status: .backlog)
+    context.insert(backlogGame)
+    let multiPlatform = Game(name: "StatsMulti", platform: "PC", reviewTitle: "t", status: .playing)
+    context.insert(multiPlatform)
+
+    statGames = [played1, backlogGame, multiPlatform]
+    try? context.save()
+
+    // 平台聚合：未通关游戏的游戏级平台也计入；游戏 × 平台各计 1。
+    let counts = LibraryStats.platformCounts(statGames)
+    check("LibraryStats: platformCounts 游戏级平台计入",
+          counts["PS5"] == 1 && counts["Switch"] == 1 && counts["PC"] == 1)
+    check("LibraryStats: platformsInUse 排序含全部平台",
+          Set(LibraryStats.platformsInUse(statGames)) == ["PS5", "Switch", "PC"])
+
+    // 平级裁决固化：同数量平台按名称升序。
+    let tie = LibraryStats.platformDistribution(statGames)
+    let names = tie.map(\.platform)
+    let countsSeq = tie.map(\.count)
+    var stableOK = true
+    for i in 0..<(names.count - 1) where countsSeq[i] == countsSeq[i + 1] {
+        if names[i] > names[i + 1] { stableOK = false }
+    }
+    check("LibraryStats: 平级裁决（数量相同 → 名称升序）", stableOK)
+
+    // 收藏汇总：未填跳过（nil ≠ 0）、全未填 = nil。
+    let copy1 = PhysicalCopy(version: "V1", count: 2)
+    copy1.priceZh = 199.5
+    copy1.game = played1
+    context.insert(copy1)
+    let copy2 = PhysicalCopy(version: "V2", count: 3)
+    copy2.estValueJa = 1200
+    copy2.game = played1
+    context.insert(copy2)
+    try? context.save()
+
+    let totalsZh = LibraryStats.collectorTotals([copy1, copy2], language: "zh-Hans")
+    check("LibraryStats: 版本数/总量", totalsZh.editionCount == 2 && totalsZh.totalQuantity == 5)
+    check("LibraryStats: 花费 zh 只算已填（199.5）", totalsZh.totalSpent == 199.5)
+    check("LibraryStats: 估值 zh 全未填 = nil（非 0）", totalsZh.totalEstimate == nil)
+    let totalsJa = LibraryStats.collectorTotals([copy1, copy2], language: "ja")
+    check("LibraryStats: 估值 ja 只算已填（1200）", totalsJa.totalEstimate == 1200)
+    check("LibraryStats: 花费 ja 全未填 = nil", totalsJa.totalSpent == nil)
+
+    // 瓦片。
+    check("LibraryStats: backlogCount", LibraryStats.backlogCount(statGames) == 1)
+    check("LibraryStats: averageScore 8×6 维 → 8.0", LibraryStats.averageScore(statGames) == 8.0)
+    check("LibraryStats: averageScore 空库 nil", LibraryStats.averageScore([]) == nil)
+}
+
+// MARK: - LibraryQuery（过滤 + 稳定排序 + 平级裁决）
+
+do {
+    let name = "MQuery"
+    let q1 = Game(name: "Zelda", reviewTitle: "t")   // 同名并列组
+    let q2 = Game(name: "zelda", reviewTitle: "t")   // 大小写不同、并列
+    let q3 = Game(name: "Mario", reviewTitle: "t")
+    context.insert(q1); context.insert(q2); context.insert(q3)
+    try? context.save()
+    let pool = [q3, q2, q1]
+
+    // 过滤：平台/搜索。
+    let filtered = LibraryQuery.filter(games: pool, group: nil, platform: nil, status: nil, search: "zelda")
+    check("LibraryQuery: 搜索过滤（大小写不敏感命中 2）", filtered.count == 2)
+
+    // 按名排序：大小写不敏感 + 并列以 createdAt 裁决（同刻创建→稳定序不跳动）。
+    let byName = LibraryQuery.sorted(pool, by: .name, language: "zh-Hans")
+    check("LibraryQuery: 按名排序（Mario 在前）", byName.first?.name == "Mario")
+
+    // 平级裁决：未评分按 scoreDescending 沉底、并列同名以 createdAt 破——两两断言确定性。
+    let byScore = LibraryQuery.sorted(pool, by: .scoreDescending, language: "zh-Hans")
+    check("LibraryQuery: 未评分沉底且顺序确定（连跑两次一致）",
+          byScore.map(\.persistentModelID) == LibraryQuery.sorted(pool, by: .scoreDescending, language: "zh-Hans").map(\.persistentModelID))
+
+    // 菜单顺序与 labelKey 表。
+    check("LibraryQuery: menuOrder 最近编辑置顶", LibrarySort.menuOrder.first == .recentEdit)
+    check("LibraryQuery: labelKey 表", LibrarySort.name.labelKey == "library.sortByName"
+          && LibrarySort.valueDescending.labelKey == "library.sortByValueDesc")
 }
 
 print(failures == 0 ? "DATA SMOKE TEST PASSED" : "DATA SMOKE TEST FAILED: \(failures) failures")

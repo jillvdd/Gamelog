@@ -519,7 +519,7 @@ private struct StatusHeroBadge: View {
         let status = game.statusValue
         let color = status.shareStatusColor
         HStack(spacing: 16) {
-            Image(systemName: statusIcon(status))
+            Image(systemName: status.statusIcon)
                 .font(.system(size: 44, weight: .semibold))
             Text(verbatim: L10n.tr(status.labelKey, lang: language))
                 .font(.system(size: 46, weight: .semibold))
@@ -531,16 +531,6 @@ private struct StatusHeroBadge: View {
         .overlay(Capsule().stroke(color.opacity(0.50), lineWidth: 2))
     }
 
-    private func statusIcon(_ s: GameStatus) -> String {
-        switch s {
-        case .backlog: "bookmark"
-        case .playing: "play.circle"
-        case .paused: "pause.circle"
-        case .dropped: "xmark.circle"
-        case .longRunning: "infinity"
-        case .completed: "checkmark.circle"
-        }
-    }
 }
 
 /// 六维均值迷你条形（全部已评分记录的维度均值，与库显示分同口径）。

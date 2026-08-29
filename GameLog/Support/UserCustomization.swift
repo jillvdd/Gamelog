@@ -48,8 +48,52 @@ enum UserCustomization {
     /// 旧键迁移在 LibraryView 首次读取时做：无此键时按 useGridView 折算 grid/list。
     static let iosLibraryViewModeKey = "customization.iosLibraryViewMode"
 
-    /// 用户名长度上限（设置页输入与导入时统一截断）。
+    /// 用户名长度上限。
     static let usernameMaxLength = 20
+
+    /// 用户名截断规则（字符数上限，非字节数——中日文一字一符）。
+    /// UI 绑定（onChange 实时截断显示）直接用；持久化路径走 `setUsername`（截断+落库一体）。
+    static func truncateUsername(_ raw: String) -> String {
+        String(Array(raw).prefix(usernameMaxLength))
+    }
+
+    /// 用户名的**安全写入**唯一入口：截断 + 落 UserDefaults（空串 = 移除）。
+    /// 备份导入等持久化路径用——规则一处，调用点不再手抄。
+    static func setUsername(_ raw: String) {
+        let truncated = truncateUsername(raw)
+        if truncated.isEmpty {
+            UserDefaults.standard.removeObject(forKey: usernameKey)
+        } else {
+            UserDefaults.standard.set(truncated, forKey: usernameKey)
+        }
+    }
+
+    // MARK: - 备份往返（自定义三项：用户名 / 头像 / 图标）
+
+    /// 读出三项供备份编码（BackupManager.encode 用；BackupWriter 走逐项读取同源）。
+    static func encodedCustomization() -> (username: String?, avatarBase64: String?, iconBase64: String?) {
+        (
+            UserDefaults.standard.string(forKey: usernameKey),
+            avatarImageData()?.base64EncodedString(),
+            iconImageData()?.base64EncodedString()
+        )
+    }
+
+    /// 从备份写回三项。**写序不变量**：先写可能抛错的文件（头像/图标）、最后写 UserDefaults（用户名）——
+    /// 用户名写盘不可回滚，若先写用户名、后写文件失败，会出现「提示导入失败但用户名已变更」；
+    /// 文件写盘失败时用户名保持原值，与「失败时原库保持完好」口径一致。
+    /// 旧版备份缺字段 → 保持现状不覆盖。返回是否全部成功（抛错即失败，调用方决定是否中断导入）。
+    static func applyCustomization(username: String?, avatarBase64: String?, iconBase64: String?) throws {
+        if let avatar = avatarBase64.flatMap({ Data(base64Encoded: $0) }) {
+            try saveAvatarPNG(avatar)
+        }
+        if let icon = iconBase64.flatMap({ Data(base64Encoded: $0) }) {
+            try saveIconPNG(icon)
+        }
+        if let name = username {
+            setUsername(name)
+        }
+    }
 
     // MARK: - 文件存储
 

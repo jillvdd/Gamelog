@@ -36,20 +36,6 @@ extension Game {
     }
 }
 
-/// 状态角标的主题色（仅网格卡片封面用；状态本体定义在 GameStatus）。
-private extension GameStatus {
-    var statusColor: Color {
-        switch self {
-        case .backlog: .blue
-        case .playing: .green
-        case .paused: .orange
-        case .dropped: .gray
-        case .longRunning: .purple
-        case .completed: .primary
-        }
-    }
-}
-
 /// 游戏名右侧的平台图标：最多显示 maxCount 个，超出显示 +N。
 /// 仅作为平台符号提示，下方的平台文字行保持不变。
 /// 与名字同行时整体垂直居中对齐（不用 firstTextBaseline——图标放大系数随平台不同，
@@ -144,31 +130,8 @@ struct GameCardView: View {
         VStack(alignment: .leading, spacing: 6) {
             ZStack(alignment: .topTrailing) {
                 cover
-                if game.isCompletedOrLongRunning {
-                    // 已通关/长线游玩：右上角评分徽章（无评分不显示）。
-                    if let score = game.libraryScore {
-                        Text(verbatim: Self.formatScore(score))
-                            .font(.system(size: 12, weight: .bold))
-                            .monospacedDigit()
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 8)
-                            .frame(height: 22)
-                            .glassCapsuleBadge(tint: Color.black.opacity(0.30),
-                                               fallback: Color.black.opacity(0.72))
-                            .padding(6)
-                    }
-                } else {
-                    // 想玩/在玩/搁置/弃坑：右上角状态标签。
-                    // 两种徽章统一尺寸（高 22、字号 12、水平内边距 8）+ 液态玻璃（状态用品牌色染色玻璃）。
-                    Text(verbatim: L10n.tr(game.statusValue.labelKey, lang: language))
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 8)
-                        .frame(height: 22)
-                        .glassCapsuleBadge(tint: game.statusValue.statusColor.opacity(0.55),
-                                           fallback: game.statusValue.statusColor.opacity(0.88))
-                        .padding(6)
-                }
+                GameBadge(game: game, style: .glass)
+                    .padding(6)
             }
             // 名字 + 平台图标：一行放得下就并排；放不下（多平台/超宽字标）图标换到名字下方一行，名字不被挤压省略。
             // 图标行与名字中轴对齐（各平台放大系数不同，基线/底对齐会顶部参差）。
@@ -258,25 +221,7 @@ struct GameRowView: View {
 
             Spacer()
 
-            if game.isCompletedOrLongRunning {
-                if let score = game.libraryScore {
-                    Text(verbatim: GameCardView.formatScore(score))
-                        .font(.system(size: 15, weight: .bold))
-                        .monospacedDigit()
-                } else {
-                    LText("score.unrated")
-                        .font(.system(size: 13))
-                        .foregroundStyle(.secondary)
-                }
-            } else {
-                // 想玩/在玩/搁置/弃坑：右侧显示状态标签。
-                Text(verbatim: L10n.tr(game.statusValue.labelKey, lang: language))
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(game.statusValue.statusColor.opacity(0.88), in: Capsule())
-            }
+            GameBadge(game: game, style: .plain)
         }
         .padding(.vertical, 4)
     }
@@ -437,30 +382,9 @@ struct GameWideCardView: View {
         }
     }
 
-    /// 右上角徽章：已通关/长线 → 评分液态玻璃胶囊（网格卡同款：深色玻璃白字，未评分不占位）；
-    /// 轻量状态 → 品牌色染色玻璃胶囊。
-    @ViewBuilder
+    /// 右上角徽章：GameBadge(.glass) 统一入口（规则与样式单一归属 Support/StatusStyle.swift）。
     private var trailingBadge: some View {
-        if game.isCompletedOrLongRunning {
-            if let score = game.libraryScore {
-                Text(verbatim: GameCardView.formatScore(score))
-                    .font(.system(size: 12, weight: .bold))
-                    .monospacedDigit()
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 8)
-                    .frame(height: 22)
-                    .glassCapsuleBadge(tint: Color.black.opacity(0.30),
-                                       fallback: Color.black.opacity(0.72))
-            }
-        } else {
-            Text(verbatim: L10n.tr(game.statusValue.labelKey, lang: language))
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 8)
-                .frame(height: 22)
-                .glassCapsuleBadge(tint: game.statusValue.statusColor.opacity(0.55),
-                                   fallback: game.statusValue.statusColor.opacity(0.88))
-        }
+        GameBadge(game: game, style: .glass)
     }
 }
 

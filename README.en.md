@@ -16,7 +16,7 @@ Interface languages: **简体中文 / 日本語 / English** (switch instantly in
 - **Review (Markdown long-form)**: the one-line verdict (tagline) renders as a large lead-in "thesis"; the review body supports a Markdown subset (headings `#` / bold `**` / italic `*` / lists `-`) like a well-set article. **macOS = WYSIWYG rich-text editor** (a dedicated "writing desk" window; the toolbar applies styles directly, saved back to Markdown; CJK italics are synthesized with a shear at draw time); **iOS = editing sheet (TextEditor)**. Per-platform editing shares one Markdown renderer, so both platforms look consistent.
 - **Six-Dimension Scoring**: Gameplay / Design / Story / Art / Music / Performance, 1–10 sliders with 0.1 steps. Overall = mean of the six; the first completion requires scores, later ones may be skipped.
 - **Completions**: platform, completion date (can be "None"), completion degree (main story / all side quests / all endings / platinum / multiple playthroughs / speedrun / custom), playtime (can be "None"), and notes.
-- **Date Picker**: macOS three-column wheel (year / month / day, handles Feb 29 and month-end clamping); iOS uses the system date picker.
+- **Date Picker**: macOS three-column wheel (year / month / day, handles Feb 29 and month-end clamping; spring-loaded snapping aligned with the system wheel feel); iOS uses the system date picker.
 - **Groups**: create / rename / delete; pick games to join via context menu (macOS) or menu (iOS); per-group stats and review (rendered as Markdown; editable in the writing desk on macOS).
 - **Collector Mode** (Settings toggle): "Details / Holdings" segmented switch on the detail page; each game can have multiple holdings (11 media types / 10 regions / 7 conditions / 11 acquisition sources / per-language price & estimated value / purchase date / notes + up to 6 photos), forming a **collection archive**. New games do **not** get a holding by default — you must toggle "I own this (create holding)" to expand the fields and build the archive. The Holdings view offers grid / list layouts, a top overview (edition count / total quantity / total spent / total estimated value), capsule-style metadata, and a full edit sheet; photos open in the system viewer; included in backups.
 - **Cover Art & Images**: import from your device (iOS pops a "Photos / Files / Camera" menu), or search & download via the [SteamGridDB](https://www.steamgriddb.com) API (requires an API Key in Settings, searches as you type); each of the five image kinds has an **auto-match** toggle (portrait cover / square cover / landscape cover / hero background / logo — about 0.6s after you stop typing it picks the first hit, never overwrites an existing image, silent on failure; renaming a game also triggers a re-fetch); square covers return 1:1 results only (both 512×512 and 1024×1024 tiers are queried); the search sheet's copy follows the image kind and pre-fills the game's English name; results show thumbnails.
@@ -30,6 +30,8 @@ Interface languages: **简体中文 / 日本語 / English** (switch instantly in
 - **Backup**: export the whole library to a single JSON (covers embedded as base64), including username / avatar / icon, restorable as a whole, compatible with older backups; import asks for confirmation. On iOS, export uses the system share sheet (AirDrop / Save to Files, etc.) with a timestamped file name.
 - **Auto Backup**: automatically writes a full local backup (one rolling file) whenever your data changes; keeps a snapshot of the old version before upgrades; if the library is empty but a backup exists, asks on launch whether to restore; snapshots before restore / import so you can undo. On iOS, backups live in Documents/Backups (visible in the Files app), so you can still grab them if the app can't launch (e.g. expired signing cert).
 - **Clear Cache**: Settings → Storage & Cache shows current cache usage and clears it with one tap (cover/image decode caches, network cache, temp files) — never touches your game data or backups.
+- **Launch Screen**: a branded splash (icon + app name + progress) shows immediately at startup and fades into the main UI; iOS additionally has a same-colored static system launch screen.
+- **Large-library performance**: images are stored as external files and lazy-loaded (hundreds-of-MB libraries no longer stutter on edits or page switches); backups are written in the background as a streaming per-game encode — the main thread is never blocked.
 
 ## Platforms
 
@@ -68,7 +70,7 @@ Or open `GameLog.xcodeproj` in Xcode and Run the `GameLog` (macOS) or `GameLog-i
 
 The repository provides one device Release IPA under `dist/`, unsigned — sign it yourself (eSign or similar) before installing:
 
-- `GameLog-beta-2.6.ipa` — unsigned device arm64 build, suited for re-signing with eSign or similar tools
+- `GameLog-beta-2.7.ipa` — unsigned device arm64 build, suited for re-signing with eSign or similar tools
 
 > Tip: for simulator or daily development debugging, just Run from Xcode — no simulator IPA is produced or needed; on macOS install straight from the DMG.
 
@@ -96,8 +98,11 @@ GameLog/
 ├── GameLogApp.swift       # macOS entry: WindowGroup + Settings/About/writing-desk scenes share one ModelContainer
 ├── iOSRootView.swift      # iOS entry: bottom TabBar (Library / Stats / Settings) + AirDrop backup import
 ├── Models/                # SwiftData models (Game / Completion / GameGroup / PhysicalCopy / Presets)
-├── Support/               # PlatformImage abstraction, ScoreMath, ExportImport/AutoBackup, UserCustomization, L10n,
-│                          #   SteamGridDB, PriceFormat, PlatformIcon (platform logos), PlatformButton,
+├── Support/               # PlatformImage abstraction, ScoreMath, ExportImport/BackupWriter/AutoBackup,
+│                          #   Game+Backup (single Game↔DTO mapping), UserCustomization, L10n, SteamGridDB, PriceFormat,
+│                          #   ImageImport (image import pipeline), LibraryStats (library aggregates),
+│                          #   LibraryQuery (filter + stable sort + sort menu), StatusStyle (status colors/badges),
+│                          #   ImageDecodeCache, LaunchGate (splash), PlatformIcon, PlatformButton,
 │                          #   PlatformConfirmDialog (bottom action sheet), ImageSourcePicker,
 │                          #   DocumentPicker (iOS file picking), ShareSheetPresenter (iOS share sheet),
 │                          #   MarkdownReview (parse/render), MarkdownRichEditor (macOS writing desk)

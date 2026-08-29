@@ -16,7 +16,7 @@
 - **レビュー（Markdown 長文）**：一言レビュー（タグライン）を大きな導入文として見出し的に表示；長文本文は Markdown サブセット（見出し `#` / 太字 `**` / 斜体 `*` / リスト `-`）に対応し、組版が行き届いた記事のようになります。**macOS = リッチテキスト WYSIWYG エディタ**（独立した「書き机」ウィンドウ。ツールバーで直接スタイル変更、保存時に Markdown へ変換。CJK 斜体は描画時にシェアで合成）；**iOS = 編集シート（TextEditor）**。端末ごとに編集しつつ、共通の Markdown レンダラで両端の見た目は一致します。
 - **6 軸スコア**：ゲームプレイ / デザイン / ストーリー / アート / ミュージック / パフォーマンス、1–10、0.1 刻みのスライダー。総合 = 6 軸の平均；最初のクリア記録では必須、以降はスキップ可能。
 - **クリア記録**：プラットフォーム、クリア日（「なし」可）、クリア度（メインストーリー / 全サブクエスト / 全エンディング / 全コレクションプラチナ / マルチ周回 / スピードラン / カスタム）、プレイ時間（「なし」可）、メモ。
-- **日付選択**：macOS は 3 連ホイール（年 / 月 / 日、閏日と月末の調整に対応）；iOS はシステムの日付ピッカー。
+- **日付選択**：macOS は 3 連ホイール（年 / 月 / 日、閏日と月末の調整に対応；システムホイールに揃えたスプリング吸着の手触り）；iOS はシステムの日付ピッカー。
 - **グループ**：作成 / 改名 / 削除；右クリック（macOS）またはメニュー（iOS）からゲームを追加；グループ統計とグループレビュー（Markdown で表示、macOS は「書き机」で編集可）。
 - **コレクターモード**（設定トグル）：詳細ページに「詳細 / 所持」のセグメント切替；各ゲームに複数の所持版（媒体 11 種 / 地域 10 種 / コンディション 7 種 / 入手元 11 種 / 言語別価格と推定価値 / 購入日 / メモ + 最大 6 枚の写真）を持て、それが**コレクション档案**となります。新規作成時は初期状態では所持を作らず、「この版を所有（所持档案を作成）」をオンにして初めてフィールドが展開されます。所持ビューはグリッド / リストの両表示、トップの総覧（版数 / 総数量 / 総支出 / 総推定価値）、カプセル式メタデータ、完全な編集シートに対応；写真はシステムビューアで表示、バックアップに含まれます。
 - **カバーと画像**：端末から選択（iOS は「写真 / ファイル / 撮影」メニュー）、または [SteamGridDB](https://www.steamgriddb.com) API で検索してダウンロード（設定で API Key が必要、入力中に自動検索、検索結果はサムネイル表示）；5 種類の画像それぞれに**自動マッチ**トグル（縦カバー / スクエアカバー / 横カバー / 背景画像 / ロゴ——名前入力が約 0.6 秒止まった時点で最初のヒットを取得、既存画像は上書きせず、失敗時は静かに無視；名前変更でも再取得）；スクエアカバーは 1:1 の結果のみ（512×512 と 1024×1024 の両サイズを検索）；検索シートの文言は画像種別ごとに変わり、ゲームの英語名を事前入力。
@@ -68,7 +68,7 @@ xcrun simctl launch booted com.abcleg.GameLog
 
 リポジトリには実機用の Release IPA（`dist/`）が 1 本あります。未署名のため、eSign などのツールで自分で署名してからインストールしてください：
 
-- `GameLog-beta-2.6.ipa` — 実機 arm64 無署名ビルド。eSign などのツールで再署名して実機インストールする向け
+- `GameLog-beta-2.7.ipa` — 実機 arm64 無署名ビルド。eSign などのツールで再署名して実機インストールする向け
 
 > ヒント：シミュレータや開発中のデバッグは Xcode で Run するだけで十分で、シミュレータ用 IPA は作成もし配布もしません；macOS は DMG から直接インストールします。
 
@@ -96,9 +96,11 @@ GameLog/
 ├── GameLogApp.swift       # macOS エントリ：WindowGroup + Settings/About/書き机 シーンが ModelContainer を共有
 ├── iOSRootView.swift      # iOS エントリ：下部 TabBar（ライブラリ / 統計 / 設定）+ AirDrop バックアップ取込
 ├── Models/                # SwiftData モデル（Game / Completion / GameGroup / PhysicalCopy / Presets）
-├── Support/               # プラットフォーム抽象 PlatformImage、ScoreMath、ExportImport/AutoBackup、
-│                          #   UserCustomization、L10n、SteamGridDB、PriceFormat、
-│                          #   PlatformIcon（プラットフォームロゴ）、PlatformButton、
+├── Support/               # プラットフォーム抽象 PlatformImage、ScoreMath、ExportImport/BackupWriter/AutoBackup、
+│                          #   Game+Backup（Game↔DTO 唯一マッピング）、UserCustomization、L10n、SteamGridDB、PriceFormat、
+│                          #   ImageImport（画像取込パイプライン）、LibraryStats（ライブラリ統計集計）、
+│                          #   LibraryQuery（フィルタ + 安定ソート + ソートメニュー）、StatusStyle（状態色/バッジ）、
+│                          #   ImageDecodeCache、LaunchGate（スプラッシュ）、PlatformIcon、PlatformButton、
 │                          #   PlatformConfirmDialog（ボトムアクションシート）、ImageSourcePicker、
 │                          #   DocumentPicker（iOS ファイル選択）、ShareSheetPresenter（iOS 共有シート）、
 │                          #   MarkdownReview（解析/表示）、MarkdownRichEditor（macOS 書き机）
