@@ -2,13 +2,14 @@
 // 覆盖：多对多双向、级联删除、删分组不删游戏、评分集成、零记录、别名搜索、
 //       备份全字段往返、重复导入幂等、导入替换语义、日期保真、持有记录往返。
 //
-// 编译运行（Xcode 工具链 + 宏插件路径，勿用 CLT swiftc）：
-//   xcrun swiftc -o /tmp/gamelog_datasmoke \
+// 编译运行（Xcode 工具链 + 宏插件路径，勿用 CLT swiftc；`-sdk` 必需，否则标准库加载失败）：
+//   xcrun swiftc -sdk <Xcode-beta MacOSX.sdk> -o /tmp/gamelog_datasmoke \
 //     Scripts/DataSmokeTest/main.swift \
 //     GameLog/Models/Game.swift GameLog/Models/Completion.swift GameLog/Models/GameGroup.swift \
 //     GameLog/Models/PhysicalCopy.swift GameLog/Models/Presets.swift GameLog/Models/Artwork.swift \
 //     GameLog/Support/ScoreMath.swift GameLog/Support/ExportImport.swift GameLog/Support/Game+Backup.swift \
-//     GameLog/Support/BackupWriter.swift \
+//     GameLog/Support/BackupWriter.swift GameLog/Support/ImageDecodeCache.swift \
+//     GameLog/Support/LibraryStats.swift GameLog/Support/LibraryQuery.swift \
 //     GameLog/Support/UserCustomization.swift GameLog/Support/PlatformImage.swift \
 //     GameLog/Support/EnumPickerRow.swift GameLog/Support/L10n.swift GameLog/Support/AppLanguage.swift \
 //     -plugin-path <Xcode-beta 插件路径>
@@ -441,6 +442,7 @@ do {
                   releaseDate: Date(timeIntervalSince1970: 1_600_000_000),
                   coverData: Data("dualpath-cover".utf8),
                   reviewTitle: "双路径", reviewBody: "一致性")
+    g1.isFavorite = true
     let g1c = Completion(platform: "PS5", date: Date(timeIntervalSince1970: 1_700_000_000),
                          degree: "主线通关", playtime: 40, notes: "n",
                          scoreGameplay: 8, scoreDesign: 8, scoreStory: 7,
@@ -471,6 +473,7 @@ do {
     }
     check("备份双路径: 名称/别名/日期一致", m.name == s.name && m.aliases == s.aliases && m.releaseDate == s.releaseDate)
     check("备份双路径: 封面 base64 一致", m.coverBase64 == s.coverBase64)
+    check("备份双路径: isFavorite 一致", m.isFavorite == true && s.isFavorite == true)
     check("备份双路径: 记录字段一致", m.completions[0].platform == s.completions[0].platform
           && m.completions[0].scoreGameplay == s.completions[0].scoreGameplay
           && m.completions[0].date == s.completions[0].date)
@@ -567,6 +570,65 @@ do {
     check("LibraryQuery: menuOrder 最近编辑置顶", LibrarySort.menuOrder.first == .recentEdit)
     check("LibraryQuery: labelKey 表", LibrarySort.name.labelKey == "library.sortByName"
           && LibrarySort.valueDescending.labelKey == "library.sortByValueDesc")
+}
+
+// MARK: - 我的最爱（isFavorite 建模 + 备份往返）+ 主页横幅字段
+
+do {
+    let favGame = Game(name: "FavoriteProbe", reviewTitle: "t", isFavorite: true)
+    context.insert(favGame)
+    let plainGame = Game(name: "PlainProbe", reviewTitle: "t")
+    context.insert(plainGame)
+    try? context.save()
+    check("favorites: init isFavorite=true 存储", favGame.isFavorite)
+    check("favorites: 默认未收藏", !plainGame.isFavorite)
+
+    let favBackup = try BackupManager.encode(games: [favGame, plainGame], groups: [])
+    try BackupManager.decodeAndReplace(favBackup, into: context)
+    try context.save()
+    if let fi = (try? context.fetch(FetchDescriptor<Game>()))?.first(where: { $0.name == "FavoriteProbe" }),
+       let pi = (try? context.fetch(FetchDescriptor<Game>()))?.first(where: { $0.name == "PlainProbe" }) {
+        check("favorites: 备份往返 true 保真", fi.isFavorite)
+        check("favorites: 备份往返 false 保真", !pi.isFavorite)
+    } else {
+        check("favorites: 备份往返解析到游戏", false)
+    }
+
+    // 旧备份缺 isFavorite → 导入未收藏。
+    let legacyFavJSON = """
+    {"version":1,"exportedAt":"2026-01-01T00:00:00Z","groups":[],"games":[{"name":"旧最爱游戏","aliases":[],"reviewTitle":"","reviewBody":"","groupNames":[],"completions":[]}]}
+    """
+    try BackupManager.decodeAndReplace(legacyFavJSON.data(using: .utf8)!, into: context)
+    try context.save()
+    let legacyFav = (try? context.fetch(FetchDescriptor<Game>()))?.first(where: { $0.name == "旧最爱游戏" })
+    check("favorites: 旧备份缺 isFavorite → 未收藏", legacyFav?.isFavorite == false)
+
+    // 主页横幅：截断规则 + 备份编码/解码往返（真实 UserDefaults，用完清掉）。
+    check("banner: truncateBannerText 20 字上限",
+          UserCustomization.truncateBannerText("一二三四五六七八九十一二三四五六七八九十一二") == "一二三四五六七八九十一二三四五六七八九十")
+    UserCustomization.setBannerTitle("登录标题")
+    UserCustomization.setBannerSubtitle("登录副标题")
+    let bannerGame = Game(name: "BannerProbe", reviewTitle: "")
+    context.insert(bannerGame)
+    try? context.save()
+    let bannerData = try BackupManager.encode(games: [bannerGame], groups: [])
+    UserCustomization.setBannerTitle("待覆盖")
+    UserCustomization.setBannerSubtitle("待覆盖")
+    try BackupManager.decodeAndReplace(bannerData, into: context)
+    try context.save()
+    check("banner: 备份往返标题", UserDefaults.standard.string(forKey: UserCustomization.bannerTitleKey) == "登录标题")
+    check("banner: 备份往返副标题", UserDefaults.standard.string(forKey: UserCustomization.bannerSubtitleKey) == "登录副标题")
+    // 旧版备份缺横幅字段 → 保持现状不覆盖。
+    let legacyBannerJSON = """
+    {"version":1,"exportedAt":"2026-01-01T00:00:00Z","groups":[],"games":[]}
+    """
+    try BackupManager.decodeAndReplace(legacyBannerJSON.data(using: .utf8)!, into: context)
+    try context.save()
+    check("banner: 无字段备份不覆盖标题", UserDefaults.standard.string(forKey: UserCustomization.bannerTitleKey) == "登录标题")
+    // 清理测试污染。
+    UserCustomization.setBannerTitle("")
+    UserCustomization.setBannerSubtitle("")
+    check("banner: 空串移除 key", UserDefaults.standard.string(forKey: UserCustomization.bannerTitleKey) == nil)
 }
 
 print(failures == 0 ? "DATA SMOKE TEST PASSED" : "DATA SMOKE TEST FAILED: \(failures) failures")

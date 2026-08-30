@@ -376,3 +376,18 @@
 "settings.cacheClearConfirm" = "Clear Caches? Caches are temporary data that can be rebuilt automatically (cover search downloads, image decoding cache, and temporary files). Your game data and backups are not affected.";
 "settings.cacheCleared" = "Cache Cleared (%@ Freed)";
 "settings.cacheClearFailed" = "Clear Failed";
+
+"game.favorites" = "Favorites";
+"home.bannerSubtitleDefault" = "%d games in library";
+"home.statsTitle" = "Library Overview";
+"home.holdingsTitle" = "Collection Overview";
+"home.spotlightNoReview" = "No review title yet";
+"home.favoritesHint" = "No favorites yet — right-click or long-press a card and choose \"Favorites\"";
+"home.holdingsHint" = "Add some collection copies to see the collector overview here";
+"settings.bannerTitle" = "Home Banner Title";
+"settings.bannerSubtitle" = "Home Banner Subtitle";
+"settings.bannerBackground" = "Home Banner Background";
+"settings.removeBanner" = "Remove Background";
+"settings.bannerHint" = "Shown on the first carousel page at the top of \"All Games\"";
+"crop.titleBanner" = "Crop Banner Background";
+"crop.titleBannerHint" = "Position the part you want inside the window";

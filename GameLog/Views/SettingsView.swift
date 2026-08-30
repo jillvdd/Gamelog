@@ -30,12 +30,28 @@ struct SettingsView: View {
     @AppStorage(UserCustomization.keepOriginalImagesKey) private var keepOriginalImages = false
     @AppStorage(UserCustomization.platformIconsKey) private var showPlatformIcons = true
     @AppStorage(UserCustomization.autoBackupKey) private var autoBackup = true
+    @AppStorage(UserCustomization.bannerBackgroundFileKey) private var bannerBackgroundFile = ""
 
     /// 用户名绑定：写入时截断到上限。用 Binding 替代 `.onChange`——`.onChange` 挂 TextField 在 macOS 会吞尾随空格。
     private var usernameBinding: Binding<String> {
         Binding(
             get: { username },
             set: { username = UserCustomization.truncateUsername($0) }
+        )
+    }
+
+    /// 主页横幅标题/副标题绑定：写入截断 + 空串移除（持久化唯一入口在 UserCustomization）。
+    private var bannerTitleBinding: Binding<String> {
+        Binding(
+            get: { UserDefaults.standard.string(forKey: UserCustomization.bannerTitleKey) ?? "" },
+            set: { UserCustomization.setBannerTitle($0) }
+        )
+    }
+
+    private var bannerSubtitleBinding: Binding<String> {
+        Binding(
+            get: { UserDefaults.standard.string(forKey: UserCustomization.bannerSubtitleKey) ?? "" },
+            set: { UserCustomization.setBannerSubtitle($0) }
         )
     }
 
@@ -66,8 +82,12 @@ struct SettingsView: View {
     /// 照片图库选择器开关（macOS 用；photoLibraryPicker 在 iOS 为 no-op，状态无害）。
     @State private var showingAvatarLibrary = false
     @State private var showingIconLibrary = false
+    /// 主页横幅背景图（macOS 文件面板 / 照片图库；iOS 相册/文件/拍照；两平台共用 SGDB 搜索）。
+    @State private var showingBannerLibrary = false
+    @State private var showingBannerSearch = false
     #if !os(macOS)
     @State private var showingAvatarPicker = false
+    @State private var showingBannerPicker = false
     @State private var showingAbout = false
     #endif
 
@@ -123,6 +143,47 @@ struct SettingsView: View {
                     }
                 }
                 #endif
+
+                // 主页横幅（轮播第 1 页）：标题 / 副标题 / 背景图。
+                LabeledContent(L10n.tr("settings.bannerTitle", lang: language)) {
+                    BorderedTextField(
+                        text: bannerTitleBinding,
+                        placeholder: L10n.tr("app.menu", lang: language)
+                    )
+                }
+                .textFieldStyle(.roundedBorder)
+
+                LabeledContent(L10n.tr("settings.bannerSubtitle", lang: language)) {
+                    BorderedTextField(
+                        text: bannerSubtitleBinding,
+                        placeholder: L10n.tr("settings.bannerSubtitle", lang: language)
+                    )
+                }
+                .textFieldStyle(.roundedBorder)
+
+                LabeledContent(L10n.tr("settings.bannerBackground", lang: language)) {
+                    HStack {
+                        bannerBackgroundPreview
+                        #if os(macOS)
+                        Button(L10n.tr("settings.chooseImage", lang: language)) { pickBannerBackground() }
+                            .appStandardButton()
+                        Button(L10n.tr("image.photoLibrary", lang: language)) { showingBannerLibrary = true }
+                            .appStandardButton()
+                        #else
+                        Button(L10n.tr("settings.chooseImage", lang: language)) { showingBannerPicker = true }
+                            .appStandardButton()
+                        #endif
+                        Button(L10n.tr("cover.titleHero", lang: language)) { showingBannerSearch = true }
+                            .appStandardButton()
+                            .help(L10n.tr("cover.titleHero", lang: language))
+                        Button(L10n.tr("settings.removeBanner", lang: language)) { UserCustomization.removeBannerBackground() }
+                            .appStandardButton()
+                            .disabled(bannerBackgroundFile.isEmpty)
+                    }
+                }
+                LText("settings.bannerHint")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
 
                 Toggle(L10n.tr("settings.autoMatchCover", lang: language), isOn: $autoMatchCover)
                 LText("settings.autoMatchCoverHint")
@@ -306,10 +367,22 @@ struct SettingsView: View {
                 }
             )
         }
+        .sheet(isPresented: $showingBannerSearch) {
+            #if os(macOS)
+            BannerSearchSheet()
+            #else
+            NavigationStack { BannerSearchSheet() }
+            #endif
+        }
         #if !os(macOS)
         .imageSourcePicker(isPresented: $showingAvatarPicker, onImages: { datas in
             if let data = datas.first, let image = AppImage(data: data) {
                 cropSession = CropSession(kind: .avatar, image: image)
+            }
+        })
+        .imageSourcePicker(isPresented: $showingBannerPicker, onImages: { datas in
+            if let data = datas.first {
+                try? UserCustomization.saveBannerBackgroundPNG(data)
             }
         })
         #endif
@@ -323,6 +396,11 @@ struct SettingsView: View {
         .photoLibraryPicker(isPresented: $showingIconLibrary, onImages: { datas in
             if let data = datas.first, let image = AppImage(data: data) {
                 cropSession = CropSession(kind: .icon, image: image)
+            }
+        })
+        .photoLibraryPicker(isPresented: $showingBannerLibrary, onImages: { datas in
+            if let data = datas.first {
+                try? UserCustomization.saveBannerBackgroundPNG(data)
             }
         })
         #endif
@@ -363,6 +441,31 @@ struct SettingsView: View {
         }
     }
     #endif
+
+    /// 主页横幅背景预览（无背景回退品牌深色渐变），设置页内小尺寸缩略。
+    private var bannerBackgroundPreview: some View {
+        Group {
+            if let img = UserCustomization.bannerBackgroundImage() {
+                Image(appImage: img)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(LinearGradient(
+                        colors: [Color(red: 0.13, green: 0.115, blue: 0.09),
+                                 Color(red: 0.075, green: 0.067, blue: 0.055)],
+                        startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .overlay {
+                        Image(systemName: "photo")
+                            .font(.system(size: 14))
+                            .foregroundStyle(.white.opacity(0.6))
+                    }
+            }
+        }
+        .frame(width: 76, height: 42)
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.quaternary, lineWidth: 0.5))
+    }
 
     // MARK: - SteamGridDB key 验证
 
@@ -452,6 +555,13 @@ struct SettingsView: View {
         } catch {
             // 保存失败（磁盘满等罕见情况）静默；下次打开设置仍显示原值
         }
+    }
+
+    /// 主页横幅背景（macOS 文件面板）：不裁切不压缩、原样存盘（显示时等比填充裁边）。
+    /// iOS 走 `.imageSourcePicker`（相册/文件/拍照），不经此路径。
+    private func pickBannerBackground() {
+        guard let data = ImageImport.pickOneFromPanel(), AppImage(data: data) != nil else { return }
+        try? UserCustomization.saveBannerBackgroundPNG(data)
     }
 
     // MARK: - 备份

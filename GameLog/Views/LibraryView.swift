@@ -34,6 +34,8 @@ struct LibraryView: View {
     var platform: String? = nil
     /// 状态过滤（想玩/在玩/搁置/弃坑/已通关），由侧边栏/iOS 筛选菜单选择驱动，与 groupFilter/platform 互斥。
     var statusFilter: GameStatus? = nil
+    /// 虚拟分组「我的最爱」：仅显示 isFavorite 游戏（侧边栏/iOS 筛选菜单进入，与分组/平台/状态互斥）。
+    var favoritesOnly: Bool = false
 
     @State private var searchText = ""
     @AppStorage("useGridView") private var useGridView = true
@@ -80,6 +82,9 @@ struct LibraryView: View {
             games: games, group: groupFilter,
             platform: platform, status: statusFilter, search: searchText
         )
+        if favoritesOnly {
+            result = result.filter(\.isFavorite)
+        }
         #if os(macOS)
         if let groupFilter, !groupPlatformFilter.isEmpty {
             result = result.filter { $0.platformList.contains(groupPlatformFilter) }
@@ -88,7 +93,29 @@ struct LibraryView: View {
         return LibraryQuery.sorted(result, by: sortOption, language: language)
     }
 
+    /// 虚拟分组「我的最爱」的全体成员（统计区块依据——不受搜索/排序影响）。
+    private var allFavorites: [Game] {
+        games.filter(\.isFavorite)
+    }
+
+    /// 轮播只出现在「全部游戏」起始页：无分组、无平台、无状态、非最爱虚拟分组。
+    private var showsHomeCarousel: Bool {
+        groupFilter == nil && platform == nil && statusFilter == nil && !favoritesOnly
+    }
+
+    /// 点击轮播内游戏行 → 复用库的推详情路径（macOS path / iOS selectedGame）。
+    private func openDetail(_ game: Game) {
+        #if os(macOS)
+        path.append(game)
+        #else
+        selectedGame = game
+        #endif
+    }
+
     private var navigationTitleText: String {
+        if favoritesOnly {
+            return L10n.tr("game.favorites", lang: language)
+        }
         if let statusFilter {
             return L10n.tr(statusFilter.labelKey, lang: language)
         }
@@ -144,6 +171,59 @@ struct LibraryView: View {
                 Divider()
                 GroupStatsSection(group: group)
                 GroupReviewSection(group: group)
+            }
+            .padding()
+            .frame(maxWidth: 1500)
+            .frame(maxWidth: .infinity, alignment: .top)
+        }
+    }
+
+    /// 「全部游戏」起始页顶端的五页轮播。
+    private var carousel: some View {
+        HomeCarousel(games: games, onSelect: openDetail)
+    }
+
+    /// 虚拟分组「我的最爱」内容：游戏列表在上、统计在下（无评价区块）。
+    private var favoritesContent: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 28) {
+                if allFavorites.isEmpty {
+                    ContentUnavailableView {
+                        Image(systemName: "heart")
+                            .font(.system(size: 48))
+                    } description: {
+                        LText("home.favoritesHint")
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 40)
+                } else if visibleGames.isEmpty {
+                    ContentUnavailableView {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 48))
+                    } description: {
+                        LText("library.noResult")
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 40)
+                } else {
+                    #if os(iOS)
+                    switch iosViewMode {
+                    case .grid: gameGrid(visibleGames)
+                    case .wideCard: gameWideCards(visibleGames)
+                    case .list: gameList(visibleGames)
+                    }
+                    #else
+                    if useGridView {
+                        gameGrid(visibleGames)
+                    } else {
+                        gameList(visibleGames)
+                    }
+                    #endif
+                }
+
+                Divider()
+                // 统计区块反映全部最爱（不受搜索/排序影响）。
+                GroupStatsSectionContent(games: allFavorites)
             }
             .padding()
             .frame(maxWidth: 1500)
@@ -232,6 +312,29 @@ struct LibraryView: View {
 
     @ViewBuilder
     private func cardMenu(for game: Game) -> some View {
+        #if os(macOS)
+        // macOS 上下文菜单顶层既不渲染 SF Symbol、系统 Toggle 勾选也不落屏（用户实测）——
+        // 用 Unicode 字形 ♥(实心)/♡(空心) 直接进菜单文字：文字一定渲染，实心/空心即状态。
+        Button {
+            game.isFavorite.toggle()
+            try? context.save()
+        } label: {
+            Text(verbatim: (game.isFavorite ? "♥ " : "♡ ") + L10n.tr("game.favorites", lang: language))
+        }
+        #else
+        // iOS 长按菜单渲染 SF Symbol：实心 = 已收藏、空心 = 未收藏（用户指定口径）。
+        Button {
+            game.isFavorite.toggle()
+            try? context.save()
+        } label: {
+            if game.isFavorite {
+                Label(L10n.tr("game.favorites", lang: language), systemImage: "heart.fill")
+            } else {
+                Label(L10n.tr("game.favorites", lang: language), systemImage: "heart")
+            }
+        }
+        #endif
+        Divider()
         Menu {
             ForEach(GameStatus.allCases) { s in
                 Button {
@@ -353,6 +456,8 @@ struct LibraryView: View {
         Group {
             if let group = groupFilter {
                 groupContent(group: group)
+            } else if favoritesOnly {
+                favoritesContent
             } else if games.isEmpty {
                 ContentUnavailableView {
                     Image(systemName: "gamecontroller")
@@ -372,16 +477,27 @@ struct LibraryView: View {
                 switch iosViewMode {
                 case .grid:
                     ScrollView {
-                        gameGrid(visibleGames)
-                            .padding()
+                        VStack(alignment: .leading, spacing: 16) {
+                            if showsHomeCarousel { carousel }
+                            gameGrid(visibleGames)
+                        }
+                        .padding()
                     }
                 case .wideCard:
                     ScrollView {
-                        gameWideCards(visibleGames)
-                            .padding()
+                        VStack(alignment: .leading, spacing: 16) {
+                            if showsHomeCarousel { carousel }
+                            gameWideCards(visibleGames)
+                        }
+                        .padding()
                     }
                 case .list:
                     List {
+                        if showsHomeCarousel {
+                            carousel
+                                .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
+                                .listRowSeparator(.hidden)
+                        }
                         ForEach(visibleGames) { game in
                             gameRow(game)
                         }
@@ -390,11 +506,19 @@ struct LibraryView: View {
                 #else
                 if useGridView {
                     ScrollView {
-                        gameGrid(visibleGames)
-                            .padding()
+                        VStack(alignment: .leading, spacing: 16) {
+                            if showsHomeCarousel { carousel }
+                            gameGrid(visibleGames)
+                        }
+                        .padding()
                     }
                 } else {
                     List {
+                        if showsHomeCarousel {
+                            carousel
+                                .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
+                                .listRowSeparator(.hidden)
+                        }
                         ForEach(visibleGames) { game in
                             gameRow(game)
                         }

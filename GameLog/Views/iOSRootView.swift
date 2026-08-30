@@ -81,6 +81,8 @@ struct iOSLibraryTab: View {
     @State private var platformFilter: String?
     /// 状态筛选（想玩/在玩/…），与分组/平台互斥单选。
     @State private var statusFilter: GameStatus?
+    /// 虚拟分组「我的最爱」筛选（与分组/平台/状态互斥单选）。
+    @State private var favoritesOnly = false
     @State private var showingGroupManager = false
 
     /// 库里出现过的平台：唯一归属 LibraryStats。
@@ -88,7 +90,7 @@ struct iOSLibraryTab: View {
 
     var body: some View {
         NavigationStack {
-            LibraryView(groupFilter: groupFilter, platform: platformFilter, statusFilter: statusFilter)
+            LibraryView(groupFilter: groupFilter, platform: platformFilter, statusFilter: statusFilter, favoritesOnly: favoritesOnly)
                 .toolbar {
                     // 筛选（分组/平台）整合为一个按钮放 leading，避免两个按钮误触；
                     // 新建游戏与「更多」在 LibraryView 的 trailing，避免触发系统折叠「…」。
@@ -114,8 +116,9 @@ struct iOSLibraryTab: View {
                 statusFilter = nil
                 groupFilter = nil
                 platformFilter = nil
+                favoritesOnly = false
             } label: {
-                if statusFilter == nil && groupFilter == nil && platformFilter == nil {
+                if statusFilter == nil && groupFilter == nil && platformFilter == nil && !favoritesOnly {
                     Label(L10n.tr("library.all", lang: language), systemImage: "checkmark")
                 } else {
                     Text(verbatim: L10n.tr("library.all", lang: language))
@@ -128,8 +131,9 @@ struct iOSLibraryTab: View {
                         statusFilter = s
                         groupFilter = nil
                         platformFilter = nil
+                        favoritesOnly = false
                     } label: {
-                        if statusFilter == s && groupFilter == nil && platformFilter == nil {
+                        if statusFilter == s && groupFilter == nil && platformFilter == nil && !favoritesOnly {
                             Label(L10n.tr(s.labelKey, lang: language), systemImage: "checkmark")
                         } else {
                             Text(verbatim: L10n.tr(s.labelKey, lang: language))
@@ -139,13 +143,27 @@ struct iOSLibraryTab: View {
             }
 
             Section(L10n.tr("library.filterGroup", lang: language)) {
+                // 虚拟分组「我的最爱」常驻首位（与真实分组并存）。
+                Button {
+                    favoritesOnly = true
+                    statusFilter = nil
+                    groupFilter = nil
+                    platformFilter = nil
+                } label: {
+                    if favoritesOnly && statusFilter == nil && groupFilter == nil && platformFilter == nil {
+                        Label(L10n.tr("game.favorites", lang: language), systemImage: "checkmark")
+                    } else {
+                        Text(verbatim: L10n.tr("game.favorites", lang: language))
+                    }
+                }
                 ForEach(groups) { group in
                     Button {
                         groupFilter = group
                         statusFilter = nil
                         platformFilter = nil
+                        favoritesOnly = false
                     } label: {
-                        if groupFilter?.persistentModelID == group.persistentModelID && statusFilter == nil && platformFilter == nil {
+                        if groupFilter?.persistentModelID == group.persistentModelID && statusFilter == nil && platformFilter == nil && !favoritesOnly {
                             Label(group.name, systemImage: "checkmark")
                         } else {
                             Text(verbatim: group.name)
@@ -160,12 +178,13 @@ struct iOSLibraryTab: View {
                         platformFilter = platform
                         statusFilter = nil
                         groupFilter = nil
+                        favoritesOnly = false
                     } label: {
                         HStack(spacing: 8) {
                             PlatformIcon(platform: platform, size: 16)
                             Text(verbatim: Presets.display(platform, category: .platform, language: language))
                             Spacer()
-                            if platformFilter == platform && statusFilter == nil && groupFilter == nil {
+                            if platformFilter == platform && statusFilter == nil && groupFilter == nil && !favoritesOnly {
                                 Image(systemName: "checkmark")
                                     .foregroundStyle(.secondary)
                             }

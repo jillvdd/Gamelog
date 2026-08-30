@@ -522,6 +522,9 @@ struct GameDetailView: View {
             ToolbarItem {
                 // .help tooltip 是 §34.5 补的 macOS 悬停提示，iOS 无此诉求。
                 HStack(spacing: 0) {
+                    toolFavoriteButton
+                        .toolbarSegmentStyle()
+                        .help(L10n.tr("game.favorites", lang: language))
                     toolShareButton
                         .toolbarSegmentStyle()
                         .help(L10n.tr("library.share", lang: language))
@@ -544,6 +547,7 @@ struct GameDetailView: View {
             // 2026-08-27 用户指定）。之前单 ToolbarItem 塞一个 HStack 才会挤成无分区的长条。
             // 旧系统（<26）无液态玻璃合并行为，回退单条分组 + 手动间距。
             if #available(iOS 26.0, *) {
+                ToolbarItem { toolFavoriteButton }
                 ToolbarItem { toolShareButton }
                 if detailStatus.isCompletedOrLongRunning {
                     ToolbarItem { toolAddCompletionButton }
@@ -553,6 +557,7 @@ struct GameDetailView: View {
             } else {
                 ToolbarItem {
                     HStack(spacing: 12) {
+                        toolFavoriteButton
                         toolShareButton
                         if detailStatus.isCompletedOrLongRunning {
                             toolAddCompletionButton
@@ -669,6 +674,20 @@ struct GameDetailView: View {
                 .labelStyle(.iconOnly)
                 .font(.system(size: 15))
                 .foregroundStyle(.red)
+        }
+    }
+
+    /// 「我的最爱」爱心开关：标记/取消收藏（库卡片角标、轮播第 2 页、虚拟分组同步）。
+    private var toolFavoriteButton: some View {
+        Button {
+            game.isFavorite.toggle()
+            try? context.save()
+        } label: {
+            Label(L10n.tr("game.favorites", lang: language),
+                  systemImage: game.isFavorite ? "heart.fill" : "heart")
+                .labelStyle(.iconOnly)
+                .font(.system(size: 15))
+                .foregroundStyle(game.isFavorite ? Color.pink : Color.primary)
         }
     }
 

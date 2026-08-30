@@ -16,13 +16,17 @@ import SwiftData
 actor BackupWriter {
 
     /// 流式写整个备份到 url。返回写入字节数。
-    /// - 顶层结构按 BackupDTO 字段顺序手拼：version / exportedAt / groups / games / username / avatarBase64 / iconBase64
+    /// - 顶层结构按 BackupDTO 字段顺序手拼：version / exportedAt / groups / games /
+    ///   username / avatarBase64 / iconBase64 / bannerTitle / bannerSubtitle / bannerBackgroundBase64
     /// - groups 数组一次编码（体量小）；games **逐个**编码写盘（单游戏峰值 ~几十 MB）
-    /// - 头像/图标 PNG 由调用方传入（后台读文件），base64 后写盘
+    /// - 头像/图标/横幅背景 PNG 由调用方传入（后台读文件），base64 后写盘
     func writeStreamingBackup(to url: URL,
                               username: String?,
                               avatarPNG: Data?,
-                              iconPNG: Data?) throws -> Int {
+                              iconPNG: Data?,
+                              bannerTitle: String? = nil,
+                              bannerSubtitle: String? = nil,
+                              bannerBackgroundPNG: Data? = nil) throws -> Int {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
 
@@ -68,13 +72,19 @@ actor BackupWriter {
         }
         try write(Data("]".utf8))
 
-        // 自定义三项（与 BackupManager.encode 同字段名；缺省 = null）
+        // 自定义项（与 BackupManager.encode 同字段名；缺省 = null）
         try write(Data(",\"username\":".utf8))
         try write(try encoder.encode(username))
         try write(Data(",\"avatarBase64\":".utf8))
         try write(try encoder.encode(avatarPNG?.base64EncodedString()))
         try write(Data(",\"iconBase64\":".utf8))
         try write(try encoder.encode(iconPNG?.base64EncodedString()))
+        try write(Data(",\"bannerTitle\":".utf8))
+        try write(try encoder.encode(bannerTitle))
+        try write(Data(",\"bannerSubtitle\":".utf8))
+        try write(try encoder.encode(bannerSubtitle))
+        try write(Data(",\"bannerBackgroundBase64\":".utf8))
+        try write(try encoder.encode(bannerBackgroundPNG?.base64EncodedString()))
         try write(Data("}".utf8))
 
         closeFH()

@@ -114,6 +114,8 @@ final class Game {
     var updatedAt: Date?
     /// 状态机状态（GameStatus.rawValue）。默认已通关；想玩/在玩等轻量状态无通关记录。
     var status: String = GameStatus.completed.rawValue
+    /// 我的最爱（用户标记；虚拟分组「我的最爱」的成员依据）。
+    var isFavorite: Bool = false
 
     @Relationship(deleteRule: .cascade, inverse: \Completion.game)
     var completions: [Completion]
@@ -133,7 +135,8 @@ final class Game {
          logoData: Data? = nil, logoSize: LogoBannerSize = .medium,
          logoVertical: LogoBannerVertical = .bottom, logoHorizontal: LogoBannerHorizontal = .leading,
          reviewTitle: String = "", reviewBody: String = "",
-         createdAt: Date = .now, status: GameStatus = .completed) {
+         createdAt: Date = .now, status: GameStatus = .completed,
+         isFavorite: Bool = false) {
         self.name = name
         self.nameZh = nameZh
         self.nameJa = nameJa
@@ -156,6 +159,7 @@ final class Game {
         self.createdAt = createdAt
         self.updatedAt = createdAt
         self.status = status.rawValue
+        self.isFavorite = isFavorite
         self.completions = []
         self.copies = []
         self.groups = []

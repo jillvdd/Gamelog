@@ -96,6 +96,18 @@ struct SteamGridDBClient {
         return response.success ? response.data : []
     }
 
+    /// 主页横幅候选（§46 用户最终口径）：**不要 2:3 封面**——只要宽幅 **hero** + 竖版卡片
+    /// **342×482 / 660×930**（SGDB `dimensions` 过滤；这两档是用户指定的非 2:3 竖版尺寸）。
+    func bannerCandidates(for gameID: Int) async throws -> [SteamGridDBGrid] {
+        async let heros = heroes(for: gameID)
+        let url = URL(string: "\(Self.base)/grids/game/\(gameID)?dimensions=342x482,660x930")!
+        let data = try await requestData(url)
+        let resp = try JSONDecoder().decode(SteamGridDBResponse<[SteamGridDBGrid]>.self, from: data)
+        let cards = resp.success ? resp.data : []
+        let h = try await heros
+        return h + cards
+    }
+
     /// 横向封面浏览分页结果（**只取 920×430 横版**——游戏横向封面主格式；API 每页 50 条，`page` 从 0 起）。
     func landscapesPage(for gameID: Int, page: Int) async throws -> GridPage {
         let url = URL(string: "\(Self.base)/grids/game/\(gameID)?dimensions=920x430&page=\(page)")!

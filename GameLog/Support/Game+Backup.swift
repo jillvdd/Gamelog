@@ -33,7 +33,8 @@ extension GameDTO {
             groupNames: game.groups.map(\.name),
             completions: game.sortedCompletions.map { CompletionDTO(from: $0) },
             copies: game.copies.map { CopyDTO(from: $0) },
-            status: game.status
+            status: game.status,
+            isFavorite: game.isFavorite
         )
     }
 }

@@ -47,6 +47,10 @@ enum UserCustomization {
     /// iOS 库视图三态（grid/wideCard/list，原始值字符串）。仅 iOS 读写；macOS 仍用旧 useGridView Bool 键。
     /// 旧键迁移在 LibraryView 首次读取时做：无此键时按 useGridView 折算 grid/list。
     static let iosLibraryViewModeKey = "customization.iosLibraryViewMode"
+    /// 主页横幅标题 / 副标题 / 背景图文件引用（设置页「主页横幅」块读写；轮播第 1 页展示）。
+    static let bannerTitleKey = "customization.bannerTitle"
+    static let bannerSubtitleKey = "customization.bannerSubtitle"
+    static let bannerBackgroundFileKey = "customization.bannerBackgroundFile"
 
     /// 用户名长度上限。
     static let usernameMaxLength = 20
@@ -68,30 +72,70 @@ enum UserCustomization {
         }
     }
 
-    // MARK: - 备份往返（自定义三项：用户名 / 头像 / 图标）
+    // MARK: - 备份往返（自定义三项 + 主页横幅：用户名 / 头像 / 图标 / 横幅标题副标题背景）
 
-    /// 读出三项供备份编码（BackupManager.encode 用；BackupWriter 走逐项读取同源）。
-    static func encodedCustomization() -> (username: String?, avatarBase64: String?, iconBase64: String?) {
+    /// 读出各项供备份编码（BackupManager.encode 用；BackupWriter 走逐项读取同源）。
+    static func encodedCustomization() -> (username: String?, avatarBase64: String?, iconBase64: String?,
+                                            bannerTitle: String?, bannerSubtitle: String?, bannerBackgroundBase64: String?) {
         (
             UserDefaults.standard.string(forKey: usernameKey),
             avatarImageData()?.base64EncodedString(),
-            iconImageData()?.base64EncodedString()
+            iconImageData()?.base64EncodedString(),
+            UserDefaults.standard.string(forKey: bannerTitleKey),
+            UserDefaults.standard.string(forKey: bannerSubtitleKey),
+            bannerBackgroundImageData()?.base64EncodedString()
         )
     }
 
-    /// 从备份写回三项。**写序不变量**：先写可能抛错的文件（头像/图标）、最后写 UserDefaults（用户名）——
+    /// 从备份写回各项。**写序不变量**：先写可能抛错的文件（头像/图标/横幅背景）、最后写 UserDefaults（用户名等）——
     /// 用户名写盘不可回滚，若先写用户名、后写文件失败，会出现「提示导入失败但用户名已变更」；
     /// 文件写盘失败时用户名保持原值，与「失败时原库保持完好」口径一致。
     /// 旧版备份缺字段 → 保持现状不覆盖。返回是否全部成功（抛错即失败，调用方决定是否中断导入）。
-    static func applyCustomization(username: String?, avatarBase64: String?, iconBase64: String?) throws {
+    static func applyCustomization(username: String?, avatarBase64: String?, iconBase64: String?,
+                                   bannerTitle: String? = nil, bannerSubtitle: String? = nil,
+                                   bannerBackgroundBase64: String? = nil) throws {
         if let avatar = avatarBase64.flatMap({ Data(base64Encoded: $0) }) {
             try saveAvatarPNG(avatar)
         }
         if let icon = iconBase64.flatMap({ Data(base64Encoded: $0) }) {
             try saveIconPNG(icon)
         }
+        if let bg = bannerBackgroundBase64.flatMap({ Data(base64Encoded: $0) }) {
+            try saveBannerBackgroundPNG(bg)
+        }
+        if let title = bannerTitle {
+            setBannerTitle(title)
+        }
+        if let subtitle = bannerSubtitle {
+            setBannerSubtitle(subtitle)
+        }
         if let name = username {
             setUsername(name)
+        }
+    }
+
+    // MARK: - 主页横幅（轮播第 1 页）
+
+    /// 横幅标题截断规则 = 用户名同款 20 字上限（规则一处，UI 绑定与持久化共用）。
+    static func truncateBannerText(_ raw: String, limit: Int = usernameMaxLength) -> String {
+        String(Array(raw).prefix(limit))
+    }
+
+    static func setBannerTitle(_ raw: String) {
+        let t = truncateBannerText(raw)
+        if t.isEmpty {
+            UserDefaults.standard.removeObject(forKey: bannerTitleKey)
+        } else {
+            UserDefaults.standard.set(t, forKey: bannerTitleKey)
+        }
+    }
+
+    static func setBannerSubtitle(_ raw: String) {
+        let t = truncateBannerText(raw)
+        if t.isEmpty {
+            UserDefaults.standard.removeObject(forKey: bannerSubtitleKey)
+        } else {
+            UserDefaults.standard.set(t, forKey: bannerSubtitleKey)
         }
     }
 
@@ -99,6 +143,7 @@ enum UserCustomization {
 
     private static let avatarFilename = "avatar.png"
     private static let iconFilename = "icon.png"
+    private static let bannerBackgroundFilename = "bannerBackground.png"
 
     private static let supportDir: URL = {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -123,6 +168,23 @@ enum UserCustomization {
         #if os(macOS)
         applyDockIcon()
         #endif
+    }
+
+    /// 主页横幅背景（不裁切、不压缩比例；显示时等比填充裁边）。
+    static func saveBannerBackgroundPNG(_ data: Data) throws {
+        try data.write(to: supportDir.appendingPathComponent(bannerBackgroundFilename), options: .atomic)
+        UserDefaults.standard.set(bannerBackgroundFilename, forKey: bannerBackgroundFileKey)
+    }
+
+    static func bannerBackgroundImageData() -> Data? {
+        guard UserDefaults.standard.string(forKey: bannerBackgroundFileKey) != nil else { return nil }
+        return try? Data(contentsOf: supportDir.appendingPathComponent(bannerBackgroundFilename))
+    }
+
+    /// 主页横幅背景图（无背景 = nil，调用点回退品牌渐变默认）。
+    static func bannerBackgroundImage() -> AppImage? {
+        guard UserDefaults.standard.string(forKey: bannerBackgroundFileKey) != nil else { return nil }
+        return loadAppImage(from: supportDir.appendingPathComponent(bannerBackgroundFilename))
     }
 
     // MARK: - 读取
@@ -160,6 +222,12 @@ enum UserCustomization {
         #if os(macOS)
         applyDockIcon()
         #endif
+    }
+
+    /// 移除主页横幅背景（回退品牌渐变默认）。
+    static func removeBannerBackground() {
+        try? FileManager.default.removeItem(at: supportDir.appendingPathComponent(bannerBackgroundFilename))
+        UserDefaults.standard.removeObject(forKey: bannerBackgroundFileKey)
     }
 
     #if os(macOS)

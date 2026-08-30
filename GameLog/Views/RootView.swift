@@ -1,9 +1,10 @@
 import SwiftUI
 import SwiftData
 
-/// 侧边栏条目：全部游戏 / 某状态 / 某个平台 / 某个分组 / 统计。
+/// 侧边栏条目：全部游戏 / 我的最爱 / 某状态 / 某个平台 / 某个分组 / 统计。
 enum SidebarItem: Hashable {
     case all
+    case favorites
     case status(GameStatus)
     case platform(String)
     case group(GameGroup)
@@ -122,40 +123,42 @@ struct RootView: View {
                         }
                     }
                 }
-                if !groups.isEmpty {
-                    Section {
-                        if groupsExpanded {
-                            ForEach(groups) { group in
-                                Label(group.name, systemImage: "folder")
-                                    .tag(SidebarItem.group(group))
-                                    .contextMenu {
-                                        Button {
-                                            pickingGamesGroup = group
-                                        } label: {
-                                            Label(L10n.tr("group.pickGames", lang: language), systemImage: "checkmark.square")
-                                        }
-                                        Button {
-                                            renameGroup = group
-                                        } label: {
-                                            Label(L10n.tr("group.rename", lang: language), systemImage: "pencil")
-                                        }
-                                        Button(role: .destructive) {
-                                            deleteGroup = group
-                                        } label: {
-                                            Label(L10n.tr("common.delete", lang: language), systemImage: "trash")
-                                        }
+                // 分组区常驻：顶部默认「我的最爱」虚拟分组（与真实分组并存，允许多个）；
+                // 分区只在有真实分组时才在最爱下方列出。
+                Section {
+                    if groupsExpanded {
+                        Label(L10n.tr("game.favorites", lang: language), systemImage: "heart.fill")
+                            .tag(SidebarItem.favorites)
+                        ForEach(groups) { group in
+                            Label(group.name, systemImage: "folder")
+                                .tag(SidebarItem.group(group))
+                                .contextMenu {
+                                    Button {
+                                        pickingGamesGroup = group
+                                    } label: {
+                                        Label(L10n.tr("group.pickGames", lang: language), systemImage: "checkmark.square")
                                     }
-                                    .popover(item: popoverBinding(for: group), arrowEdge: .trailing) { _ in
-                                        GroupGamePickerView(group: group)
+                                    Button {
+                                        renameGroup = group
+                                    } label: {
+                                        Label(L10n.tr("group.rename", lang: language), systemImage: "pencil")
                                     }
-                            }
+                                    Button(role: .destructive) {
+                                        deleteGroup = group
+                                    } label: {
+                                        Label(L10n.tr("common.delete", lang: language), systemImage: "trash")
+                                    }
+                                }
+                                .popover(item: popoverBinding(for: group), arrowEdge: .trailing) { _ in
+                                    GroupGamePickerView(group: group)
+                                }
                         }
-                    } header: {
+                    }
+                } header: {
                         SidebarSectionHeader(title: L10n.tr("game.groups", lang: language), isExpanded: groupsExpanded) {
                             withAnimation(.easeInOut(duration: 0.2)) { groupsExpanded.toggle() }
                         }
                     }
-                }
                 Section {
                     Label(L10n.tr("library.stats", lang: language), systemImage: "chart.bar.fill")
                         .tag(SidebarItem.stats)
@@ -204,6 +207,8 @@ struct RootView: View {
             switch selection {
             case .all, .none:
                 LibraryView(groupFilter: nil)
+            case .favorites:
+                LibraryView(groupFilter: nil, favoritesOnly: true)
             case .status(let status):
                 LibraryView(groupFilter: nil, statusFilter: status)
             case .platform(let platform):

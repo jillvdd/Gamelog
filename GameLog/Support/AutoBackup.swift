@@ -189,12 +189,16 @@ final class AutoBackup: ObservableObject {
         let username = UserDefaults.standard.string(forKey: UserCustomization.usernameKey)
         let avatarPNG = UserCustomization.avatarImageData()
         let iconPNG = UserCustomization.iconImageData()
+        let bannerTitle = UserDefaults.standard.string(forKey: UserCustomization.bannerTitleKey)
+        let bannerSubtitle = UserDefaults.standard.string(forKey: UserCustomization.bannerSubtitleKey)
+        let bannerBG = UserCustomization.bannerBackgroundImageData()
 
         Task.detached(priority: .utility) { [writer] in
             let result: Int?
             do {
                 result = try await writer.writeStreamingBackup(
-                    to: url, username: username, avatarPNG: avatarPNG, iconPNG: iconPNG
+                    to: url, username: username, avatarPNG: avatarPNG, iconPNG: iconPNG,
+                    bannerTitle: bannerTitle, bannerSubtitle: bannerSubtitle, bannerBackgroundPNG: bannerBG
                 )
             } catch {
                 // 写盘失败：保持旧文件不动（流式写在临时名 → 成功才换名，见下）。
@@ -329,6 +333,9 @@ final class AutoBackup: ObservableObject {
         let username = UserDefaults.standard.string(forKey: UserCustomization.usernameKey)
         let avatarPNG = UserCustomization.avatarImageData()
         let iconPNG = UserCustomization.iconImageData()
+        let bannerTitle = UserDefaults.standard.string(forKey: UserCustomization.bannerTitleKey)
+        let bannerSubtitle = UserDefaults.standard.string(forKey: UserCustomization.bannerSubtitleKey)
+        let bannerBG = UserCustomization.bannerBackgroundImageData()
 
         let semaphore = DispatchSemaphore(value: 0)
         nonisolated(unsafe) var ok = false
@@ -336,7 +343,8 @@ final class AutoBackup: ObservableObject {
             var bytes = -1
             do {
                 bytes = try await writer.writeStreamingBackup(
-                    to: url, username: username, avatarPNG: avatarPNG, iconPNG: iconPNG
+                    to: url, username: username, avatarPNG: avatarPNG, iconPNG: iconPNG,
+                    bannerTitle: bannerTitle, bannerSubtitle: bannerSubtitle, bannerBackgroundPNG: bannerBG
                 )
             } catch { }
             ok = bytes >= 0

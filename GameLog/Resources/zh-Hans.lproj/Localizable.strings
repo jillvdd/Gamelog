@@ -376,3 +376,18 @@
 "settings.cacheClearConfirm" = "清除缓存？缓存仅为可自动重建的临时数据（封面搜索下载、图片解码缓存、临时文件），不会影响游戏数据与备份。";
 "settings.cacheCleared" = "已清除缓存（释放 %@）";
 "settings.cacheClearFailed" = "清除失败";
+
+"game.favorites" = "我的最爱";
+"home.bannerSubtitleDefault" = "共 %d 款游戏";
+"home.statsTitle" = "库内速览";
+"home.holdingsTitle" = "收藏家速览";
+"home.spotlightNoReview" = "还没有写评价标题";
+"home.favoritesHint" = "还没有「我的最爱」——右键或长按卡片，选「我的最爱」加入";
+"home.holdingsHint" = "添加一些持有记录后，这里会显示收藏统计";
+"settings.bannerTitle" = "主页标题";
+"settings.bannerSubtitle" = "主页副标题";
+"settings.bannerBackground" = "主页背景图";
+"settings.removeBanner" = "移除背景图";
+"settings.bannerHint" = "显示在「全部游戏」页顶端的轮播第 1 页";
+"crop.titleBanner" = "裁切横幅背景";
+"crop.titleBannerHint" = "把想要的背景部分放进窗口";

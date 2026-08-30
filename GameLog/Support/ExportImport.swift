@@ -12,6 +12,10 @@ struct BackupDTO: Codable {
     var username: String?
     var avatarBase64: String?
     var iconBase64: String?
+    /// 主页横幅（旧版备份缺字段 → nil，导入时保持现状）。
+    var bannerTitle: String?
+    var bannerSubtitle: String?
+    var bannerBackgroundBase64: String?
 }
 
 struct GroupDTO: Codable {
@@ -51,6 +55,8 @@ struct GameDTO: Codable {
     var copies: [CopyDTO]?
     /// 状态机状态（旧版备份缺字段 → nil，导入默认已通关）。
     var status: String?
+    /// 我的最爱（旧版备份缺字段 → nil，导入保持未收藏）。
+    var isFavorite: Bool?
 }
 
 /// 一条持有记录（版本 + 数量 + 最多 6 张照片 base64 + 藏品档案全字段）。
@@ -106,7 +112,10 @@ enum BackupManager {
             games: games.map { GameDTO(from: $0) },
             username: customization.username,
             avatarBase64: customization.avatarBase64,
-            iconBase64: customization.iconBase64
+            iconBase64: customization.iconBase64,
+            bannerTitle: customization.bannerTitle,
+            bannerSubtitle: customization.bannerSubtitle,
+            bannerBackgroundBase64: customization.bannerBackgroundBase64
         )
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
@@ -120,11 +129,14 @@ enum BackupManager {
         decoder.dateDecodingStrategy = .iso8601
         let dto = try decoder.decode(BackupDTO.self, from: data)
 
-        // 自定义三项：写序不变量（文件先、用户名最后）在 UserCustomization.applyCustomization 内。
+        // 自定义项：写序不变量（文件先、用户名最后）在 UserCustomization.applyCustomization 内。
         try UserCustomization.applyCustomization(
             username: dto.username,
             avatarBase64: dto.avatarBase64,
-            iconBase64: dto.iconBase64
+            iconBase64: dto.iconBase64,
+            bannerTitle: dto.bannerTitle,
+            bannerSubtitle: dto.bannerSubtitle,
+            bannerBackgroundBase64: dto.bannerBackgroundBase64
         )
 
         // 再清空现有（删除游戏会级联删除通关记录与持有记录；以下重建均不抛错，不会中途失败）
@@ -174,7 +186,9 @@ enum BackupManager {
                 reviewTitle: gameDTO.reviewTitle,
                 reviewBody: gameDTO.reviewBody,
                 // 旧版备份缺 status → 默认已通关。
-                status: gameDTO.status.flatMap(GameStatus.init(rawValue:)) ?? .completed
+                status: gameDTO.status.flatMap(GameStatus.init(rawValue:)) ?? .completed,
+                // 旧版备份缺 isFavorite → 未收藏。
+                isFavorite: gameDTO.isFavorite ?? false
             )
             game.groups = gameDTO.groupNames.compactMap { groupMap[$0.trimmingCharacters(in: .whitespaces)] }
             context.insert(game)

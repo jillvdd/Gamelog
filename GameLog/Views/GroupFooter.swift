@@ -62,13 +62,23 @@ struct PlatformBarRow: View {
 
 /// 分组视图底部的统计区块：平均分（按游戏聚合）+ 平台分布（按通关记录计数）。
 /// 统计始终反映整个分组，不受搜索/平台筛选影响。
+/// 真实分组入口；虚拟分组「我的最爱」直接复用内容体 `GroupStatsSectionContent`。
 struct GroupStatsSection: View {
-    @Environment(\.appLanguageCode) private var language
     let group: GameGroup
+    var body: some View {
+        GroupStatsSectionContent(games: Array(group.games))
+    }
+}
 
-    /// 分组内各游戏的库显示分（按游戏聚合，取整到 0.5）；未评分游戏不计入。
+/// 统计区块内容体：按一组游戏计算（真实分组 / 虚拟分组共用），
+/// `GroupStatsSection` 是它的 `GameGroup` 包装。
+struct GroupStatsSectionContent: View {
+    @Environment(\.appLanguageCode) private var language
+    let games: [Game]
+
+    /// 组内各游戏的库显示分（按游戏聚合，取整到 0.5）；未评分游戏不计入。
     private var gameScores: [Double] {
-        group.games.compactMap(\.libraryScore)
+        games.compactMap(\.libraryScore)
     }
 
     /// 平均分：已评分游戏的库分均值，再取整到 0.1；无已评分游戏则 nil。
@@ -79,7 +89,7 @@ struct GroupStatsSection: View {
 
     /// 平台分布：按游戏×平台计数（每游戏每平台计 1，含稳定平级裁决）——唯一归属 LibraryStats。
     private var platformCounts: [(platform: String, count: Int)] {
-        LibraryStats.platformDistribution(Array(group.games))
+        LibraryStats.platformDistribution(games)
     }
 
     private var maxPlatformCount: Int {

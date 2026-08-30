@@ -36,6 +36,16 @@ extension Game {
     }
 }
 
+/// 卡片左上角的「我的最爱」爱心角标（网格卡 / iOS 宽卡共用）。
+struct FavoriteHeartBadge: View {
+    var body: some View {
+        Image(systemName: "heart.fill")
+            .font(.system(size: 12))
+            .foregroundStyle(.white)
+            .shadow(color: .black.opacity(0.45), radius: 2, y: 1)
+    }
+}
+
 /// 游戏名右侧的平台图标：最多显示 maxCount 个，超出显示 +N。
 /// 仅作为平台符号提示，下方的平台文字行保持不变。
 /// 与名字同行时整体垂直居中对齐（不用 firstTextBaseline——图标放大系数随平台不同，
@@ -132,6 +142,12 @@ struct GameCardView: View {
                 cover
                 GameBadge(game: game, style: .glass)
                     .padding(6)
+            }
+            .overlay(alignment: .topLeading) {
+                if game.isFavorite {
+                    FavoriteHeartBadge()
+                        .padding(8)
+                }
             }
             // 名字 + 平台图标：一行放得下就并排；放不下（多平台/超宽字标）图标换到名字下方一行，名字不被挤压省略。
             // 图标行与名字中轴对齐（各平台放大系数不同，基线/底对齐会顶部参差）。
@@ -267,6 +283,12 @@ struct GameWideCardView: View {
                 .frame(width: cardHeight, height: cardHeight)
                 .overlay(alignment: .topTrailing) {
                     trailingBadge.padding(6)
+                }
+                .overlay(alignment: .topLeading) {
+                    if game.isFavorite {
+                        FavoriteHeartBadge()
+                            .padding(8)
+                    }
                 }
 
             // 右列：整块可显示文字区——标题+平台在顶端，元数据面板贴底（中段弹性空隙）。
