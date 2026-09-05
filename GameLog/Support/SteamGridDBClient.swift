@@ -174,6 +174,15 @@ struct SteamGridDBClient {
         }
     }
 
+    /// 分页类型的**服务器全量总数**（gridsPage 的 `total` 字段）；hero/logo 不分页，返回第 0 页 count。
+    /// CoverSearchSheet 的「加载更多」用此值判断是否还有下一页——用第 0 页 count 会让分页死掉。
+    func artworkTotal(for gameId: Int, kind: ArtworkKind, firstPageCount: Int) async -> Int {
+        guard kind.supportsPaging, let page = try? await artworkPage(for: gameId, kind: kind, page: 0) else {
+            return firstPageCount
+        }
+        return max(page.total, firstPageCount)
+    }
+
     /// 按图类取分页查询（仅 supportsPaging 类型；hero/logo 不分页返回 nil）。
     func artworkPage(for gameId: Int, kind: ArtworkKind, page: Int) async throws -> GridPage? {
         switch kind {

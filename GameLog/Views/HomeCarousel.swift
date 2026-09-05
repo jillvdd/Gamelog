@@ -11,7 +11,7 @@ import SwiftData
 ///
 /// 五页（2026-08-30 用户定稿顺序）：
 /// ① 主页横幅——用户可自定义的标题 / 副标题 / 背景图（无背景回退品牌深色渐变）+ 大头像；
-/// ② 随机拾遗——**从全库直接随机**一款，封面全幅打底（横图优先）+ 底部信息/评价标题 +
+/// ② 随机游戏——**从全库直接随机**一款，封面全幅打底（横图优先）+ 底部信息/评价标题 +
 ///    右上角**突出评分**（琥珀星标胶囊）与 shuffle 再随机；
 /// ③ 我的最爱——随机置顶一款最爱（1:1 封面 + 信息，轮换）+ 其余最爱列表在下；
 /// ④ 库内速览——游戏数 / 库平均分 / 想玩 / 已通关·长线 + 六状态分布；
@@ -24,21 +24,42 @@ struct HomeCarousel: View {
     var onSelect: (Game) -> Void = { _ in }
 
     @State private var page = 0
-    /// 随机拾遗：每次进入库首页随机的一款游戏（封面 + 信息 + 评价标题）。
-    @State private var spotlight: Game?
-    /// 我的最爱页「置顶」的随机最爱（每次进入首页轮换一款；其余最爱在下方列表）。
-    @State private var featuredFavorite: Game?
+    /// 随机游戏：每次进入库首页随机的一款游戏（封面 + 信息 + 评价标题）。
+    /// 存 **PersistentIdentifier 而非 Game 引用**——@State 持有已删除 Game 的引用后，
+    /// body 重算访问属性会触发 SwiftData fatal（backing data detached，2026-09-05 审计实锤复现）；
+    /// 存 ID 则每次求值在新鲜的 `games` 里解析，找不到（已删）自动重抽，天然自愈。
+    @State private var spotlightID: PersistentIdentifier?
+    /// 我的最爱页「置顶」的随机最爱（每次进入首页轮换一款；其余最爱在下方列表）。同上存 ID。
+    @State private var featuredFavoriteID: PersistentIdentifier?
     /// 内容缩放因子：卡片宽/720 设计基准（钳制 0.85–2.0）。窗口缩放时经背景 GeometryReader
     /// 逐帧更新——内容字号/尺寸随卡片等比放大收缩，避免宽窗口下内容缩在角落（§45 用户要求）。
     @State private var contentUnit: CGFloat = 1
+    /// 随机游戏底图偏好（设置页「个性化」）：auto=横图优先（landscape→hero）、
+    /// hero=仅背景图、landscape=仅横向封面（2026-09-05 用户拍板：mac 横向封面全幅
+    /// 打底在 2.8:1 卡片里上下裁切影响观感，给选择权）。
+    /// iPad 横竖屏分开（用户要求，仅 iPad）：竖屏读 spotlightBackdropPreferenceKey
+    /// （iPhone/macOS 同源），横屏读 spotlightBackdropPadLandscapeKey；按实测
+    /// pageWidth 判定（≥950 = 横屏/超宽），与详情页 hero 版式阈值同源。
+    @AppStorage(UserCustomization.spotlightBackdropPreferenceKey) private var spotlightBackdropRaw = UserCustomization.spotlightBackdropAuto
+    @AppStorage(UserCustomization.spotlightBackdropPadLandscapeKey) private var spotlightBackdropPadLandscapeRaw = UserCustomization.spotlightBackdropAuto
+
+    /// 当前生效的底图偏好：iPad 横屏走专用键，其余（iPad 竖屏/iPhone/macOS）走通用键。
+    private var activeSpotlightBackdropRaw: String {
+        iPadLayout.isPad && pageWidth >= iPadLayout.wideThreshold
+            ? spotlightBackdropPadLandscapeRaw
+            : spotlightBackdropRaw
+    }
 
     /// 固定比例容器：宽度填满，高度 = 宽度 / 比例（数值越大卡片越矮）。
     /// 2026-08-30 用户要求「高度减少一点」：macOS 2.4 → 2.8、iOS 1.9 → 2.1。
+    /// iPad 横屏（需求①，2026-09-05）：宽 1133pt 时 2.1 比例卡高 540pt 太高——横屏
+    /// 加扁到 3.0（≈macOS 桌面观感）；iPad 竖屏 744pt 走 iPhone 的 2.1 不变。
     private var aspectRatio: CGFloat {
         #if os(macOS)
         2.8
         #else
-        2.1
+        if iPadLayout.isPad && pageWidth >= iPadLayout.wideThreshold { return 3.0 }
+        return 2.1
         #endif
     }
 
@@ -66,9 +87,29 @@ struct HomeCarousel: View {
             }
         )
         .onAppear {
-            spotlight = Self.randomSpotlight(games: games, avoid: spotlight)
-            featuredFavorite = Self.randomFavorite(toFeature: favorites, avoid: featuredFavorite)
+            if spotlight == nil {
+                spotlightID = Self.randomSpotlightID(games: games, avoiding: nil)
+            }
+            if featuredFavorite == nil {
+                featuredFavoriteID = Self.randomFavoriteID(games: favorites, avoiding: nil)
+            }
+            reloadUserImages()
         }
+        // 库首页重新出现（从设置/详情返回）时刷新用户图，套用设置页可能刚改的横幅/头像。
+        .onReceive(NotificationCenter.default.publisher(for: UserCustomization.userImagesChangedNotification)) { _ in
+            reloadUserImages()
+        }
+    }
+
+    /// 横幅背景 + 头像：**载入一次进 @State**，不做每次 body 求值都读磁盘解码
+    /// （bannerBackgroundImage() 是同步 Data(contentsOf:) + NSImage 解码，横幅图可达数 MB，
+    /// 窗口缩放逐帧重算时会反复走磁盘——2026-09-05 审计发现）。设置页改图后发通知刷新。
+    @State private var bannerImage: AppImage?
+    @State private var avatarImage: AppImage?
+
+    private func reloadUserImages() {
+        bannerImage = UserCustomization.bannerBackgroundImage()
+        avatarImage = UserCustomization.avatarImage()
     }
 
     /// 实测内容列宽 = 每页卡片的宽（也是高的唯一来源）。不用 aspectRatio（弹性高度下会被
@@ -78,12 +119,42 @@ struct HomeCarousel: View {
     @State private var pageWidth: CGFloat = 0
     private var pageHeight: CGFloat { pageWidth / aspectRatio }
 
+    // MARK: - 随机对象解析（ID → Game，已删自愈）
+
+    /// 随机游戏当前游戏：按 ID 在新鲜 games 里解析；ID 失效（游戏已删）自动重抽一款。
+    /// 每次求值都解析（而非缓存 Game 引用）——这是悬空引用崩溃的自愈点。
+    private var spotlight: Game? {
+        if let spotlightID, let hit = games.first(where: { $0.persistentModelID == spotlightID }) {
+            return hit
+        }
+        let fresh = Self.randomSpotlightID(games: games, avoiding: nil)
+        if fresh != spotlightID { spotlightID = fresh }
+        return fresh.flatMap { id in games.first { $0.persistentModelID == id } }
+    }
+
+    /// 最爱置顶当前游戏：同 spotlight 口径（只在 favorites 里解析与重抽）。
+    private var featuredFavorite: Game? {
+        if let featuredFavoriteID,
+           let hit = favorites.first(where: { $0.persistentModelID == featuredFavoriteID }) {
+            return hit
+        }
+        let fresh = Self.randomFavoriteID(games: favorites, avoiding: nil)
+        if fresh != featuredFavoriteID { featuredFavoriteID = fresh }
+        return fresh.flatMap { id in favorites.first { $0.persistentModelID == id } }
+    }
+
     /// 设计基准宽（contentUnit = 卡片宽 / 此值）。
     private static let referenceWidth: CGFloat = 720
 
     /// 内容缩放因子：钳制在 0.85–2.0，窗口再宽也不至于字号失控。
+    /// iPad 横屏（需求①）：宽 1133pt 裸算 unit=1.57 → 字号/头像/间距整体放大 ~57%，
+    /// 横屏「卡片过大」的观感大头在此——钳到 1.15（与竖屏 1.03 观感衔接），卡片变扁后
+    /// 内容量不变、字号只略放大；iPhone 分支不动（宽 < 950 走原钳制）。
     private static func clampedUnit(_ width: CGFloat) -> CGFloat {
-        min(max(width / referenceWidth, 0.85), 2.0)
+        if iPadLayout.isPad && width >= iPadLayout.wideThreshold {
+            return min(max(width / referenceWidth, 0.85), 1.15)
+        }
+        return min(max(width / referenceWidth, 0.85), 2.0)
     }
 
     /// 分页容器。macOS 无 `PageTabViewStyle`（`@available(macOS, unavailable)`）——
@@ -100,6 +171,11 @@ struct HomeCarousel: View {
         // 页宽 = 实测内容列宽（pageWidth），不用 containerRelativeFrame（越界根因，见 body 注）。
         // 高度链：外层 .frame(height: pageHeight) 定 ScrollView 高 → 行内显式 frame 定页宽高，
         // 卡片盒子与图/容器完全解耦。
+        //
+        // 指示条用 .never（永不显示）。⚠️ macOS 27 实测 .hidden 档对横向 ScrollView **失效**
+        // （独立四组对照实验：无修饰符/.hidden 有条、.never 干净、死区裁切无效——条画在
+        // NSScrollView 视口内部底部预留区，clipped 裁不到；NSScroller frame 位于内容正下方
+        // 17pt，AppleShowScrollBars=Always 时常驻）。
         ScrollView(.horizontal) {
             HStack(spacing: 18) {
                 ForEach(0..<5, id: \.self) { i in
@@ -112,7 +188,7 @@ struct HomeCarousel: View {
         }
         .scrollTargetBehavior(.viewAligned(limitBehavior: .always))
         .scrollPosition(id: Binding<Int?>(get: { page }, set: { page = $0 ?? 0 }))
-        .scrollIndicators(.hidden)
+        .scrollIndicators(.never)
         #else
         // iOS：TabView 分页自身把每页钳到视口宽；高度用同一实测值，比例恒定。
         TabView(selection: $page) {
@@ -179,7 +255,7 @@ struct HomeCarousel: View {
             // （弹性 frame 不钳制布局，任意比例图都会以理想尺寸撑破 ZStack，§46 实证）。
             Color.clear
                 .overlay {
-                    if let image = UserCustomization.bannerBackgroundImage() {
+                    if let image = bannerImage {
                         Image(appImage: image)
                             .resizable()
                             .scaledToFill()
@@ -237,7 +313,7 @@ struct HomeCarousel: View {
     /// 大头像：用户头像，未设时同理占位（圆框 + 描边）；随卡片缩放（更大更大气）。
     private var bannerAvatar: some View {
         Group {
-            if let image = UserCustomization.avatarImage() {
+            if let image = avatarImage {
                 Image(appImage: image)
                     .resizable()
                     .scaledToFill()
@@ -335,10 +411,13 @@ struct HomeCarousel: View {
     }
 
     /// 从我喜爱列表里随机挑一款置顶（每次进入首页换一轮，尽量不重复上一款）。
-    private static func randomFavorite(toFeature games: [Game], avoid: Game?) -> Game? {
+    private static func randomFavoriteID(games: [Game], avoiding avoid: PersistentIdentifier?) -> PersistentIdentifier? {
         guard !games.isEmpty else { return nil }
-        guard let avoid, games.count > 1 else { return games.randomElement() }
-        return games.filter { $0.persistentModelID != avoid.persistentModelID }.randomElement()
+        if let avoid, games.count > 1,
+           let next = games.filter({ $0.persistentModelID != avoid }).randomElement() {
+            return next.persistentModelID
+        }
+        return games.randomElement()?.persistentModelID
     }
 
     // MARK: - ④ 库内速览
@@ -408,14 +487,27 @@ struct HomeCarousel: View {
         }
     }
 
-    // MARK: - ② 随机拾遗（第 2 页；全库随机）
+    // MARK: - ② 随机游戏（第 2 页；全库随机）
 
-    /// 随机拾遗页：有横图（横向封面/背景图）→ 封面全幅打底（提亮封面）；否则（仅竖版封面/
+    /// 随机游戏底图按设置页偏好解析：auto=横向封面优先、无则背景图；hero=仅背景图；
+    /// landscape=仅横向封面。都取不到返回 nil（调用点回退竖版版式/渐变）。
+    private func backdropImage(for game: Game) -> AppImage? {
+        switch activeSpotlightBackdropRaw {
+        case UserCustomization.spotlightBackdropHero:
+            return game.heroImage
+        case UserCustomization.spotlightBackdropLandscape:
+            return game.landscapeImage
+        default:
+            return game.landscapeImage ?? game.heroImage
+        }
+    }
+
+    /// 随机游戏页：解析出底图（按偏好）→ 封面全幅打底（提亮）；否则（仅竖版封面/
     /// 无图）→ 网格同款 2:3 封面 + 文字右侧（2026-08-30 用户定稿：竖图不放大打底，避免特高观感）。
     private var spotlightPage: some View {
         Group {
             if let game = spotlight {
-                if game.landscapeImage != nil || game.heroImage != nil {
+                if backdropImage(for: game) != nil {
                     spotlightFullBleed(game)
                 } else {
                     spotlightPortraitFallback(game)
@@ -446,7 +538,9 @@ struct HomeCarousel: View {
                 #if os(iOS)
                 VStack(alignment: .leading, spacing: 6 * contentUnit) {
                     spotlightScoreInline(game)
-                    HStack(alignment: .firstTextBaseline, spacing: 8 * contentUnit) {
+                    // 平台图标与标题中轴对齐（详情页 nameRow 统一口径；firstTextBaseline 对
+                    // 图片等效底对齐，图标放大系数不同会顶部参差）。
+                    HStack(alignment: .center, spacing: 8 * contentUnit) {
                         Text(verbatim: game.displayName(for: language))
                             .font(.system(size: 20 * contentUnit, weight: .bold))
                             .foregroundStyle(.white)
@@ -456,7 +550,7 @@ struct HomeCarousel: View {
                             GamePlatformIcons(platforms: game.platformList, maxCount: 4, iconSize: 13 * contentUnit)
                         }
                     }
-                    // 评价标题（随机拾遗的重点展示对象）。
+                    // 评价标题（随机游戏的重点展示对象）。
                     HStack(alignment: .firstTextBaseline, spacing: 5 * contentUnit) {
                         Image(systemName: "text.quote")
                             .font(.system(size: 12 * contentUnit))
@@ -486,7 +580,7 @@ struct HomeCarousel: View {
                     if !game.platformList.isEmpty {
                         GamePlatformIcons(platforms: game.platformList, maxCount: 4, iconSize: 13 * contentUnit)
                     }
-                    // 评价标题（随机拾遗的重点展示对象）。
+                    // 评价标题（随机游戏的重点展示对象）。
                     HStack(alignment: .firstTextBaseline, spacing: 5 * contentUnit) {
                         Image(systemName: "text.quote")
                             .font(.system(size: 12 * contentUnit))
@@ -550,7 +644,7 @@ struct HomeCarousel: View {
     /// shuffle 再随机按钮（iOS 右上角单独用；macOS 与评分胶囊并排）。
     private func spotlightShuffleButton(_ game: Game) -> some View {
         Button {
-            spotlight = Self.randomSpotlight(games: games, avoid: game)
+            spotlightID = Self.randomSpotlightID(games: games, avoiding: game.persistentModelID)
         } label: {
             Image(systemName: "shuffle")
                 .font(.system(size: 13 * contentUnit, weight: .semibold))
@@ -572,24 +666,30 @@ struct HomeCarousel: View {
                     #if os(iOS)
                     spotlightScoreInline(game)
                     #endif
-                    HStack(alignment: .firstTextBaseline, spacing: 8 * contentUnit) {
+                    // iOS 平台图标与标题中轴对齐（详情页 nameRow 口径）；macOS 保持基线对齐版式。
+                    #if os(iOS)
+                    HStack(alignment: .center, spacing: 8 * contentUnit) {
                         Text(verbatim: game.displayName(for: language))
                             .font(.system(size: 20 * contentUnit, weight: .bold))
                             .lineLimit(2)
                             .multilineTextAlignment(.leading)
-                        #if os(iOS)
                         if !game.platformList.isEmpty {
                             GamePlatformIcons(platforms: game.platformList, maxCount: 4, iconSize: 13 * contentUnit)
                         }
-                        #endif
                     }
+                    #else
+                    Text(verbatim: game.displayName(for: language))
+                        .font(.system(size: 20 * contentUnit, weight: .bold))
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                    #endif
                     #if os(macOS)
                     if !game.platformList.isEmpty {
                         GamePlatformIcons(platforms: game.platformList, maxCount: 4, iconSize: 13 * contentUnit)
                     }
                     #endif
                     Spacer(minLength: 4 * contentUnit)
-                    // 评价标题（随机拾遗的重点展示对象）。
+                    // 评价标题（随机游戏的重点展示对象）。
                     HStack(alignment: .firstTextBaseline, spacing: 5 * contentUnit) {
                         Image(systemName: "text.quote")
                             .font(.system(size: 12 * contentUnit))
@@ -657,7 +757,7 @@ struct HomeCarousel: View {
         }
     }
 
-    /// 随机拾遗全幅底色（仅在有横图时被调用）：横图 scaledToFill + 轻微提亮。
+    /// 随机游戏全幅底色（仅在有横图时被调用）：横图 scaledToFill + 轻微提亮。
     /// 根治（§46 三点问题）：Color.clear 承接提案尺寸、图只做 overlay——overlay 内的图
     /// **永不参与布局定尺寸**；此前「scaledToFill + 弹性 frame」被图理想尺寸撑破
     /// （460:215 图按宽填充报 545pt 高 > 卡片盒 417pt），ZStack 溢出→上下内容被裁。
@@ -665,7 +765,7 @@ struct HomeCarousel: View {
     private func spotlightBackdrop(_ game: Game) -> some View {
         Color.clear
             .overlay {
-                if let image = game.landscapeImage ?? game.heroImage {
+                if let image = backdropImage(for: game) {
                     Image(appImage: image)
                         .resizable()
                         .scaledToFill()
@@ -704,11 +804,14 @@ struct HomeCarousel: View {
         .shadow(color: .black.opacity(0.10), radius: 6, y: 2)
     }
 
-    /// 随机拾遗入口：从库里随机挑一款（每次进入首页换一轮，尽量不重复上一款）。
-    private static func randomSpotlight(games: [Game], avoid: Game?) -> Game? {
+    /// 随机游戏入口：从库里随机挑一款（每次进入首页换一轮，尽量不重复上一款）。
+    private static func randomSpotlightID(games: [Game], avoiding avoid: PersistentIdentifier?) -> PersistentIdentifier? {
         guard !games.isEmpty else { return nil }
-        guard let avoid, games.count > 1 else { return games.randomElement() }
-        return games.filter { $0.persistentModelID != avoid.persistentModelID }.randomElement()
+        if let avoid, games.count > 1,
+           let next = games.filter({ $0.persistentModelID != avoid }).randomElement() {
+            return next.persistentModelID
+        }
+        return games.randomElement()?.persistentModelID
     }
 
     /// 1:1 方形封面：优先方形图，无则竖版封面正裁填满，再退占位。

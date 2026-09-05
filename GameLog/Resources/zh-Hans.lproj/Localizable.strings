@@ -142,6 +142,11 @@
 "settings.restoreIcon" = "恢复默认图标";
 "settings.autoMatchCover" = "自动匹配封面";
 "settings.autoMatchCoverHint" = "输入游戏名后，自动搜索 SteamGridDB 并填入第一张封面；已展开开关且未设置的方形封面/横向封面/背景图/Logo 也会一并匹配（需在下方配置 API Key）。";
+"settings.spotlightBackdrop" = "随机游戏底图";
+"settings.spotlightBackdropAuto" = "自动（横图优先）";
+"settings.spotlightBackdropPadLandscape" = "随机游戏底图（横屏）";
+"settings.minimalGrid" = "网格极简模式";
+"settings.minimalGridHint" = "网格视图只显示封面与右上角评分/状态胶囊，隐藏名称、平台、日期等信息。";
 "settings.hideToolbarGlass" = "隐藏上方毛玻璃";
 "settings.hideToolbarGlassHint" = "隐藏所有页面（库/详情/统计）顶部工具栏的毛玻璃背景，界面更简洁。（macOS 15 及以上可启用）";
 "settings.collectorMode" = "收藏家模式";

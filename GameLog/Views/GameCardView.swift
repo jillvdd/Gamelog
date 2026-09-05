@@ -71,8 +71,12 @@ struct GamePlatformIcons: View {
 }
 
 /// 网格视图中的游戏卡片：封面 + 库显示分徽章 + 名称 + 平台/日期。
+/// 极简模式（2026-09-05 用户要求，设置「个性化」开关默认关）：只显示封面 +
+/// 右上角胶囊 + 爱心角标，封面下方信息全部隐藏。
 struct GameCardView: View {
     @Environment(\.appLanguageCode) private var language
+    /// 网格极简模式开关（UserCustomization.minimalGridKey，默认关闭）。
+    @AppStorage(UserCustomization.minimalGridKey) private var minimalGrid = false
     let game: Game
 
     private var cover: some View {
@@ -125,18 +129,49 @@ struct GameCardView: View {
 
     /// 跟随界面语言的卡片日期格式。此前 `Date.formatted` 跟随系统 locale，
     /// 中文界面会显示英文日期「2 Aug 2026」。
+    /// DateFormatter 按 language 缓存——大网格每卡片每次渲染都新建 Formatter
+    /// 是已知性能坑（苹果文档明示重 Formatter 创建昂贵，2026-09-05 审计）。
+    private static var cardDateFormatters: [String: DateFormatter] = [:]
     static func cardDate(_ date: Date, language: String) -> String {
-        let fmt = DateFormatter()
-        fmt.locale = Locale(identifier: language)
-        if language == "zh-Hans" || language == "ja" {
-            fmt.dateFormat = "yyyy年M月d日"
+        let fmt: DateFormatter
+        if let cached = cardDateFormatters[language] {
+            fmt = cached
         } else {
-            fmt.dateFormat = "MMM d, yyyy"
+            let f = DateFormatter()
+            f.locale = Locale(identifier: language)
+            if language == "zh-Hans" || language == "ja" {
+                f.dateFormat = "yyyy年M月d日"
+            } else {
+                f.dateFormat = "MMM d, yyyy"
+            }
+            cardDateFormatters[language] = f
+            fmt = f
         }
         return fmt.string(from: date)
     }
 
     var body: some View {
+        if minimalGrid {
+            // 极简模式：仅封面 + 右上角胶囊 + 爱心角标（无名称/平台/日期信息行）。
+            ZStack(alignment: .topTrailing) {
+                cover
+                GameBadge(game: game, style: .glass)
+                    .padding(6)
+            }
+            .overlay(alignment: .topLeading) {
+                if game.isFavorite {
+                    FavoriteHeartBadge()
+                        .padding(8)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+            fullCard
+        }
+    }
+
+    /// 完整信息卡（默认）：封面 + 徽章 + 名称/平台 + 日期行。
+    private var fullCard: some View {
         VStack(alignment: .leading, spacing: 6) {
             ZStack(alignment: .topTrailing) {
                 cover
@@ -252,6 +287,9 @@ struct GameRowView: View {
 struct GameWideCardView: View {
     @Environment(\.appLanguageCode) private var language
     let game: Game
+    /// 所在内容列实测宽（LibraryView 背景 GeometryReader 测量传入；0 = 未知，回退横版卡）。
+    /// iPad 竖/横屏分档与竖版卡封面边长都由此驱动（与 header/hero 的宽度阈值同源）。
+    var viewWidth: CGFloat = 0
 
     private var clearDateValue: String? {
         game.latestCompletionDate.map { GameCardView.cardDate($0, language: language) }
@@ -276,6 +314,68 @@ struct GameWideCardView: View {
     }
 
     var body: some View {
+        if iPadLayout.isPadLandscapeCard(viewWidth: viewWidth) {
+            horizontalCard
+        } else if iPadLayout.isPad {
+            iPadPortraitCard
+        } else {
+            horizontalCard
+        }
+    }
+
+    /// iPad 竖屏竖版卡（2026-09-05 需求①）：横版卡 260pt 方形封面吃掉大半列宽，
+    /// 文字区仅剩 ~65pt 五项元数据必然省略。改上图下文：方形封面满列宽在上，
+    /// 标题/平台/元数据满宽在下，文字可用宽 ~349pt。封面与文字间 10pt 间距。
+    /// 元数据仍贴底（与横版同构），标题区顶端。
+    private var iPadPortraitCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            imageArea(edge: iPadPortraitEdge)
+                .overlay(alignment: .topTrailing) {
+                    trailingBadge.padding(6)
+                }
+                .overlay(alignment: .topLeading) {
+                    if game.isFavorite {
+                        FavoriteHeartBadge()
+                            .padding(8)
+                    }
+                }
+
+            VStack(alignment: .leading, spacing: 0) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(verbatim: titleText)
+                        .font(.system(size: titleFontSize, weight: .semibold))
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                    GamePlatformIcons(platforms: game.platformList, maxCount: 5, iconSize: 15)
+                }
+                Spacer(minLength: 6)
+                metaBlock
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, 10)
+            .padding(.bottom, 12)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+        .frame(height: iPadPortraitEdge + iPadLayout.padPortraitTextBlockHeight)
+        .background(.regularMaterial, in: Self.cardShape)
+        .overlay(Self.cardShape.strokeBorder(.quaternary, lineWidth: 0.5))
+        .clipShape(Self.cardShape)
+        .shadow(color: .black.opacity(0.14), radius: 6, x: 0, y: 2)
+    }
+
+    /// iPad 竖屏卡封面边长 = 双列布局列宽：（内容宽 − 列间距 14）÷ 2，钳最小 200。
+    /// viewWidth 未传（0）时回退 349（iPad mini 竖屏实测列宽）。
+    private var iPadPortraitEdge: CGFloat {
+        guard viewWidth > 0 else { return 349 }
+        return max(200, (viewWidth - 14) / 2)
+    }
+    private var titleFontSize: CGFloat { iPadLayout.isPadLandscapeCard(viewWidth: viewWidth) ? 18 : 15 }
+    private var metaFontSize: CGFloat { iPadLayout.isPadLandscapeCard(viewWidth: viewWidth) ? 14 : 12 }
+    private var metaLabelFontSize: CGFloat { iPadLayout.isPadLandscapeCard(viewWidth: viewWidth) ? 10 : 9 }
+    private var metaSpacing: CGFloat { iPadLayout.isPadLandscapeCard(viewWidth: viewWidth) ? 5 : 4 }
+
+    /// 横版卡（iPhone 全部 + iPad 横屏）：左方形封面满卡高、右文字列（原版结构）。
+    private var horizontalCard: some View {
         HStack(alignment: .top, spacing: 0) {
             // 左列：方形封面满卡高（宽 = 卡高），上下左右全贴边，左缘圆角由整卡 clipShape 裁出；
             // 右上角评分/状态胶囊（覆盖在图上，网格卡同款 padding 6）。
@@ -295,10 +395,10 @@ struct GameWideCardView: View {
             VStack(alignment: .leading, spacing: 0) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(verbatim: titleText)
-                        .font(.system(size: 14, weight: .semibold))
+                        .font(.system(size: titleFontSize, weight: .semibold))
                         .lineLimit(2)
                         .multilineTextAlignment(.leading)
-                    GamePlatformIcons(platforms: game.platformList, maxCount: 5, iconSize: 12)
+                    GamePlatformIcons(platforms: game.platformList, maxCount: 5, iconSize: iPadLayout.isPadLandscapeCard(viewWidth: viewWidth) ? 15 : 12)
                 }
                 Spacer(minLength: 4)
                 metaBlock
@@ -318,13 +418,16 @@ struct GameWideCardView: View {
     private static let cardShape = RoundedRectangle(cornerRadius: 14, style: .continuous)
     /// 卡高 = 左列方形封面边长。标题块（两行 ~52）进右列后，为保元数据五项完整显示，
     /// 从 170 加到 215（两行长名 + 五项面板 + 内距的临界预算）。
-    private let cardHeight: CGFloat = 215
+    /// iPad 横屏档（2026-09-05）：双列卡列宽 ~350+，卡高升到 260，封面/字号同比例
+    /// 放大（标题 18 / 元数据 14 / 小标题 10）适配大屏；iPhone 保持 215 单列不变。
+    /// iPad 竖屏走 iPadPortraitCard（上图下文），不用此值。
+    private var cardHeight: CGFloat { iPadLayout.isPadLandscapeCard(viewWidth: viewWidth) ? 260 : 215 }
 
     /// 右列元数据块（2026-08-27 用户追加定稿）：每项 = 小标题（game.releaseDate/developer/
     /// publisher/genre/card.clearedDate，三语现成 key）+ 值；厂商与发行商**分两行**。各缺项整组跳过。
     @ViewBuilder
     private var metaBlock: some View {
-        VStack(alignment: .leading, spacing: 3) {
+        VStack(alignment: .leading, spacing: metaSpacing) {
             if let releaseDateText {
                 metaItem(titleKey: "game.releaseDate", value: releaseDateText, valueLimit: 1)
             }
@@ -353,7 +456,7 @@ struct GameWideCardView: View {
         return s.isEmpty ? nil : s
     }
 
-    /// 一条元数据：8pt 次要色标题 + 12pt 紧凑值（长值在词边界处截断省略）。
+    /// 一条元数据：小号次要色标题 + 值（长值在词边界处截断省略）。字号随 iPad 档升档。
     @ViewBuilder
     private func metaItem(titleKey: String, value: String, valueLimit: Int) -> some View {
         #if os(iOS)
@@ -363,34 +466,35 @@ struct GameWideCardView: View {
         #endif
         return VStack(alignment: .leading, spacing: 0) {
             Text(verbatim: L10n.tr(titleKey, lang: language))
-                .font(.system(size: 8, weight: .medium))
+                .font(.system(size: metaLabelFontSize, weight: .medium))
                 .foregroundStyle(.tertiary)
                 .textCase(.uppercase)
             Text(verbatim: valueText)
-                .font(.system(size: 12))
+                .font(.system(size: metaFontSize))
                 .foregroundStyle(.secondary)
                 .lineLimit(valueLimit)
                 .multilineTextAlignment(.leading)
         }
     }
 
-    /// 封面区（方形满卡高、上下左右全贴边）：1:1 图 scaledToFill 零裁切正好填满；
+    /// 封面区（方形满边长、上下左右全贴边）：1:1 图 scaledToFill 零裁切正好填满；
     /// 无 1:1 图用竖版封面 scaledToFit 等高完整展示（左右透卡底材质，不垫灰底）；
     /// 全无图手柄占位。frame 定尺寸在前、clipped 在后，防图铺出图区（§40.1 教训）。
+    /// 边长参数化：横版卡 = cardHeight，iPad 竖版卡 = iPadPortraitEdge（列宽）。
     @ViewBuilder
-    private var imageArea: some View {
+    private func imageArea(edge: CGFloat) -> some View {
         Group {
             if let image = game.squareImage {
                 Image(appImage: image)
                     .resizable()
                     .scaledToFill()
-                    .frame(width: cardHeight, height: cardHeight)
+                    .frame(width: edge, height: edge)
                     .clipped()
             } else if let image = game.coverImage {
                 Image(appImage: image)
                     .resizable()
                     .scaledToFit()
-                    .frame(width: cardHeight, height: cardHeight)
+                    .frame(width: edge, height: edge)
                     .clipped()
             } else {
                 ZStack {
@@ -399,10 +503,12 @@ struct GameWideCardView: View {
                         .font(.system(size: 28))
                         .foregroundStyle(.tertiary)
                 }
-                .frame(width: cardHeight, height: cardHeight)
+                .frame(width: edge, height: edge)
             }
         }
     }
+
+    private var imageArea: some View { imageArea(edge: cardHeight) }
 
     /// 右上角徽章：GameBadge(.glass) 统一入口（规则与样式单一归属 Support/StatusStyle.swift）。
     private var trailingBadge: some View {

@@ -14,7 +14,13 @@ struct GameLogApp: App {
         do {
             let container = try ModelContainer(for: schema)
             // 启动即迁移平台旧名（Switch → Nintendo Switch），UI 展示前完成，幂等。
-            PlatformMigration.migrate(in: ModelContext(container))
+            // save 失败不阻断启动（迁移幂等，下次启动重跑）；此前 try? 吞错会让闸门
+            // 置位而数据未迁移（2026-09-05 审计）。
+            do {
+                try PlatformMigration.migrate(in: ModelContext(container))
+            } catch {
+                NSLog("GameLog: PlatformMigration save failed: \(error)")
+            }
             return container
         } catch {
             fatalError("无法创建数据容器: \(error)")

@@ -463,11 +463,44 @@ struct GameDetailView: View {
                     .frame(maxWidth: .infinity, alignment: .top)
                 }
                 #else
-                // iOS 双分支（2026-08-27 grill 定稿）：设了横向封面 → 满宽横幅版式
-                // （横幅提 16pt 内边距层外：左右贴屏、顶贴导航栏下方）；没设 → 原竖排逐像素不变。
-                if game.landscapeImage != nil {
+                // iPad 三分支（2026-09-05 五项适配，需求③横屏 + 需求②竖屏）：
+                // ① 横屏（宽 ≥ 阈值）+ 已设背景图 → **macOS 同款 hero 版式**（heroBanner
+                //    铺满 + Logo/封面前景 + 描边圆角，内容 28 边距同 mac）。
+                // ② 其余情况走 iPhone 版式，但 iPad 把横幅 260pt 上限放宽到 560——
+                //    竖屏 744pt 宽 920×430 横图满宽显示高 ~347pt（需求②：占满屏宽
+                //    不留白边），此前被压到 260 缩小居中左右透白边。
+                // iPhone 分支原样保留（isPad=false 时与旧版逐像素一致）。
+                if iPadLayout.isPad,
+                   game.heroImage != nil,
+                   geo.size.width >= iPadLayout.wideThreshold {
                     VStack(alignment: .leading, spacing: 0) {
-                        landscapeBanner(width: geo.size.width)
+                        heroBanner(width: geo.size.width)
+                            .padding(.bottom, 6)
+                        VStack(alignment: .leading, spacing: 28) {
+                            header(width: geo.size.width - 56, hideCoverBand: true)
+                            if collectorMode {
+                                detailTabPicker
+                            }
+                            if !collectorMode || detailTab == .details {
+                                detailsContent(width: geo.size.width - 56)
+                            }
+                            if collectorMode && detailTab == .holdings {
+                                HoldingsView(game: game)
+                            }
+                        }
+                        .padding(.top, 10)
+                        .padding(.horizontal, 28)
+                        .padding(.bottom, 28)
+                    }
+                    .frame(maxWidth: 1500)
+                    .frame(maxWidth: .infinity, alignment: .top)
+                } else if game.landscapeImage != nil {
+                    VStack(alignment: .leading, spacing: 0) {
+                        if iPadLayout.isPad {
+                            iPadLandscapeBanner(width: geo.size.width)
+                        } else {
+                            landscapeBanner(width: geo.size.width)
+                        }
                         VStack(alignment: .leading, spacing: 28) {
                             header(width: geo.size.width, hideCover: true)
                             if collectorMode {
@@ -513,6 +546,13 @@ struct GameDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         #endif
         .onAppear { detailStatus = game.statusValue }
+        // 模型状态变化（编辑 sheet 保存、右键菜单改状态等）回同步局部 @State——sheet 收起
+        // 不触发本视图 onDisappear，若不回同步，离开详情页时 persistStatusIfChanged 会把
+        // 旧状态写回模型，静默回滚用户的编辑（2026-09-05 审计实锤）。滑块拖动只改 detailStatus
+        // 不写模型，不会触发本回调，延迟写入设计（§29.14）不受影响。
+        .onChange(of: game.statusValue) { _, newValue in
+            if detailStatus != newValue { detailStatus = newValue }
+        }
         // 离开详情页时才把状态变更持久化到模型（§29.14 差异 A：避免点击即时写 SwiftData 触发整页重算卡顿）。
         .onDisappear { persistStatusIfChanged() }
         // 全屏毛玻璃下推 + 「隐藏上方毛玻璃」开关由全局 appToolbar() 统一处理。
@@ -626,6 +666,9 @@ struct GameDetailView: View {
                     isDestructive: true
                 ) {
                     context.delete(game)
+                    // 缓存 key = persistentModelID+字段，pk 删除后可能被新插入行重用——
+                    // 不清缓存旧图会贴到新游戏上（2026-09-05 审计）。
+                    ImageDecodeCache.bump()
                     dismiss()
                 }
             ]
@@ -714,7 +757,37 @@ struct GameDetailView: View {
                 }
             }
             #else
-            if hideCover {
+            // iPad 宽版式（需求④→用户追加竖屏同款，2026-09-05）：只要 iPad 且已评分，
+            // 横竖屏都把评分卡放信息右侧（macOS wideHeader 同款双栏）。竖屏有横幅时
+            // 信息列 ~378pt 容纳名字/元数据/状态滑块；未评分回落旧分支。iPhone 不变。
+            if iPadLayout.isPad, game.libraryScore != nil, !hideCover {
+                // 无横幅版式（无横向封面/无背景图）：封面 + 信息 + 评分卡三栏。
+                HStack(alignment: .top, spacing: 24) {
+                    coverBlock
+                    VStack(alignment: .leading, spacing: 12) {
+                        nameRow
+                        LocalizedNamesSubtitle(game: game, currentLanguage: language, font: .body)
+                        metadataFlowRow
+                        DetailStatusPicker(status: $detailStatus)
+                            .frame(maxWidth: 720, alignment: .leading)
+                    }
+                    scoreCard
+                    Spacer(minLength: 0)
+                }
+            } else if iPadLayout.isPad, game.libraryScore != nil {
+                // 有横幅（hideCover）：横幅已在 body 层铺满，信息 + 评分卡双栏。
+                HStack(alignment: .top, spacing: 24) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        nameRow
+                        LocalizedNamesSubtitle(game: game, currentLanguage: language, font: .body)
+                        metadataFlowRow
+                        DetailStatusPicker(status: $detailStatus)
+                            .frame(maxWidth: 720, alignment: .leading)
+                    }
+                    scoreCard
+                    Spacer(minLength: 0)
+                }
+            } else if hideCover {
                 // iOS 横向封面横幅版式：横幅已在 body 层贴屏满宽，这里只出信息列。
                 infoBlock
             } else {
@@ -745,6 +818,24 @@ struct GameDetailView: View {
         }
         .frame(width: width, height: imageHeight)
     }
+    /// iPad 横向封面横幅（需求②，2026-09-05）：iPhone 版 landscapeBanner 去掉 260pt
+    /// 高度上限——iPad 竖屏宽 744pt，920×430 横图全宽显示高 ~347pt，正合「提升高度、
+    /// 占满屏宽不留白边」；上限只在横屏 hero 分支接管后才需要（横屏不再走此函数）。
+    /// 横屏无背景图回落此分支时宽 1133 高 530 略高，仍完整显示不裁切，可接受。
+    fileprivate func iPadLandscapeBanner(width: CGFloat) -> some View {
+        let imageAspect = game.landscapeImage.map { $0.size.width / max($0.size.height, 1) } ?? (920.0 / 430.0)
+        let imageHeight = min(560, width / max(imageAspect, 0.5))
+        return Group {
+            if let image = game.landscapeImage {
+                Image(appImage: image)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: width, height: imageHeight)
+            }
+        }
+        .frame(width: width, height: imageHeight)
+    }
+
     /// macOS 宽窗头部（2026-08-26 用户定稿）：封面单独在顶带（右移 48pt、左右全留白）；
     /// 名字/其他语言名/元数据行贴内容左缘；评分卡在名字块右侧、顶端与游戏名平齐；
     /// 状态滑块限宽 720 独占一行（在左列内、元数据下方）。未评分（想玩等）不渲染评分卡。

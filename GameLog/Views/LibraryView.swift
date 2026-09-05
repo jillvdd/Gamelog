@@ -44,6 +44,10 @@ struct LibraryView: View {
     // 旧值迁移：首次读取时无新键 → 按 useGridView 折算（onAppear 里 migratelibraryViewModeIfNeeded）。
     @AppStorage(UserCustomization.iosLibraryViewModeKey) private var iosViewModeRaw = ""
     @State private var didMigrateLibraryViewMode = false
+    /// 宽卡双列网格的实测内容列宽（背景 GeometryReader 测量，HomeCarousel pageWidth 同款
+    /// 模式）——供 GameWideCardView 做 iPad 横竖屏分档与竖版卡封面边长。首帧 0 时卡片走
+    /// 349 回退边长，onAppear 即校正（与轮播 pageWidth 起步 0 同口径）。
+    @State private var wideCardGridWidth: CGFloat = 0
     #endif
     /// 分组视图内局部平台过滤（不持久化，切换分组即重置）。
     @State private var groupPlatformFilter = ""
@@ -123,6 +127,20 @@ struct LibraryView: View {
             return Presets.display(platform, category: .platform, language: language)
         }
         return groupFilter?.name ?? L10n.tr("library.all", lang: language)
+    }
+
+    /// iOS 起始页内联标题开关（2026-09-05 用户要求）：「全部游戏」+ 轮播页的标题不再占
+    /// 导航大标题，改渲染在五页轮播下方、游戏列表上方。仅在实际显示轮播内容页时生效——
+    /// 空库 / 搜索无结果（轮播不显示）与其他筛选态（最爱/状态/平台/分组）仍走系统大标题。
+    private var showsInlineHomeTitle: Bool {
+        showsHomeCarousel && !games.isEmpty && !visibleGames.isEmpty
+    }
+
+    /// 轮播下方的内联标题：字号对齐系统大标题，与其他页标题视觉一致。
+    private var inlineHomeTitle: some View {
+        Text(verbatim: L10n.tr("library.all", lang: language))
+            .font(.largeTitle.weight(.bold))
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     /// 切换分组/平台筛选时重置导航上下文：退出已打开的详情页、清空搜索词。
@@ -255,18 +273,52 @@ struct LibraryView: View {
 
     #if os(iOS)
     /// iOS 单列横向卡视图（间距 12 与网格一致）。
+    /// iPad（需求⑤ + 需求①，2026-09-05）：双列卡（左右一列两个游戏），列间距 14、
+    /// 行间距 12；横屏走横版卡（260pt 卡高升档）、竖屏走竖版卡（上图下文）——
+    /// 分档与几何由 GameWideCardView 依据内容列实测宽自算。
+    ///
+    /// ⚠️ 列宽测量**必须走 background GeometryReader**（2026-09-05 滚动回归根治）：
+    /// 此前用 GeometryReader 直接包 LazyVGrid，而它位于 ScrollView > VStack 内——
+    /// GeometryReader 贪婪吸收 ScrollView 的有限高度提案（= 视口高）上报为自身尺寸，
+    /// VStack 总内容高 = 视口高 → 无可滚余量（主页彻底无法下滚），且 LazyVGrid 被
+    /// 钳死在该高度内无法 lazy 生长。background 版不参与布局提案（Color.clear 承接
+    /// 既有尺寸），只读实测宽存 @State，与 HomeCarousel pageWidth 同一 idiom。
     @ViewBuilder
     private func gameWideCards(_ games: [Game]) -> some View {
-        LazyVStack(spacing: 12) {
-            ForEach(games) { game in
-                Button {
-                    selectedGame = game
-                } label: {
-                    GameWideCardView(game: game)
-                        .contentShape(Rectangle())
+        if iPadLayout.isPad {
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 14, alignment: .top),
+                                GridItem(.flexible(), spacing: 14, alignment: .top)],
+                      spacing: 12) {
+                ForEach(games) { game in
+                    Button {
+                        selectedGame = game
+                    } label: {
+                        GameWideCardView(game: game, viewWidth: wideCardGridWidth)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(PressFeedbackButtonStyle())
+                    .contextMenu { cardMenu(for: game) }
                 }
-                .buttonStyle(PressFeedbackButtonStyle())
-                .contextMenu { cardMenu(for: game) }
+            }
+            .background(
+                GeometryReader { proxy in
+                    Color.clear
+                        .onAppear { wideCardGridWidth = proxy.size.width }
+                        .onChange(of: proxy.size.width) { _, w in wideCardGridWidth = w }
+                }
+            )
+        } else {
+            LazyVStack(spacing: 12) {
+                ForEach(games) { game in
+                    Button {
+                        selectedGame = game
+                    } label: {
+                        GameWideCardView(game: game)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(PressFeedbackButtonStyle())
+                    .contextMenu { cardMenu(for: game) }
+                }
             }
         }
     }
@@ -393,6 +445,11 @@ struct LibraryView: View {
         .onChange(of: statusFilter) { _, _ in
             resetNavigationContext()
         }
+        // 整库替换（备份导入/自动备份恢复/AirDrop 导入）后：栈上的旧 Game 引用已 detached，
+        // 详情页下一帧 body 访问即 SwiftData fatal——立即退出详情页并清搜索（同族轮播崩溃的导航版）。
+        .onReceive(NotificationCenter.default.publisher(for: UserCustomization.libraryReplacedNotification)) { _ in
+            resetNavigationContext()
+        }
         #if os(iOS)
         .onAppear {
             // 旧键一次性迁移：无新键 → 按 useGridView（网格 true / 列表 false）折算三态值。
@@ -444,6 +501,8 @@ struct LibraryView: View {
                 ) {
                     if let game = pendingDeleteGame {
                         context.delete(game)
+                        // 缓存 key = persistentModelID+字段，pk 重用会让旧图贴到新游戏（审计 2026-09-05）。
+                        ImageDecodeCache.bump()
                     }
                     pendingDeleteGame = nil
                 }
@@ -479,6 +538,8 @@ struct LibraryView: View {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 16) {
                             if showsHomeCarousel { carousel }
+                            // iOS 起始页标题在轮播下方（2026-09-05 用户要求）；其余态走导航大标题。
+                            if showsInlineHomeTitle { inlineHomeTitle }
                             gameGrid(visibleGames)
                         }
                         .padding()
@@ -487,6 +548,7 @@ struct LibraryView: View {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 16) {
                             if showsHomeCarousel { carousel }
+                            if showsInlineHomeTitle { inlineHomeTitle }
                             gameWideCards(visibleGames)
                         }
                         .padding()
@@ -497,6 +559,12 @@ struct LibraryView: View {
                             carousel
                                 .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
                                 .listRowSeparator(.hidden)
+                            // 内联标题与网格/宽卡分支同位（轮播下方、列表上方）。
+                            if showsInlineHomeTitle {
+                                inlineHomeTitle
+                                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 0, trailing: 16))
+                                    .listRowSeparator(.hidden)
+                            }
                         }
                         ForEach(visibleGames) { game in
                             gameRow(game)
@@ -540,7 +608,9 @@ struct LibraryView: View {
         #if os(macOS)
         .navigationTitle(hideToolbarGlass ? "" : navigationTitleText)
         #else
-        .navigationTitle(navigationTitleText)
+        // iOS 起始页（轮播页）标题内联到轮播下方（showsInlineHomeTitle），导航标题置空；
+        // 空库 / 搜索无结果 / 其他筛选态仍走系统大标题。
+        .navigationTitle(showsInlineHomeTitle ? "" : navigationTitleText)
         #endif
         // 全屏毛玻璃下推 + 「隐藏上方毛玻璃」开关由全局 appToolbar() 统一处理（库/详情/统计一致）。
         .appToolbar()

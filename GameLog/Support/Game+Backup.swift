@@ -34,7 +34,9 @@ extension GameDTO {
             completions: game.sortedCompletions.map { CompletionDTO(from: $0) },
             copies: game.copies.map { CopyDTO(from: $0) },
             status: game.status,
-            isFavorite: game.isFavorite
+            isFavorite: game.isFavorite,
+            createdAt: game.createdAt,
+            updatedAt: game.updatedAt
         )
     }
 }

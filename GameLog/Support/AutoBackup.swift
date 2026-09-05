@@ -215,6 +215,11 @@ final class AutoBackup: ObservableObject {
                     // 失败重试标记：下次前台/启动补写。
                     Self.setPendingFlag(true)
                 }
+                // 写入期间有新改动（didSave 在 isWriting=true 时置位 needsWrite）→ 立刻补写一轮，
+                // 否则这轮改动要等下一次 didSave 才会被备份（2026-09-05 审计：竞态漏备份窗口）。
+                if ok && self.needsWrite {
+                    self.performWrite()
+                }
                 completion?(ok)
             }
         }

@@ -408,7 +408,9 @@ struct CoverSearchSheet: View {
                 let candidates = try await client.artworkResults(for: game.id, kind: kind)
                 guard gen == downloadGeneration else { return }
                 grids = candidates
-                gridTotal = candidates.count
+                // gridTotal 必须取服务器 total（全部页数），不能取第 0 页 count——否则
+                // `grids.count < gridTotal` 永假，「加载更多」永不出现（2026-09-05 审计实锤）。
+                gridTotal = await client.artworkTotal(for: game.id, kind: kind, firstPageCount: candidates.count)
                 gridPage = 0
                 isLoading = false
             } catch {

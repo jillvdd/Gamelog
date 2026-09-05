@@ -51,6 +51,27 @@ enum UserCustomization {
     static let bannerTitleKey = "customization.bannerTitle"
     static let bannerSubtitleKey = "customization.bannerSubtitle"
     static let bannerBackgroundFileKey = "customization.bannerBackgroundFile"
+    /// 随机游戏底图偏好（轮播第 2 页）：auto=默认横图优先（landscape→hero）、hero=仅背景图、
+    /// landscape=仅横向封面（用户拍板 2026-09-05：mac 横向封面 2.8:1 卡片上下裁切影响观感，
+    /// 给用户选择权）。设置页 Picker 读写；缺失/未知值回退 auto。
+    /// iPad 横竖屏分开（2026-09-05 用户要求，仅 iPad）：横屏读 PadLandscapeKey，
+    /// 竖屏读本键（iPhone/macOS 同源）；设置页仅 iPad 显示第二个 Picker。
+    static let spotlightBackdropPreferenceKey = "customization.spotlightBackdrop"
+    static let spotlightBackdropPadLandscapeKey = "customization.spotlightBackdropPadLandscape"
+    static let spotlightBackdropAuto = "auto"
+    static let spotlightBackdropHero = "hero"
+    static let spotlightBackdropLandscape = "landscape"
+    /// 网格极简模式（默认关闭；开启后网格卡仅显示封面 + 右上角胶囊 + 爱心角标，
+    /// 封面下方名称/平台/日期等信息全部隐藏）。全平台生效。
+    static let minimalGridKey = "customization.minimalGrid"
+
+    /// 用户图（横幅背景/头像）变更通知：HomeCarousel 监听并重载 @State 缓存
+    /// （轮播不再每次 body 求值都读磁盘，改图后靠此通知刷新）。
+    static let userImagesChangedNotification = Notification.Name("customization.userImagesChanged")
+    /// 整库替换（备份导入/自动备份恢复/AirDrop 导入）后广播：持有旧 Game/Group 强引用的
+    /// 导航状态（iOS selectedGame、macOS path）立即重置，防悬空引用访问 detached 模型
+    /// 触发 SwiftData fatal（与轮播 spotlight 崩溃同族，2026-09-05 审计）。
+    static let libraryReplacedNotification = Notification.Name("library.replaced")
 
     /// 用户名长度上限。
     static let usernameMaxLength = 20
@@ -160,6 +181,7 @@ enum UserCustomization {
     static func saveAvatarPNG(_ data: Data) throws {
         try data.write(to: supportDir.appendingPathComponent(avatarFilename), options: .atomic)
         UserDefaults.standard.set(avatarFilename, forKey: avatarFileKey)
+        NotificationCenter.default.post(name: userImagesChangedNotification, object: nil)
     }
 
     static func saveIconPNG(_ data: Data) throws {
@@ -174,6 +196,7 @@ enum UserCustomization {
     static func saveBannerBackgroundPNG(_ data: Data) throws {
         try data.write(to: supportDir.appendingPathComponent(bannerBackgroundFilename), options: .atomic)
         UserDefaults.standard.set(bannerBackgroundFilename, forKey: bannerBackgroundFileKey)
+        NotificationCenter.default.post(name: userImagesChangedNotification, object: nil)
     }
 
     static func bannerBackgroundImageData() -> Data? {
@@ -214,6 +237,7 @@ enum UserCustomization {
     static func removeAvatar() {
         try? FileManager.default.removeItem(at: supportDir.appendingPathComponent(avatarFilename))
         UserDefaults.standard.removeObject(forKey: avatarFileKey)
+        NotificationCenter.default.post(name: userImagesChangedNotification, object: nil)
     }
 
     static func removeIcon() {
@@ -228,6 +252,7 @@ enum UserCustomization {
     static func removeBannerBackground() {
         try? FileManager.default.removeItem(at: supportDir.appendingPathComponent(bannerBackgroundFilename))
         UserDefaults.standard.removeObject(forKey: bannerBackgroundFileKey)
+        NotificationCenter.default.post(name: userImagesChangedNotification, object: nil)
     }
 
     #if os(macOS)

@@ -29,8 +29,14 @@ struct SettingsView: View {
     @AppStorage(UserCustomization.collectorModeKey) private var collectorMode = false
     @AppStorage(UserCustomization.keepOriginalImagesKey) private var keepOriginalImages = false
     @AppStorage(UserCustomization.platformIconsKey) private var showPlatformIcons = true
+    @AppStorage(UserCustomization.minimalGridKey) private var minimalGrid = false
     @AppStorage(UserCustomization.autoBackupKey) private var autoBackup = true
     @AppStorage(UserCustomization.bannerBackgroundFileKey) private var bannerBackgroundFile = ""
+    @AppStorage(UserCustomization.spotlightBackdropPreferenceKey) private var spotlightBackdropRaw = UserCustomization.spotlightBackdropAuto
+    /// iPad 横屏专用底图偏好（仅 iPad 显示；竖屏/iPhone/macOS 走上面通用键）。
+    #if os(iOS)
+    @AppStorage(UserCustomization.spotlightBackdropPadLandscapeKey) private var spotlightBackdropPadLandscapeRaw = UserCustomization.spotlightBackdropAuto
+    #endif
 
     /// 用户名绑定：写入时截断到上限。用 Binding 替代 `.onChange`——`.onChange` 挂 TextField 在 macOS 会吞尾随空格。
     private var usernameBinding: Binding<String> {
@@ -190,6 +196,26 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
+                // 随机游戏底图偏好（轮播第 2 页）：默认横图优先；可选仅背景图/仅横向封面
+                // （mac 横向封面全幅打底上下裁切影响观感，用户拍板给选择权 2026-09-05）。
+                // iOS 上此键只管 iPad 竖屏 + iPhone（竖屏语义）；iPad 横屏用下面专用 Picker。
+                Picker(L10n.tr("settings.spotlightBackdrop", lang: language), selection: $spotlightBackdropRaw) {
+                    Text(verbatim: L10n.tr("settings.spotlightBackdropAuto", lang: language)).tag(UserCustomization.spotlightBackdropAuto)
+                    Text(verbatim: L10n.tr("game.hero", lang: language)).tag(UserCustomization.spotlightBackdropHero)
+                    Text(verbatim: L10n.tr("game.landscape", lang: language)).tag(UserCustomization.spotlightBackdropLandscape)
+                }
+
+                #if os(iOS)
+                // iPad 横屏专用底图（仅 iPad 显示；iPhone 上第二个 Picker 无意义）。
+                if iPadLayout.isPad {
+                    Picker(L10n.tr("settings.spotlightBackdropPadLandscape", lang: language), selection: $spotlightBackdropPadLandscapeRaw) {
+                        Text(verbatim: L10n.tr("settings.spotlightBackdropAuto", lang: language)).tag(UserCustomization.spotlightBackdropAuto)
+                        Text(verbatim: L10n.tr("game.hero", lang: language)).tag(UserCustomization.spotlightBackdropHero)
+                        Text(verbatim: L10n.tr("game.landscape", lang: language)).tag(UserCustomization.spotlightBackdropLandscape)
+                    }
+                }
+                #endif
+
                 #if os(macOS)
                 Toggle(L10n.tr("settings.hideToolbarGlass", lang: language), isOn: $hideToolbarGlass)
                 LText("settings.hideToolbarGlassHint")
@@ -211,6 +237,12 @@ struct SettingsView: View {
 
                 Toggle(L10n.tr("settings.platformIcons", lang: language), isOn: $showPlatformIcons)
                 LText("settings.platformIconsHint")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                // 网格极简模式（全平台；默认关）：网格卡仅封面 + 右上角胶囊 + 爱心角标。
+                Toggle(L10n.tr("settings.minimalGrid", lang: language), isOn: $minimalGrid)
+                LText("settings.minimalGridHint")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

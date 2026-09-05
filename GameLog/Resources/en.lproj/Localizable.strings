@@ -142,6 +142,11 @@
 "settings.restoreIcon" = "Restore Default Icon";
 "settings.autoMatchCover" = "Automatically Match Cover";
 "settings.autoMatchCoverHint" = "When you enter a game name, automatically searches SteamGridDB and sets the first cover found; square / landscape covers / hero images / logos whose toggle is on and unset are matched too (requires an API key below).";
+"settings.spotlightBackdrop" = "Spotlight Backdrop";
+"settings.spotlightBackdropAuto" = "Auto (landscape first)";
+"settings.spotlightBackdropPadLandscape" = "Spotlight Backdrop (Landscape)";
+"settings.minimalGrid" = "Minimal Grid Mode";
+"settings.minimalGridHint" = "Grid shows only covers with the score/status capsule; name, platform, and dates are hidden.";
 "settings.hideToolbarGlass" = "Hide Top Toolbar Background";
 "settings.hideToolbarGlassHint" = "Hides the frosted-glass background of the top toolbar on all pages (Library / Detail / Stats) for a cleaner look. (macOS 15 and later)";
 "settings.collectorMode" = "Collector Mode";

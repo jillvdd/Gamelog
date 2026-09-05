@@ -39,9 +39,9 @@ struct PlatformIcon: View {
         let effectiveAspect = isWhite ? rawAspect : min(max(rawAspect, 0.5), 3.0)
         let fitHeight = min(slot.height, slot.width / effectiveAspect)
         return Group {
-            if let fileName, PlatformIconLoader.image(named: fileName) != nil {
+            if let fileName, let image = PlatformIconLoader.image(named: fileName) {
                 PlatformIconImage(
-                    image: PlatformIconLoader.image(named: fileName)!,
+                    image: image,
                     size: fitHeight,
                     isTemplate: PlatformIconLoader.isTemplate(named: fileName),
                     whiteBackground: isWhite
@@ -158,16 +158,21 @@ private struct PlatformIconImage: View {
 enum PlatformIconLoader {
     private static var templateCache: [String: Bool] = [:]
     private static var aspectCache: [String: CGFloat] = [:]
+    /// 解码后的图标缓存：图标是 bundle 内固定资源，进程内不变。此前每次 body 求值都
+    /// `NSImage(contentsOf:)` 读盘解码（侧边栏每行 ×每渲染，slotBody 还读两次）——
+    /// 大库下每次 @Query 变化都重复几十次磁盘 I/O（2026-09-05 审计）。
+    private static var imageCache: [String: AppImage] = [:]
     /// 需要白底承托的图标（稀疏深色/彩色字标在深浅主题下都看不清，如 SFC、各代任天堂字标）：
     /// 渲染时垫一块白底圆角块，宽度上限 5× 高（比普通图标更宽，文字不被压扁）。
     private static let whiteBackgroundIcons: Set<String> = [
         "SFC-SNES", "3DS", "NDS", "N64", "FC-NES", "GBA", "Game-Boy-Color", "Game-Boy",
     ]
 
-    /// 清空 aspect/template 缓存（内存态；「清除缓存」功能调用）。
+    /// 清空 aspect/template/图标缓存（内存态；「清除缓存」功能调用）。
     static func clearCaches() {
         aspectCache.removeAll()
         templateCache.removeAll()
+        imageCache.removeAll()
     }
 
     /// 图标宽高比（宽/高），仅读文件头不解码整图，按文件名缓存。
@@ -218,12 +223,15 @@ enum PlatformIconLoader {
     }
 
     static func image(named: String) -> AppImage? {
+        if let cached = imageCache[named] { return cached }
         guard let url = Bundle.main.url(forResource: named, withExtension: "png") else { return nil }
         #if os(macOS)
-        return NSImage(contentsOf: url)
+        guard let img = NSImage(contentsOf: url) else { return nil }
         #else
-        return UIImage(contentsOfFile: url.path)
+        guard let img = UIImage(contentsOfFile: url.path) else { return nil }
         #endif
+        imageCache[named] = img
+        return img
     }
 
     /// 图标是否需要白底承托。

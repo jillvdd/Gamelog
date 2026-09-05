@@ -57,6 +57,11 @@ struct GameDTO: Codable {
     var status: String?
     /// 我的最爱（旧版备份缺字段 → nil，导入保持未收藏）。
     var isFavorite: Bool?
+    /// 创建/最近编辑时间（旧版备份缺字段 → nil，导入回落 .now）。
+    /// 备份往返不保时间戳的话，导入后 @Query(sort: \Game.createdAt) 顺序漂移、
+    /// 「最近编辑」排序失真（2026-09-05 审计）。
+    var createdAt: Date?
+    var updatedAt: Date?
 }
 
 /// 一条持有记录（版本 + 数量 + 最多 6 张照片 base64 + 藏品档案全字段）。
@@ -165,6 +170,18 @@ enum BackupManager {
         }
 
         for gameDTO in dto.games {
+            // base64 解码/枚举解析拆出局部变量：Game init 参数 20+，全内联会超出编译器
+            // 类型检查预算（2026-09-05 实测 unable to type-check in reasonable time）。
+            let coverData = gameDTO.coverBase64.flatMap { Data(base64Encoded: $0) }
+            let squareData = gameDTO.squareBase64.flatMap { Data(base64Encoded: $0) }
+            let landscapeData = gameDTO.landscapeBase64.flatMap { Data(base64Encoded: $0) }
+            let heroData = gameDTO.heroBase64.flatMap { Data(base64Encoded: $0) }
+            let logoData = gameDTO.logoBase64.flatMap { Data(base64Encoded: $0) }
+            let logoSize = gameDTO.logoSizeRaw.flatMap(LogoBannerSize.init(rawValue:)) ?? LogoBannerSize.medium
+            let logoVertical = gameDTO.logoVerticalRaw.flatMap(LogoBannerVertical.init(rawValue:)) ?? LogoBannerVertical.bottom
+            let logoHorizontal = gameDTO.logoHorizontalRaw.flatMap(LogoBannerHorizontal.init(rawValue:)) ?? LogoBannerHorizontal.leading
+            let importedStatus = gameDTO.status.flatMap(GameStatus.init(rawValue:)) ?? GameStatus.completed
+            let importedCreatedAt = gameDTO.createdAt ?? Date.now
             let game = Game(
                 name: gameDTO.name,
                 nameZh: gameDTO.nameZh,
@@ -175,21 +192,23 @@ enum BackupManager {
                 developer: gameDTO.developer,
                 publisher: gameDTO.publisher,
                 genre: gameDTO.genre,
-                coverData: gameDTO.coverBase64.flatMap { Data(base64Encoded: $0) },
-                squareData: gameDTO.squareBase64.flatMap { Data(base64Encoded: $0) },
-                landscapeData: gameDTO.landscapeBase64.flatMap { Data(base64Encoded: $0) },
-                heroData: gameDTO.heroBase64.flatMap { Data(base64Encoded: $0) },
-                logoData: gameDTO.logoBase64.flatMap { Data(base64Encoded: $0) },
-                logoSize: gameDTO.logoSizeRaw.flatMap(LogoBannerSize.init(rawValue:)) ?? .medium,
-                logoVertical: gameDTO.logoVerticalRaw.flatMap(LogoBannerVertical.init(rawValue:)) ?? .bottom,
-                logoHorizontal: gameDTO.logoHorizontalRaw.flatMap(LogoBannerHorizontal.init(rawValue:)) ?? .leading,
+                coverData: coverData,
+                squareData: squareData,
+                landscapeData: landscapeData,
+                heroData: heroData,
+                logoData: logoData,
+                logoSize: logoSize,
+                logoVertical: logoVertical,
+                logoHorizontal: logoHorizontal,
                 reviewTitle: gameDTO.reviewTitle,
                 reviewBody: gameDTO.reviewBody,
-                // 旧版备份缺 status → 默认已通关。
-                status: gameDTO.status.flatMap(GameStatus.init(rawValue:)) ?? .completed,
-                // 旧版备份缺 isFavorite → 未收藏。
+                // 旧版备份缺 createdAt → .now（模型默认）；缺 status → 默认已通关。
+                createdAt: importedCreatedAt,
+                status: importedStatus,
                 isFavorite: gameDTO.isFavorite ?? false
             )
+            // updatedAt 单独恢复：init 把 updatedAt 钉成 createdAt，而导入的 updatedAt 可能更早/更晚。
+            game.updatedAt = gameDTO.updatedAt ?? game.createdAt
             game.groups = gameDTO.groupNames.compactMap { groupMap[$0.trimmingCharacters(in: .whitespaces)] }
             context.insert(game)
 
@@ -239,5 +258,8 @@ enum BackupManager {
         }
         // 全库重建：解码缓存按 persistentModelID 做 key，全部失效（旧 ID 的旧图不再命中）。
         ImageDecodeCache.bump()
+        // 广播整库替换：导航栈里的旧 Game/Group 引用已全部 detached，持有方（iOS selectedGame、
+        // macOS path、轮播 spotlight 等）收到后重置，防悬空访问 SwiftData fatal。
+        NotificationCenter.default.post(name: UserCustomization.libraryReplacedNotification, object: nil)
     }
 }
