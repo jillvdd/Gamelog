@@ -51,20 +51,23 @@ struct iOSRootView: View {
         )
     }
 
-    /// 导入 AirDrop 收到的备份：替换整个库。
+    /// 导入 AirDrop 收到的备份：走统一入口 importBackup（快照→后台重建→定制回写→广播→补备份）。
+    /// 安全作用域内只同步读完 Data 就释放——`defer{stop}` 不可跨 await（2026-09-08），
+    /// 后续异步链只传 Data 不传 URL。
     private func importIncomingBackup() {
         guard let url = incomingBackupURL else { return }
         incomingBackupURL = nil
         // 「文件」App 打开方式发来的 URL 是 security-scoped，直接读会无权限；AirDrop 路径系统已拷入沙盒可读。
+        // 无条件 start：对 AirDrop URL 是 no-op（返回 false），对「文件」App 路径真正生效。
         let didStart = url.startAccessingSecurityScopedResource()
-        defer { if didStart { url.stopAccessingSecurityScopedResource() } }
-        do {
-            let data = try Data(contentsOf: url)
-            AutoBackup.shared.writeSnapshot(context: context)
-            try BackupManager.decodeAndReplace(data, into: context)
-            try context.save()
-        } catch {
-            // 导入失败静默：保留现有数据。
+        guard let data = try? Data(contentsOf: url) else {
+            if didStart { url.stopAccessingSecurityScopedResource() }
+            return
+        }
+        if didStart { url.stopAccessingSecurityScopedResource() }
+        let context = context
+        Task { @MainActor in
+            try? await AutoBackup.shared.importBackup(data, into: context) { _ in }
         }
     }
 }

@@ -374,6 +374,7 @@
 "backup.keepEmpty" = "Keep Empty";
 "backup.nowDone" = "Backup Saved";
 "backup.nowFailed" = "Backup failed — check available disk space";
+"backup.importing" = "Importing Backup…";
 "backup.noBackupYet" = "No Backup Yet";
 "settings.storage" = "Storage & Cache";
 "settings.cacheSize" = "Cache Size: %@";

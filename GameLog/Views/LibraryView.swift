@@ -28,6 +28,9 @@ enum IOSLibraryViewMode: String, CaseIterable, Identifiable {
 struct LibraryView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.appLanguageCode) private var language
+    /// 整库替换锁定期（根容器经 environment 下传）：true 时只渲染静态占位，
+    /// 不持有/不渲染任何 Game/Group——杜绝替换中的 detached 访问崩溃（2026-09-08）。
+    @Environment(\.libraryReplacing) private var libraryReplacing
     @Query(sort: \Game.createdAt) private var games: [Game]
     let groupFilter: GameGroup?
     /// 非分组视图（全部游戏 / 侧边栏某平台）的平台过滤，由侧边栏选择驱动，切换即重置。
@@ -145,6 +148,8 @@ struct LibraryView: View {
 
     /// 切换分组/平台筛选时重置导航上下文：退出已打开的详情页、清空搜索词。
     /// 否则同 case 分支内切换（如平台 A → 平台 B）视图身份不变，path/selectedGame/searchText 会残留。
+    /// 整库替换时同样调用：额外清掉三个持有旧 Game 的 sheet state，否则 sheet 里
+    /// 的编辑/分组/删除页访问 detached 模型即 SwiftData fatal（2026-09-08）。
     private func resetNavigationContext() {
         #if os(macOS)
         path = NavigationPath()
@@ -152,6 +157,11 @@ struct LibraryView: View {
         selectedGame = nil
         #endif
         searchText = ""
+        editingGame = nil
+        groupPickerGame = nil
+        pendingDeleteGame = nil
+        showingNewGame = false
+        showingShare = false
     }
 
     // MARK: - 分组视图（游戏 + 底部统计/评价）
@@ -423,14 +433,25 @@ struct LibraryView: View {
 
     var body: some View {
         Group {
-            #if os(macOS)
-            NavigationStack(path: $path) {
+            if libraryReplacing {
+                // 整库替换锁定期占位：纯静态视图，不触碰任何 Game/Group。
+                // 遮罩挡手（根容器），此分支挡渲染——两者缺一不可（2026-09-08）。
+                VStack(spacing: 16) {
+                    ProgressView()
+                    LText("backup.importing")
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                #if os(macOS)
+                NavigationStack(path: $path) {
+                    libraryContent
+                }
+                #else
+                // iOS：复用外层（iOSLibraryTab 的）NavigationStack，这里不再建栈，避免双导航栏。
                 libraryContent
+                #endif
             }
-            #else
-            // iOS：复用外层（iOSLibraryTab 的）NavigationStack，这里不再建栈，避免双导航栏。
-            libraryContent
-            #endif
         }
         .onChange(of: groupFilter?.persistentModelID) { _, _ in
             // 切换分组即重置组内平台过滤（切换页面重置过滤状态）。
@@ -464,30 +485,44 @@ struct LibraryView: View {
             }
         }
         #endif
-        .sheet(isPresented: $showingNewGame) {
+        // 以下 sheet/弹窗在整库替换锁定期一律不呈现（绑定的 Game 引用已 detached，
+        // 呈现即崩；上锁瞬间步骤 9 会同步清掉这些 state，此处是双保险 2026-09-08）。
+        .sheet(isPresented: Binding(
+            get: { showingNewGame && !libraryReplacing },
+            set: { showingNewGame = $0 }
+        )) {
             #if os(macOS)
             GameEditView(game: nil)
             #else
             NavigationStack { GameEditView(game: nil) }
             #endif
         }
-        .sheet(isPresented: $showingShare) {
+        .sheet(isPresented: Binding(
+            get: { showingShare && !libraryReplacing },
+            set: { showingShare = $0 }
+        )) {
             SharePanelView()
         }
-        .sheet(item: $editingGame) { game in
+        .sheet(item: Binding(
+            get: { libraryReplacing ? nil : editingGame },
+            set: { editingGame = $0 }
+        )) { game in
             #if os(macOS)
             GameEditView(game: game)
             #else
             NavigationStack { GameEditView(game: game) }
             #endif
         }
-        .sheet(item: $groupPickerGame) { game in
+        .sheet(item: Binding(
+            get: { libraryReplacing ? nil : groupPickerGame },
+            set: { groupPickerGame = $0 }
+        )) { game in
             GroupPickerSheet(game: game)
         }
         .platformConfirmDialog(
             L10n.tr("common.confirmDelete", lang: language),
             isPresented: Binding(
-                get: { pendingDeleteGame != nil },
+                get: { pendingDeleteGame != nil && !libraryReplacing },
                 set: { if !$0 { pendingDeleteGame = nil } }
             ),
             message: pendingDeleteGame.map {

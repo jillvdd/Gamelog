@@ -123,6 +123,8 @@ context.insert(exportC)
 try? context.save()
 let originalDate = exportC.date
 let originalRelease = exportGame.releaseDate!
+let originalCreatedAt = exportGame.createdAt
+let originalUpdatedAt = exportGame.updatedAt
 
 // 先清掉当前上下文（模拟导入前已有数据），再走 decodeAndReplace
 let stray = Game(name: "旧数据", reviewTitle: "应被替换")
@@ -163,6 +165,10 @@ check("六维评分往返", ic.scoreGameplay == 9.5 && ic.scoreDesign == 9 && ic
     && ic.scoreArt == 8.5 && ic.scoreMusic == 9 && ic.scorePerformance == 9)
 check("记录↔游戏关联恢复", ic.game?.persistentModelID == ig.persistentModelID)
 check("库显示分往返 9.1（9.5+9+9.5+8.5+9+9→54.5/6→9.083→round 0.1→9.1）", ig.libraryScore == 9.1)
+// §47⑦：createdAt/updatedAt 备份往返保真（2026-09-05 修码时漏补断言，2026-09-08 补）。
+// ISO8601 编码秒级精度：亚秒截断属编码器既定行为，断言秒级一致（排序/显示语义所需精度）。
+check("时间戳往返：createdAt 保真（秒级）", abs(ig.createdAt.timeIntervalSince(originalCreatedAt)) < 1)
+check("时间戳往返：updatedAt 保真（秒级）", (ig.updatedAt ?? .distantPast).timeIntervalSince(originalUpdatedAt ?? .distantPast).magnitude < 1)
 
 // --- 7. 重复导入幂等 ---
 try BackupManager.decodeAndReplace(backupData, into: context)
@@ -331,6 +337,9 @@ try BackupManager.decodeAndReplace(legacyData, into: context)
 try context.save()
 let legacyImported = (try? context.fetch(FetchDescriptor<Game>()))?.first { $0.name == "旧版游戏" }
 check("状态机：旧备份缺 status → 默认已通关", legacyImported?.statusValue == .completed)
+// §47⑦：旧备份缺 createdAt/updatedAt → 回落非 nil（.now / createdAt），不崩不丢序。
+check("时间戳：旧备份缺 createdAt → 回落 .now（非 nil）", legacyImported?.createdAt != nil)
+check("时间戳：旧备份缺 updatedAt → 回落 createdAt（非 nil）", legacyImported?.updatedAt != nil)
 
 // MARK: - 持有档案枚举 migrate（beta 2.2）
 
@@ -477,6 +486,7 @@ do {
     check("备份双路径: 记录字段一致", m.completions[0].platform == s.completions[0].platform
           && m.completions[0].scoreGameplay == s.completions[0].scoreGameplay
           && m.completions[0].date == s.completions[0].date)
+    check("备份双路径: createdAt/updatedAt 一致", m.createdAt == s.createdAt && m.updatedAt == s.updatedAt)
     try? FileManager.default.removeItem(at: tmpURL)
 }
 

@@ -69,6 +69,9 @@ struct SettingsView: View {
     /// macOS 分享备份：待分享的临时文件 URL + 分享面板锚点触发开关。
     @State private var backupShareURL: URL?
     @State private var showingBackupShare = false
+    /// 导出禁重入（2026-09-08）：BackupManager.encode 主线程同步编码，800MB 库
+    /// 数秒卡死；连点会叠多个 1GB Data 编码。置位期间禁用导出按钮。
+    @State private var isExporting = false
     @State private var cropSession: CropSession?
     /// SteamGridDB key 是否明文显示。
     @State private var showKey = false
@@ -299,12 +302,14 @@ struct SettingsView: View {
                 HStack {
                     Button(L10n.tr("backup.export", lang: language)) { export() }
                         .appStandardButton()
+                        .disabled(isExporting)
                     Button {
                         shareBackup()
                     } label: {
                         Label(L10n.tr("backup.share", lang: language), systemImage: "square.and.arrow.up")
                     }
                     .appStandardButton()
+                    .disabled(isExporting)
                     // 系统分享面板（含 AirDrop）从本按钮位置弹出；anchor 隐藏在按钮背后。
                     .background {
                         if let url = backupShareURL {
@@ -319,6 +324,7 @@ struct SettingsView: View {
                 // 规避 sheet 首次弹出为空白、需先弹其他窗「预热」的问题）。
                 Button(L10n.tr("backup.export", lang: language)) { prepareBackupShare() }
                     .appStandardButton()
+                    .disabled(isExporting)
                 Button(L10n.tr("backup.import", lang: language)) { importBackup() }
                     .appStandardButton()
                 #endif
@@ -607,6 +613,10 @@ struct SettingsView: View {
     }
 
     private func export() {
+        // 禁重入：同步编码期间按钮已禁用，此处是双保险（2026-09-08）。
+        guard !isExporting else { return }
+        isExporting = true
+        defer { isExporting = false }
         #if os(macOS)
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.json]
@@ -629,6 +639,9 @@ struct SettingsView: View {
     /// macOS 分享备份：编码整库 → 写临时文件 → 从「分享备份」按钮位置弹出系统分享面板（含 AirDrop）。
     /// 同步编码与 export() / iOS prepareBackupShare 口径一致。
     private func shareBackup() {
+        guard !isExporting else { return }
+        isExporting = true
+        defer { isExporting = false }
         guard let data = try? BackupManager.encode(games: games, groups: groups) else {
             statusMessage = L10n.tr("backup.exportFailed", lang: language)
             return
@@ -647,6 +660,9 @@ struct SettingsView: View {
     /// iOS 备份导出：编码成 JSON → 写临时文件 → 直接用 UIKit 呈现系统分享单（含 AirDrop / 存储到文件）。
     /// 不走 SwiftUI sheet：挂 Form 行按钮上的 sheet 首次弹窗会呈现为空白、静默失败（先弹别的窗可「预热」）。
     private func prepareBackupShare() {
+        guard !isExporting else { return }
+        isExporting = true
+        defer { isExporting = false }
         guard let data = try? BackupManager.encode(games: games, groups: groups) else {
             statusMessage = L10n.tr("backup.exportFailed", lang: language)
             return
@@ -679,19 +695,27 @@ struct SettingsView: View {
         #endif
     }
 
-    /// 解码并整库替换。iOS 的「文件」App URL 在安全沙盒作用域外，需先取得安全作用域授权才能读取，
+    /// 解码并整库替换（走统一入口 importBackup：快照→后台重建→定制回写→广播→补备份）。
+    /// iOS 的「文件」App URL 在安全沙盒作用域外，需先取得安全作用域授权才能读取，
     /// 否则 Data(contentsOf:) 抛权限错误被静默吞掉（与 onOpenURL 路径一致）。
+    /// 安全作用域内只同步读完 Data 就释放——`defer{stop}` 不可跨 await（2026-09-08），
+    /// 后续异步链只传 Data 不传 URL。
     private func importBackupData(from url: URL, requestAccess: Bool) {
         let didStart = requestAccess ? url.startAccessingSecurityScopedResource() : false
-        defer { if didStart { url.stopAccessingSecurityScopedResource() } }
-        do {
-            let data = try Data(contentsOf: url)
-            AutoBackup.shared.writeSnapshot(context: context)
-            try BackupManager.decodeAndReplace(data, into: context)
-            try context.save()
-            statusMessage = L10n.tr("backup.importDone", lang: language)
-        } catch {
+        guard let data = try? Data(contentsOf: url) else {
+            if didStart { url.stopAccessingSecurityScopedResource() }
             statusMessage = L10n.tr("backup.importFailed", lang: language)
+            return
+        }
+        if didStart { url.stopAccessingSecurityScopedResource() }
+        let context = context
+        Task { @MainActor in
+            do {
+                try await AutoBackup.shared.importBackup(data, into: context) { _ in }
+                statusMessage = L10n.tr("backup.importDone", lang: language)
+            } catch {
+                statusMessage = L10n.tr("backup.importFailed", lang: language)
+            }
         }
     }
 
@@ -725,10 +749,17 @@ struct SettingsView: View {
     }
 
     private func restoreFromAutoBackup() {
-        let ok = AutoBackup.shared.restoreFromAutoBackup(context: context)
-        statusMessage = ok
-            ? L10n.tr("backup.restoreDone", lang: language)
-            : L10n.tr("backup.restoreFailed", lang: language)
+        // 统一入口是 async：包 Task，后台重建期间主线程不卡，完成后回填状态。
+        // 进度遮罩由根容器按 importProgress 自动呈现。
+        let context = context
+        Task { @MainActor in
+            do {
+                try await AutoBackup.shared.restoreFromAutoBackup(context: context) { _ in }
+                statusMessage = L10n.tr("backup.restoreDone", lang: language)
+            } catch {
+                statusMessage = L10n.tr("backup.restoreFailed", lang: language)
+            }
+        }
     }
 
     private func clearCache() {

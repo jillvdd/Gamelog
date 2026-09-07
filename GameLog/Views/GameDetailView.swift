@@ -414,6 +414,12 @@ struct GameDetailView: View {
     }
 
     var body: some View {
+        // 纵深守卫：整库替换后若此页仍被渲染（如通知时序缝隙），game 已 detached，
+        // 直接访问属性即 SwiftData fatal——画空视图等导航重置把它弹走（2026-09-08）。
+        if game.isDeleted {
+            Color.clear
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
         // 单 ScrollView 内联铺开：游戏信息 → (详情|持有) 滑块 → 详情内容 / 持有档案内联在信息下方。
         // 不再整页替换（§29.9：HoldingsView 已去掉自带 ScrollView，作为内联子视图承载于本 ScrollView）。
         // macOS 已设背景图时走独立分支：heroBanner 提出内边距层外——左右满幅、顶边零间隙贴住
@@ -673,6 +679,7 @@ struct GameDetailView: View {
                 }
             ]
         )
+        } // else（isDeleted 纵深守卫）：替换后残留渲染走空分支
     }
 
     // MARK: - 工具栏按钮

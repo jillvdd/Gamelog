@@ -374,6 +374,7 @@
 "backup.keepEmpty" = "保留空库";
 "backup.nowDone" = "已保存备份";
 "backup.nowFailed" = "备份失败，请检查磁盘空间";
+"backup.importing" = "正在导入备份…";
 "backup.noBackupYet" = "尚未备份";
 "settings.storage" = "存储与缓存";
 "settings.cacheSize" = "当前缓存占用：%@";

@@ -129,10 +129,10 @@ enum BackupManager {
     }
 
     /// 导入：清空现有数据，按 JSON 重建。
+    /// 兼容入口：行为与旧实现一致（decode → 定制回写 → apply → 清缓存 → 广播），
+    /// 供 DataSmokeTest 与过渡期调用方使用；新异步导入链走 decode + apply（见下）。
     static func decodeAndReplace(_ data: Data, into context: ModelContext) throws {
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        let dto = try decoder.decode(BackupDTO.self, from: data)
+        let dto = try decode(data)
 
         // 自定义项：写序不变量（文件先、用户名最后）在 UserCustomization.applyCustomization 内。
         try UserCustomization.applyCustomization(
@@ -143,6 +143,29 @@ enum BackupManager {
             bannerSubtitle: dto.bannerSubtitle,
             bannerBackgroundBase64: dto.bannerBackgroundBase64
         )
+
+        try apply(dto, into: context)
+
+        // 全库重建：解码缓存按 persistentModelID 做 key，全部失效（旧 ID 的旧图不再命中）。
+        ImageDecodeCache.bump()
+        // 广播整库替换：导航栈里的旧 Game/Group 引用已全部 detached，持有方（iOS selectedGame、
+        // macOS path、轮播 spotlight 等）收到后重置，防悬空访问 SwiftData fatal。
+        NotificationCenter.default.post(name: UserCustomization.libraryReplacedNotification, object: nil)
+    }
+
+    /// 纯解码：JSON → BackupDTO（无副作用，可在后台线程调用）。
+    static func decode(_ data: Data) throws -> BackupDTO {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode(BackupDTO.self, from: data)
+    }
+
+    /// 按 DTO 重建全库：清空现有 + 逐游戏重建（不含定制回写/清缓存/广播——
+    /// 新定序要求这三者在 DB 落盘成功后由调用方在主线程执行，见 AutoBackup.importBackup）。
+    /// - Parameters:
+    ///   - onProgress: 已处理游戏数/总数回调（约每 50 个游戏一次 + 末尾一次），nil = 不上报。
+    static func apply(_ dto: BackupDTO, into context: ModelContext,
+                      onProgress: ((Int, Int) -> Void)? = nil) throws {
 
         // 再清空现有（删除游戏会级联删除通关记录与持有记录；以下重建均不抛错，不会中途失败）
         if let existingGames = try? context.fetch(FetchDescriptor<Game>()) {
@@ -169,7 +192,11 @@ enum BackupManager {
             groupMap[groupName] = group
         }
 
-        for gameDTO in dto.games {
+        for (index, gameDTO) in dto.games.enumerated() {
+            // 进度上报（后台导入链用；每 50 个游戏一次 + 末尾一次，主线程节流见调用方）。
+            if let onProgress = onProgress, (index % 50 == 0 || index + 1 == dto.games.count) {
+                onProgress(index + 1, dto.games.count)
+            }
             // base64 解码/枚举解析拆出局部变量：Game init 参数 20+，全内联会超出编译器
             // 类型检查预算（2026-09-05 实测 unable to type-check in reasonable time）。
             let coverData = gameDTO.coverBase64.flatMap { Data(base64Encoded: $0) }
@@ -256,10 +283,5 @@ enum BackupManager {
                 }
             }
         }
-        // 全库重建：解码缓存按 persistentModelID 做 key，全部失效（旧 ID 的旧图不再命中）。
-        ImageDecodeCache.bump()
-        // 广播整库替换：导航栈里的旧 Game/Group 引用已全部 detached，持有方（iOS selectedGame、
-        // macOS path、轮播 spotlight 等）收到后重置，防悬空访问 SwiftData fatal。
-        NotificationCenter.default.post(name: UserCustomization.libraryReplacedNotification, object: nil)
     }
 }

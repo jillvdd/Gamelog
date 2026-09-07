@@ -29,7 +29,7 @@ Interface languages: **简体中文 / 日本語 / English** (switch instantly in
   - **Group card**: title + one-line group-review quote + stat items (average / game count / completions / top game / collection value, toggleable and reorderable) + platform distribution bars + in-group cover grid; separate phone / desktop layouts.
   - "Style Settings" configures all three pools in one place; overview tiles and group tiles share one field configuration. Export as JPEG (default) or PNG with the game / group name in the file name; on iOS, tap the preview for fullscreen and save straight to the Photos album (requires add-photo permission). The watermark (username's gamelog + avatar) is localized per language.
 - **Stats & Rankings**: total completions, library average (plus backlog count), platform distribution, and collection value (when Collector Mode is on: edition count / total quantity / total spent / total estimated value); average-score leaderboard + six-dimension boards (top 5 / 10 per dimension); the "Overall Ranking" page switches between **Score Boards** and **Value Boards** at the top — Score Boards hold 7 boards (average + six dimensions), Value Boards hold three pages (by game value / by platform (machine) value / by group value), each paging up to 100 entries and filterable by platform.
-- **Backup**: export the whole library to a single JSON (covers embedded as base64), including username / avatar / icon, restorable as a whole, compatible with older backups; import asks for confirmation. On iOS, export uses the system share sheet (AirDrop / Save to Files, etc.) with a timestamped file name.
+- **Backup**: export the whole library to a single JSON (covers embedded as base64), including username / avatar / icon, restorable as a whole, compatible with older backups; import asks for confirmation and runs in the background with progress (large libraries no longer freeze), the UI locks during import and the current library stays untouched on failure. On iOS, export uses the system share sheet (AirDrop / Save to Files, etc.) with a timestamped file name.
 - **Auto Backup**: automatically writes a full local backup (one rolling file) whenever your data changes; keeps a snapshot of the old version before upgrades; if the library is empty but a backup exists, asks on launch whether to restore; snapshots before restore / import so you can undo. On iOS, backups live in Documents/Backups (visible in the Files app), so you can still grab them if the app can't launch (e.g. expired signing cert).
 - **Clear Cache**: Settings → Storage & Cache shows current cache usage and clears it with one tap (cover/image decode caches, network cache, temp files) — never touches your game data or backups.
 - **Launch Screen**: a branded splash (icon + app name + progress) shows immediately at startup and fades into the main UI; iOS additionally has a same-colored static system launch screen.
@@ -72,7 +72,7 @@ Or open `GameLog.xcodeproj` in Xcode and Run the `GameLog` (macOS) or `GameLog-i
 
 The repository provides one device Release IPA under `dist/`, unsigned — sign it yourself (eSign or similar) before installing:
 
-- `GameLog-beta-2.9.ipa` — unsigned device arm64 build, suited for re-signing with eSign or similar tools
+- `GameLog-beta-3.0.ipa` — unsigned device arm64 build, suited for re-signing with eSign or similar tools
 
 > Tip: for simulator or daily development debugging, just Run from Xcode — no simulator IPA is produced or needed; on macOS install straight from the DMG.
 
@@ -100,7 +100,7 @@ GameLog/
 ├── GameLogApp.swift       # macOS entry: WindowGroup + Settings/About/writing-desk scenes share one ModelContainer
 ├── iOSRootView.swift      # iOS entry: bottom TabBar (Library / Stats / Settings) + AirDrop backup import
 ├── Models/                # SwiftData models (Game / Completion / GameGroup / PhysicalCopy / Presets)
-├── Support/               # PlatformImage abstraction, ScoreMath, ExportImport/BackupWriter/AutoBackup,
+├── Support/               # PlatformImage abstraction, ScoreMath, ExportImport/BackupWriter/BackupImporter/AutoBackup,
 │                          #   Game+Backup (single Game↔DTO mapping), UserCustomization, L10n, SteamGridDB, PriceFormat,
 │                          #   ImageImport (image import pipeline), LibraryStats (library aggregates),
 │                          #   LibraryQuery (filter + stable sort + sort menu), StatusStyle (status colors/badges),

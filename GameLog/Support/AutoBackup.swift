@@ -46,6 +46,12 @@ final class AutoBackup: ObservableObject {
     private var needsWrite = false
     /// 后台写盘进行中（期间新触发的防抖在写完后补一轮）。
     private var isWriting = false
+    /// 整库替换进行中（备份导入/自动备份恢复/AirDrop 导入）：抑制自动备份写盘，
+    /// 防后台 save 触发 didSave 监听（object:nil）去编码半替换库（2026-09-08）。
+    private var isImporting = false
+    /// 导入进度 0~1（非 nil = 锁定期，根容器据此上锁+显示进度；nil = 无锁）。
+    /// @Published 供 AutoBackupContainer 观察；只在主线程读写（本类 @MainActor）。
+    @Published var importProgress: Double? = nil
     private var debounceTask: Task<Void, Never>?
     private var didSaveObserver: NSObjectProtocol?
     private var lifecycleObserver: NSObjectProtocol?
@@ -178,6 +184,9 @@ final class AutoBackup: ObservableObject {
     /// 后台流式写滚动备份。completion 回主线程；ok = 是否成功写盘。
     private func performWrite(completion: ((Bool) -> Void)? = nil) {
         guard Self.isEnabled else { completion?(false); return }
+        // 整库替换期间抑制：didSave 监听（object:nil）会被后台导入 save 触发，
+        // 此时写盘会编码半替换库；解锁后统一入口会补写一次（2026-09-08）。
+        guard !isImporting else { completion?(false); return }
         guard let writer else { completion?(false); return }
         guard !isWriting else { completion?(false); return }
         guard libraryIsNonEmpty() else { needsWrite = false; completion?(false); return }
@@ -301,29 +310,91 @@ final class AutoBackup: ObservableObject {
 
     // MARK: - 恢复与快照
 
-    /// 从自动备份恢复：**先**后台写当前状态快照（可后悔），快照落盘**后**才整体替换。
-    /// 返回是否恢复成功。
-    @discardableResult
-    func restoreFromAutoBackup(context: ModelContext) -> Bool {
-        guard let data = try? Data(contentsOf: Self.backupFileURL) else { return false }
-        guard writeSnapshot(context: context) else { return false }
-        do {
-            try BackupManager.decodeAndReplace(data, into: context)
-            try context.save()
-            return true
-        } catch {
-            // 恢复失败：当前数据已被快照保留，可手动找回。
-            return false
+    /// 统一导入入口：三条导入路径（设置页手动导入 / AirDrop / 自动备份恢复）唯一收敛点。
+    ///
+    /// 定序（新不变量，2026-09-08）：上锁 → 快照落盘 → 后台 decode+重建+save →
+    /// 主线程定制回写 → 主线程清缓存 → 主线程广播整库替换 → 补一次自动备份 → 解锁。
+    /// 任何一步 throw 即中断：后台草稿未 save，主库零触碰（比旧实现"内存已换、
+    /// 持久化失败、无回滚"更安全）；当前数据已被恢复前快照保留，可手动找回。
+    ///
+    /// - Parameters:
+    ///   - data: 已读入内存的备份 JSON（调用方在安全作用域内同步读完后传入，
+    ///     后续链路只碰 Data 不碰 URL——`defer{stop}` 不可跨 await）。
+    ///   - context: 主线程上下文（仅用于取 container 建后台上下文 + 读定制项；
+    ///     绝不传进后台任务做 save）。
+    ///   - onProgress: 0~1 进度（后台每 ~50 游戏一次 MainActor.run 上报）。
+    func importBackup(_ data: Data, into context: ModelContext,
+                      onProgress: @escaping @MainActor (Double) -> Void = { _ in }) async throws {
+        // 重入保护：导入锁定期二次调用直接抛错（调用方回填 importFailed）。
+        guard !isImporting else { throw ImportError.alreadyImporting }
+        isImporting = true
+        importProgress = 0
+        // 保底清理：任何路径（成功/抛错/取消）都解锁，防旗标永久置位锁死自动备份。
+        defer {
+            isImporting = false
+            importProgress = nil
         }
+
+        // 1. 恢复前快照（throw 即中断，不再有"快照失败仍继续替换"）。
+        await onProgress(0.02)
+        try await writeSnapshot(context: context)
+
+        // 2. 后台 decode（纯函数）+ 重建 + save。DTO 在主线程解出后只传值类型进后台。
+        let dto = try BackupManager.decode(data)
+        await onProgress(0.05)
+        let container = context.container
+        try await Task.detached(priority: .utility) {
+            let importer = BackupImporter(modelContainer: container)
+            try await importer.applyDTO(dto) { done, total in
+                guard total > 0 else { return }
+                let frac = 0.05 + 0.85 * Double(done) / Double(total)
+                Task { @MainActor in onProgress(frac) }
+            }
+        }.value
+
+        // 3. 主线程定制回写（DB 已落盘成功后才写文件/UserDefaults；写序不变量在内）。
+        await onProgress(0.93)
+        try UserCustomization.applyCustomization(
+            username: dto.username,
+            avatarBase64: dto.avatarBase64,
+            iconBase64: dto.iconBase64,
+            bannerTitle: dto.bannerTitle,
+            bannerSubtitle: dto.bannerSubtitle,
+            bannerBackgroundBase64: dto.bannerBackgroundBase64
+        )
+
+        // 4. 主线程清解码缓存（key 含 persistentModelID，旧 ID 旧图不再命中）。
+        ImageDecodeCache.bump()
+
+        // 5. 主线程广播整库替换（观察者在主线程重置导航，防后台 post 跑错线程）。
+        await onProgress(0.97)
+        NotificationCenter.default.post(name: UserCustomization.libraryReplacedNotification, object: nil)
+
+        // 6. 先解锁再补一次自动备份：performWrite 被 isImporting 守卫拦住，
+        // 必须解锁后才调；defer 的二次清零幂等无害。
+        await onProgress(1.0)
+        isImporting = false
+        importProgress = nil
+        scheduleWrite()
+    }
+
+    /// 从自动备份恢复：走统一入口 importBackup（快照→后台重建→定制回写→广播→补备份）。
+    /// 快照失败/解码失败/ save 失败一律 throw，调用方回填 restoreFailed。
+    func restoreFromAutoBackup(context: ModelContext,
+                               onProgress: @escaping @MainActor (Double) -> Void = { _ in }) async throws {
+        guard let data = try? Data(contentsOf: Self.backupFileURL) else {
+            throw ImportError.backupUnreadable
+        }
+        try await importBackup(data, into: context, onProgress: onProgress)
     }
 
     /// 恢复/导入前快照：把当前数据写为带时间戳的文件（不参与滚动覆盖）。
     /// 每次「整体替换」操作（恢复、手动导入、AirDrop 导入）前调用，误恢复时能找回。
-    /// 编码与写盘在 ModelActor 后台执行、本调用**同步等待**完成（主线程不被
-    /// 771MB 编码阻塞，只是等待；调用点语义与旧实现一致：返回时快照已落盘或失败）。
-    /// 返回是否成功（空库无可快照视为成功）。
-    @discardableResult
-    func writeSnapshot(context: ModelContext) -> Bool {
+    /// 编码与写盘在 ModelActor 后台执行；`await` 返回 = 原子换名完成 = 快照已落盘，
+    /// 调用方在 await 之后才能替换，顺序由编译器保证（2026-09-08 去 semaphore 化，
+    /// 旧 DispatchSemaphore 同步等待阻塞主线程）。
+    /// 空库无可快照视为成功；失败时 throw（调用方统一中断，不再有"快照失败仍继续替换"）。
+    func writeSnapshot(context: ModelContext) async throws {
         let container = context.container
         var desc = FetchDescriptor<Game>()
         desc.fetchLimit = 1
@@ -331,7 +402,7 @@ final class AutoBackup: ObservableObject {
         var gdesc = FetchDescriptor<GameGroup>()
         gdesc.fetchLimit = 1
         let hasGroups = ((try? context.fetch(gdesc))?.isEmpty == false)
-        guard hasGames || hasGroups else { return true }
+        guard hasGames || hasGroups else { return }
 
         let writer = writer ?? BackupWriter(modelContainer: container)
         let url = Self.backupDir.appendingPathComponent("GameLog-autobackup-snapshot-\(Self.snapshotTimestamp()).json")
@@ -342,22 +413,12 @@ final class AutoBackup: ObservableObject {
         let bannerSubtitle = UserDefaults.standard.string(forKey: UserCustomization.bannerSubtitleKey)
         let bannerBG = UserCustomization.bannerBackgroundImageData()
 
-        let semaphore = DispatchSemaphore(value: 0)
-        nonisolated(unsafe) var ok = false
-        Task.detached(priority: .utility) { [writer] in
-            var bytes = -1
-            do {
-                bytes = try await writer.writeStreamingBackup(
-                    to: url, username: username, avatarPNG: avatarPNG, iconPNG: iconPNG,
-                    bannerTitle: bannerTitle, bannerSubtitle: bannerSubtitle, bannerBackgroundPNG: bannerBG
-                )
-            } catch { }
-            ok = bytes >= 0
-            if ok { AutoBackup.trimSnapshotFilesStatic(keep: 10) }
-            semaphore.signal()
-        }
-        semaphore.wait()
-        return ok
+        let bytes = try await writer.writeStreamingBackup(
+            to: url, username: username, avatarPNG: avatarPNG, iconPNG: iconPNG,
+            bannerTitle: bannerTitle, bannerSubtitle: bannerSubtitle, bannerBackgroundPNG: bannerBG
+        )
+        guard bytes >= 0 else { throw SnapshotError.writeFailed }
+        Self.trimSnapshotFilesStatic(keep: 10)
     }
 
     /// trimSnapshotFiles 的静态包装（后台 Task 闭包内用）。
@@ -433,6 +494,32 @@ final class AutoBackup: ObservableObject {
     }
 }
 
+/// 快照失败错误（writeSnapshot 改 async throws 后的失败载体）。
+enum SnapshotError: Error {
+    case writeFailed
+}
+
+/// 统一导入入口错误。
+enum ImportError: Error {
+    /// 导入锁定期间重入（导入未完成又点导入/恢复）。
+    case alreadyImporting
+    /// 自动备份文件读不出（不存在/权限/损坏到连 Data 都读不出）。
+    case backupUnreadable
+}
+
+/// 整库替换锁定态环境键：根容器在导入锁定时置 true，下层 LibraryView 据此
+/// 切静态占位分支（不持有任何 Game/Group，杜绝 detached 渲染崩溃 2026-09-08）。
+private struct LibraryReplacingKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    var libraryReplacing: Bool {
+        get { self[LibraryReplacingKey.self] }
+        set { self[LibraryReplacingKey.self] = newValue }
+    }
+}
+
 /// 空库恢复询问的内容（供 .platformConfirmDialog presenting 识别）。
 struct EmptyRestoreInfo: Identifiable {
     let id = UUID()
@@ -464,7 +551,28 @@ struct AutoBackupContainer<Content: View>: View {
     }
 
     var body: some View {
-        content
+        ZStack {
+            content
+                // 导入锁定时禁用底层一切交互（挡手；挡渲染靠 LibraryView 的分支占位）。
+                .disabled(backup.importProgress != nil)
+            // 整库替换锁定期全屏进度遮罩：吃掉所有触摸，防止用户在新旧库交替时操作。
+            if let frac = backup.importProgress {
+                Color.black.opacity(0.45)
+                    .ignoresSafeArea()
+                    .allowsHitTesting(true)
+                    .overlay {
+                        VStack(spacing: 16) {
+                            ProgressView(value: frac)
+                                .frame(width: 220)
+                            LText("backup.importing")
+                                .foregroundStyle(.white)
+                        }
+                        .padding(28)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    }
+            }
+        }
+            .environment(\.libraryReplacing, backup.importProgress != nil)
             .platformConfirmDialog(
                 L10n.tr("backup.emptyRestoreTitle", lang: language),
                 isPresented: emptyRestoreBinding,
@@ -476,7 +584,10 @@ struct AutoBackupContainer<Content: View>: View {
                 cancelTitle: L10n.tr("backup.keepEmpty", lang: language),
                 actions: [
                     ConfirmAction(title: L10n.tr("backup.restoreNow", lang: language)) {
-                        AutoBackup.shared.restoreFromAutoBackup(context: context)
+                        let context = context
+                        Task { @MainActor in
+                            try? await AutoBackup.shared.restoreFromAutoBackup(context: context) { _ in }
+                        }
                     }
                 ]
             )

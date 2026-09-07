@@ -236,6 +236,16 @@ struct RootView: View {
                 pickingGamesGroup = nil
             }
         }
+        // 整库替换（后台导入链在 DB 落盘后主线程广播）：onChange 的 ID 比对可能因
+        // SwiftData pk 复用而漏判，此处无条件重置选择 + 关掉三个持有旧 Group 的弹窗
+        // （rename/delete/picking），防悬空访问 detached 模型（2026-09-08）。
+        .onReceive(NotificationCenter.default.publisher(for: UserCustomization.libraryReplacedNotification)) { _ in
+            selection = .all
+            renameGroup = nil
+            deleteGroup = nil
+            pickingGamesGroup = nil
+            showingNewGroup = false
+        }
         .sheet(isPresented: $showingNewGroup) {
             NewGroupSheet()
         }

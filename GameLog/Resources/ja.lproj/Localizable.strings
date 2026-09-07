@@ -374,6 +374,7 @@
 "backup.keepEmpty" = "空のままにする";
 "backup.nowDone" = "バックアップを保存しました";
 "backup.nowFailed" = "バックアップに失敗しました。ディスク容量を確認してください";
+"backup.importing" = "バックアップを読み込み中…";
 "backup.noBackupYet" = "まだバックアップはありません";
 "settings.storage" = "ストレージとキャッシュ";
 "settings.cacheSize" = "キャッシュ容量：%@";

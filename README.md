@@ -29,7 +29,7 @@
   - **分组卡**：标题 + 一句话分组评价引言 + 统计要素（均分 / 游戏数 / 通关数 / 最高分游戏 / 收藏价值，可勾选排序）+ 平台分布条 + 组内封面格；手机 / 桌面两套布局。
   - 「样式设置」统一配置上述三个要素池，总览格与分组卡格共用同一份格子字段配置；导出格式 JPEG（默认）/ PNG 可选，文件名自动带游戏 / 分组名；iOS 点预览全屏看大图、一键保存到相册（需照片添加权限）；水印（用户名·游戏簿 + 头像）随语言本地化。
 - **统计与排行榜**：通关总数、库平均分（含想玩数）、按平台分布、收藏价值（收藏家模式开启时显示版本数 / 总数量 / 总花费 / 总估值）；平均分榜 + 六维榜（各维度前 5 / 10）；「整体排名」页顶部在**分数榜 / 价值榜**之间切换——分数榜含平均分与六维共 7 个榜单，价值榜含「按游戏价值 / 按机器（平台）价值 / 按分组价值」三页，每页最多 100 条翻页、可按平台过滤。
-- **备份**：整个库导出为单个 JSON（封面以 base64 内嵌），用户名 / 头像 / 图标一并导出、可整体还原，兼容旧版备份；导入带确认弹窗。iOS 导出走系统分享单（AirDrop / 存储到文件等），导出文件名带时间戳。
+- **备份**：整个库导出为单个 JSON（封面以 base64 内嵌），用户名 / 头像 / 图标一并导出、可整体还原，兼容旧版备份；导入带确认弹窗，导入在后台执行并显示进度（大库不再卡死），导入期间界面锁定、失败时原库零触碰。iOS 导出走系统分享单（AirDrop / 存储到文件等），导出文件名带时间戳。
 - **自动备份**：每次数据改动后自动在本地写完整备份（覆盖式单文件）；版本升级前自动留存旧版快照；库为空但备份有数据时启动弹窗询问恢复；恢复 / 导入前自动留快照可反悔。iOS 备份存 Documents/Backups（「文件」App 可见），签名过期等打不开 app 时也能取走文件。
 - **清除缓存**：设置 → 存储与缓存 显示当前缓存占用并可一键清除（封面/图片解码缓存、网络缓存、临时文件），不影响任何游戏数据与备份。
 - **开屏界面**：启动即显示品牌开屏（图标 + 应用名 + 进度条），主界面就绪后淡入接管；iOS 额外有同色系统静态开屏，点图标瞬间有画面。
@@ -72,7 +72,7 @@ xcrun simctl launch booted com.abcleg.GameLog
 
 本仓库提供一份真机用 Release IPA（`dist/`），未签名，需自行签名（eSign 等工具）后安装：
 
-- `GameLog-beta-2.9.ipa` — 真机 arm64 无签名包，适合用 eSign 等工具重签后装机
+- `GameLog-beta-3.0.ipa` — 真机 arm64 无签名包，适合用 eSign 等工具重签后装机
 
 > 提示：模拟器与日常开发调试直接用 Xcode Run 即可，不出也不需要模拟器 IPA；macOS 直接用 DMG 安装。
 
@@ -100,7 +100,7 @@ GameLog/
 ├── GameLogApp.swift       # macOS 入口：WindowGroup + Settings/About/写字台 场景共享 ModelContainer
 ├── iOSRootView.swift      # iOS 入口：底部 TabBar（库 / 统计 / 设置）+ AirDrop 备份导入
 ├── Models/                # SwiftData 模型（Game / Completion / GameGroup / PhysicalCopy / Presets）
-├── Support/               # 平台抽象 PlatformImage、评分逻辑 ScoreMath、备份 ExportImport/BackupWriter/AutoBackup、
+├── Support/               # 平台抽象 PlatformImage、评分逻辑 ScoreMath、备份 ExportImport/BackupWriter/BackupImporter/AutoBackup、
 │                          #   Game+Backup（Game↔DTO 唯一映射）、个性化 UserCustomization、L10n、SteamGridDB、PriceFormat、
 │                          #   Artwork.swift 在 Models/（五类图 kind 表）、ImageImport（图片导入管线）、
 │                          #   LibraryStats（库统计聚合）、LibraryQuery（库过滤+稳定排序+排序菜单）、

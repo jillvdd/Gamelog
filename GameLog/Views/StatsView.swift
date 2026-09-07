@@ -130,6 +130,10 @@ struct StatsView: View {
             .appToolbar()
             .navigationDestination(item: $selectedGame) { GameDetailView(game: $0) }
             .navigationDestination(isPresented: $showingOverall) { OverallRankingView() }
+            // 整库替换后栈上旧 Game 已 detached：退出详情防悬空访问（2026-09-08）。
+            .onReceive(NotificationCenter.default.publisher(for: UserCustomization.libraryReplacedNotification)) { _ in
+                selectedGame = nil
+            }
         }
     }
 
