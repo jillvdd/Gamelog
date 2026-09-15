@@ -424,14 +424,16 @@ struct HomeCarousel: View {
 
     private var statsPage: some View {
         carouselCard(icon: "chart.bar.fill", titleKey: "home.statsTitle") {
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                statTile(value: "\(games.count)", label: L10n.tr("stats.totalGames", lang: language))
-                statTile(value: averageScore.map { String(format: "%.1f", $0) } ?? "—",
-                         label: L10n.tr("stats.avgScore", lang: language))
-                statTile(value: "\(backlogCount)", label: L10n.tr("stats.backlogCount", lang: language))
-                statTile(value: "\(completedCount)",
-                         label: L10n.tr(GameStatus.completed.labelKey, lang: language))
-            }
+            statTiles([
+                (value: "\(games.count)",
+                 label: L10n.tr("stats.totalGames", lang: language)),
+                (value: averageScore.map { String(format: "%.1f", $0) } ?? "—",
+                 label: L10n.tr("stats.avgScore", lang: language)),
+                (value: "\(backlogCount)",
+                 label: L10n.tr("stats.backlogCount", lang: language)),
+                (value: "\(completedCount)",
+                 label: L10n.tr(GameStatus.completed.labelKey, lang: language)),
+            ])
             statusDistribution
         }
     }
@@ -475,14 +477,16 @@ struct HomeCarousel: View {
             if totals.editionCount == 0 {
                 emptyHint("home.holdingsHint")
             } else {
-                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                    statTile(value: "\(totals.editionCount)", label: L10n.tr("copy.overviewEditions", lang: language))
-                    statTile(value: "\(totals.totalQuantity)", label: L10n.tr("copy.overviewQuantity", lang: language))
-                    statTile(value: PriceFormat.string(totals.totalSpent, language: language) ?? "—",
-                             label: L10n.tr("copy.overviewSpent", lang: language))
-                    statTile(value: PriceFormat.string(totals.totalEstimate, language: language) ?? "—",
-                             label: L10n.tr("copy.overviewEstimate", lang: language))
-                }
+                statTiles([
+                    (value: "\(totals.editionCount)",
+                     label: L10n.tr("copy.overviewEditions", lang: language)),
+                    (value: "\(totals.totalQuantity)",
+                     label: L10n.tr("copy.overviewQuantity", lang: language)),
+                    (value: PriceFormat.string(totals.totalSpent, language: language) ?? "—",
+                     label: L10n.tr("copy.overviewSpent", lang: language)),
+                    (value: PriceFormat.string(totals.totalEstimate, language: language) ?? "—",
+                     label: L10n.tr("copy.overviewEstimate", lang: language)),
+                ])
             }
         }
     }
@@ -854,11 +858,43 @@ struct HomeCarousel: View {
             content()
         }
         .padding(16)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        // 宽度走弹性（内容本就撑满页面宽），**高度必须硬性定值**——§46 口径：只有定值 frame
+        // 才钳制布局。用 `maxHeight: .infinity` 时，内容自然高超过页面盒的页（④⑤ 速览页：
+        // 2×2 瓦片 + 六状态分布实测 ~145pt > 可用 ~119pt）会把卡片撑破页面盒，超出的部分被
+        // TabView 页面居中后由 `.clipped()` 从上下裁掉——两端的圆角正好被切走，⑤ 页只剩一段弧、
+        // ④ 页直接变直角，与 ①②③ 页的 16pt 圆角对不上（2026-09-15 用户报告实锤，§51）。
+        // 定值高度让卡片盒子恒等于页面盒：内容再高也只在盒内溢出（由 clipShape 收边）。
+        .frame(maxWidth: .infinity)
+        .frame(height: max(pageHeight, 80), alignment: .topLeading)
         .background(Self.cardShape.fill(Color.semantic(.controlBackground)))
         .overlay(Self.cardShape.strokeBorder(.quaternary, lineWidth: 0.5))
         .clipShape(Self.cardShape)
         .shadow(color: .black.opacity(0.09), radius: 9, y: 2)
+    }
+
+    /// 速览页瓦片版式：卡片矮时（iPhone，2.1 比例 ≈176pt）2×2 网格的自然高放不进页面盒，
+    /// 卡片会被撑破（圆角被裁，见 carouselCard 注释）——改**单行四列**（实测 ~80pt，宽裕）；
+    /// 卡片够高（iPad / macOS / 宽窗）保持 2×2 观感不变。阈值 260pt：iPhone 全系（≈163–200pt）
+    /// 走紧凑，iPad 竖 339 / 横 367、macOS 最窄窗 ~285 都走 2×2。
+    private var usesCompactStatTiles: Bool { pageHeight < 260 }
+
+    /// 四个统计瓦片（版式按卡片高度自适应，见 usesCompactStatTiles）。
+    private func statTiles(_ items: [(value: String, label: String)]) -> some View {
+        Group {
+            if usesCompactStatTiles {
+                HStack(spacing: 8) {
+                    ForEach(items.indices, id: \.self) { i in
+                        statTile(value: items[i].value, label: items[i].label)
+                    }
+                }
+            } else {
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                    ForEach(items.indices, id: \.self) { i in
+                        statTile(value: items[i].value, label: items[i].label)
+                    }
+                }
+            }
+        }
     }
 
     /// 统计小瓦片：大数值 + 次要小标签（随卡片缩放）。
