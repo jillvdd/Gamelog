@@ -13,7 +13,9 @@ import SwiftData
 /// ① 主页横幅——用户可自定义的标题 / 副标题 / 背景图（无背景回退品牌深色渐变）+ 大头像；
 /// ② 随机游戏——**从全库直接随机**一款，封面全幅打底（横图优先）+ 底部信息/评价标题 +
 ///    右上角**突出评分**（琥珀星标胶囊）与 shuffle 再随机；
-/// ③ 我的最爱——随机置顶一款最爱（1:1 封面 + 信息，轮换）+ 其余最爱列表在下；
+/// ③ 我的最爱——**iPhone** 走②同款「横向封面」显示模式、只展示随机选中的一款（2026-09-15 用户
+///    要求：原「置顶 1:1 方卡 + 其余列表 + 分割线」在矮卡上置顶卡与分割线重叠，改版）；
+///    **iPad / macOS 保持原版式**（随机置顶 1:1 方卡 + 其余最爱列表在下）；
 /// ④ 库内速览——游戏数 / 库平均分 / 想玩 / 已通关·长线 + 六状态分布；
 /// ⑤ 收藏家速览——收藏档案 / 总数量 / 总花费 / 总估值（无持有记录时提示）。
 struct HomeCarousel: View {
@@ -329,9 +331,25 @@ struct HomeCarousel: View {
         .shadow(color: .black.opacity(0.35), radius: 10 * contentUnit, y: 4 * contentUnit)
     }
 
-    // MARK: - ③ 我的最爱（随机置顶一款 1:1 封面 + 信息，其余列表在下方）
+    // MARK: - ③ 我的最爱
 
+    /// 我的最爱页：**iPhone** 走②随机游戏同款「横向封面」显示模式（只展示随机选中的一款）；
+    /// **iPad / macOS 保持原版式**（随机置顶 1:1 方卡 + 其余列表在下），未改动。
+    @ViewBuilder
     private var favoritesPage: some View {
+        #if os(iOS)
+        if iPadLayout.isPad {
+            favoritesListPage
+        } else {
+            favoritesSpotlightPage
+        }
+        #else
+        favoritesListPage
+        #endif
+    }
+
+    /// 原版式（iPad / macOS）：随机置顶一款 1:1 方卡 + 其余最爱列表在下。
+    private var favoritesListPage: some View {
         carouselCard(icon: "heart.fill", titleKey: "game.favorites") {
             if favorites.isEmpty {
                 emptyHint("home.favoritesHint")
@@ -405,6 +423,123 @@ struct HomeCarousel: View {
         }
         .buttonStyle(PressFeedbackButtonStyle())
     }
+
+    #if os(iOS)
+    // MARK: ③ iPhone 版「横向封面」版式（与②逐项同构，②本身代码未改动）
+
+    /// iPhone 版「我的最爱」：与②随机游戏**同一显示模式**——有横图/背景图 → 全幅打底 + 压底
+    /// 文字块；否则 → 2:3 封面 + 右侧文字（同②的两种形态，判定口径也一致：复用 backdropImage）。
+    /// **只展示随机选中的那一款**——不再有「置顶卡 + 其余列表 + 分割线」（原版式在矮卡上置顶卡
+    /// 会与分割线重叠，2026-09-15 用户报告并要求改成②的样式）。
+    @ViewBuilder
+    private var favoritesSpotlightPage: some View {
+        if let game = featuredFavorite {
+            if backdropImage(for: game) != nil {
+                favoritesFullBleed(game)
+            } else {
+                favoritesPortraitFallback(game)
+            }
+        } else {
+            emptyHint("home.favoritesHint")
+                .padding(16)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Self.cardShape.fill(Color.semantic(.controlBackground)))
+                .clipShape(Self.cardShape)
+        }
+    }
+
+    /// 全幅版：底图铺满 + 压底文字块（评分小胶囊 / 名称+平台 / 评价标题），右上角爱心标。
+    /// 高度走硬性定值（§51 口径：只有定值 frame 才钳制布局，否则内容撑破页面盒会连圆角一起被裁）。
+    private func favoritesFullBleed(_ game: Game) -> some View {
+        Button(action: { onSelect(game) }) {
+            ZStack(alignment: .bottom) {
+                spotlightBackdrop(game)
+                LinearGradient(
+                    colors: [.black.opacity(0.02), .black.opacity(0.72)],
+                    startPoint: .top, endPoint: .bottom
+                )
+                favoritesTextBlock(game, onPhoto: true)
+                    .padding(16 * contentUnit)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: max(pageHeight, 80), alignment: .topLeading)
+        }
+        .buttonStyle(PressFeedbackButtonStyle())
+        .clipShape(Self.cardShape)
+        .overlay(Self.cardShape.strokeBorder(.white.opacity(0.1), lineWidth: 1))
+        .shadow(color: .black.opacity(0.22), radius: 14, y: 4)
+        .overlay(alignment: .topTrailing) { favoriteHeartBadge.padding(12 * contentUnit) }
+    }
+
+    /// 竖版回退版（该最爱没有横图/背景图）：左 2:3 封面 + 右文字列，版式对齐②的 iOS 回退分支。
+    private func favoritesPortraitFallback(_ game: Game) -> some View {
+        Button(action: { onSelect(game) }) {
+            HStack(spacing: 16 * contentUnit) {
+                posterCover(game)
+                favoritesTextBlock(game, onPhoto: false)
+                Spacer(minLength: 0)
+            }
+            .padding(16 * contentUnit)
+            .contentShape(Rectangle())
+            .frame(maxWidth: .infinity)
+            .frame(height: max(pageHeight, 80), alignment: .topLeading)
+        }
+        .buttonStyle(PressFeedbackButtonStyle())
+        .background(Self.cardShape.fill(Color.semantic(.controlBackground)))
+        .overlay(Self.cardShape.strokeBorder(.quaternary, lineWidth: 0.5))
+        .clipShape(Self.cardShape)
+        .shadow(color: .black.opacity(0.09), radius: 9, y: 2)
+        .overlay(alignment: .topTrailing) { favoriteHeartBadge.padding(12 * contentUnit) }
+    }
+
+    /// 文字块。`onPhoto` = 压在照片上：白字版、评价标题紧随（靠 ZStack 压底）；
+    /// false = 普通卡上：主色字版、评价标题用 Spacer 推到文字列底部（与②回退版同款）。
+    private func favoritesTextBlock(_ game: Game, onPhoto: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 6 * contentUnit) {
+            spotlightScoreInline(game)
+            // 平台图标与标题中轴对齐（详情页 nameRow 统一口径）。
+            HStack(alignment: .center, spacing: 8 * contentUnit) {
+                Text(verbatim: game.displayName(for: language))
+                    .font(.system(size: 20 * contentUnit, weight: .bold))
+                    .foregroundStyle(onPhoto ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                if !game.platformList.isEmpty {
+                    GamePlatformIcons(platforms: game.platformList, maxCount: 4, iconSize: 13 * contentUnit)
+                }
+            }
+            if !onPhoto { Spacer(minLength: 4 * contentUnit) }
+            // 评价标题（与②同款：这张卡的重点展示对象之一）。
+            HStack(alignment: .firstTextBaseline, spacing: 5 * contentUnit) {
+                Image(systemName: "text.quote")
+                    .font(.system(size: 12 * contentUnit))
+                    .foregroundStyle(Color(red: 1.0, green: 0.72, blue: 0.42))
+                if game.reviewTitle.isEmpty {
+                    Text(verbatim: L10n.tr("home.spotlightNoReview", lang: language))
+                        .font(.system(size: 15 * contentUnit))
+                        .foregroundStyle(onPhoto ? AnyShapeStyle(.white.opacity(0.75)) : AnyShapeStyle(.tertiary))
+                } else {
+                    Text(verbatim: game.reviewTitle)
+                        .font(.system(size: 15 * contentUnit, weight: .medium))
+                        .foregroundStyle(onPhoto ? AnyShapeStyle(.white.opacity(0.92)) : AnyShapeStyle(.secondary))
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                }
+            }
+        }
+    }
+
+    /// 右上角爱心标：与②的 shuffle 同款胶囊（不可点）——标的是「这张卡展示的是最爱」。
+    private var favoriteHeartBadge: some View {
+        Image(systemName: "heart.fill")
+            .font(.system(size: 13 * contentUnit, weight: .semibold))
+            .foregroundStyle(Color.pink)
+            .padding(8 * contentUnit)
+            .background(Capsule().fill(.black.opacity(0.45)))
+            .overlay(Capsule().strokeBorder(.white.opacity(0.3), lineWidth: 1))
+    }
+    #endif
 
     private var favorites: [Game] {
         games.filter(\.isFavorite)
