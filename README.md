@@ -1,140 +1,148 @@
 # 我的游戏簿（My Gamelog）
 
-> [English](README.en.md) · [日本語](README.ja.md) · **简体中文**
+<p align="center">
+  <img src="appcover.PNG" alt="My Gamelog Cover" width="100%" style="border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,0.15);" />
+</p>
 
-一个 **macOS + iOS** 个人应用，用来记录你的游戏库与通关经历：想玩 / 在玩 / 已通关等状态、封面、六维评分、每次通关的平台 / 日期 / 程度 / 时长 / 内容、实体收藏（版本 / 数量 / 照片），并生成适合分享的图片。纯本地存储（SwiftData），数据完全属于你自己。
+<p align="center">
+  <strong>专为游戏玩家打造的个人游戏库与通关历程管理应用</strong>
+  <br />
+  纯本地存储 · 原生交互 · 实体收藏 · 外部账号同步 · 精美分享卡
+</p>
 
-支持界面语言：**简体中文 / 日本語 / English**（设置里即时切换）。macOS 与 iOS 各自本地独立存储，可通过 JSON 备份互通（含 AirDrop）。
+<p align="center">
+  <a href="README.en.md">English</a> · <a href="README.ja.md">日本語</a> · <strong>简体中文</strong>
+</p>
 
-## 功能
+<p align="center">
+  <img src="https://img.shields.io/badge/Platform-macOS%2014.0%2B%20%7C%20iOS%2018.0%2B-blue?style=flat-square" alt="Platform" />
+  <img src="https://img.shields.io/badge/Swift-5.10%20%2F%206.0-orange?style=flat-square" alt="Swift" />
+  <img src="https://img.shields.io/badge/SwiftUI-SwiftData-purple?style=flat-square" alt="SwiftUI + SwiftData" />
+  <img src="https://img.shields.io/badge/Version-beta%203.2-amber?style=flat-square" alt="Version" />
+  <img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="License" />
+</p>
 
-- **游戏库**：按名称 + 别名 + 多语言名搜索；按状态 / 平台 / 分组筛选；分组管理（macOS 侧边栏 / iOS 筛选菜单），同一游戏可进多个分组；排序支持：名字 / 发售日期 / 通关日期 / 平均分（从低到高 / 从高到低）/ **最近编辑** / **价值最高**，默认按「最近编辑」。库显示分 = 该游戏所有已评分通关记录平均分的均值，取整到 0.1；未评分显示「未评分」。
-- **我的最爱**：任何卡片右键/长按菜单或详情页工具栏的爱心开关，一键收藏/取消（卡片封面有爱心角标显示状态；macOS 菜单用实心 ♥/空心 ♡ 区分）；侧边栏「分组」区顶部常驻「我的最爱」虚拟分组（iOS 在筛选菜单分组区首位），汇总全部收藏并带统计区块，与真实分组并存（允许多个）。
-- **库首页轮播**（「全部游戏」页顶端，五页横向翻页 + 圆点可点跳页）：① 主页横幅（个性化标题/副标题/背景图 + 大头像）② 随机游戏（每次进首页从全库随机一款：横向封面全幅打底 + 右上角「平均分」胶囊 + 评价标题，无横图时改网格同款 2:3 封面 + 文字右侧，右上角可再随机；底图可在设置里选「自动（横图优先）/ 仅背景图 / 仅横向封面」，iPad 横竖屏分开设置）③ 我的最爱（随机置顶一款 1:1 封面 + 其余列表在下）④ 库内速览（游戏数/平均分/想玩/已通关·长线 + 六状态分布）⑤ 收藏家速览（版本数/总量/花费/估值）。卡片随窗口等比缩放、内容联调；macOS 翻页吸附、页间留缝像翻卡片，iOS 原生整页翻页；iPad 横屏自动转扁比例、内容不再放大失控。**iOS 起始页标题内联**：「全部游戏」大标题在轮播下方随内容滚动（不占导航栏）。
-- **视图（分端设计）**：**macOS** 网格 / 列表切换 + 侧边栏；**iPhone** 三选一视图——网格 / **单列横向卡**（左侧方形封面满卡高上下贴边铺图，无方图时竖版封面等高居中；玻璃材质圆角卡底 + 细描边 + 投影，封面右上角液态玻璃评分胶囊，右列为标题 + 平台 + 元数据文字区）/ 列表，选择跨会话记忆并从旧偏好自动迁移；**iPad** 横向卡升级为**双列宽卡**（横屏横版卡左图右文、卡高与字号升档；竖屏竖版卡上图下文、封面满列宽，元数据五项完整不省略）。**网格极简模式**（全平台开关）：开启后网格只显示封面与右上角评分/状态胶囊，名称/平台/日期全部隐藏。
-- **游戏状态**：想玩 / 在玩 / 搁置 / 弃坑 / 已通关 / 长线游玩 六状态；非已通关状态无需通关记录与评分，流转到「已通关」或「长线游玩」时才挂记录；库按状态筛选、详情页液态玻璃滑块选择器（双平台统一在分数区下方）；未通关游戏也有游戏级平台，参与平台筛选与统计。
-- **游戏详情**：评价区（一句话 tagline 引言 + 长评正文）、所有通关记录（可编辑 / 追加 / 删除）、六维彩色条形图；厂商 / 发行商 / 游戏类型三可选字段；收藏家模式开启后多一个「持有」页签。**iOS 标题词边界断行**：大标题按 NLTokenizer 分词，换行只落在词边界，不再出现「死神的遺|言」式硬折行。
-- **详情页头部（分端设计）**：**macOS** 宽窗走「封面顶带 + 信息列 + 玻璃评分卡」布局，缩窗自动回落单列；可设背景图横幅（完整无裁切、顶贴页面、宽度铺满、高度随窗与源图比例联动）+ Logo（透明 PNG，大小 / 垂直 / 水平三档 ×三档按游戏微调，与封面锁死等比联动）。**iPad** 横屏走 macOS 同款 hero 版式（背景图横幅 + Logo 前景 + 28 边距）；竖屏横向封面满宽显示（高度上限放宽到 560pt，不留白边）；已评分的游戏横竖屏都把玻璃评分卡放信息右侧（macOS 同款双栏）。**iPhone** 设了横版封面时走满宽横幅版式（顶贴导航栏、按源图比例定高、上限 260pt 不裁切），没设则完全保持原版式。
-- **评价（Markdown 长评）**：一句话评价（tagline）作为大号引言「题眼」展示；长评正文支持 Markdown 子集（标题 `#` / 加粗 `**` / 斜体 `*` / 列表 `-`），像排版考究的文章。**macOS = 富文本所见即所得编辑器**（独立「写字台」窗口，工具条直接改样式，存盘转回 Markdown；中文斜体在绘制层合成倾斜）；**iOS = 编辑 sheet（TextEditor）**。分端编辑、共享同一份 Markdown 渲染，双端观感一致。
-- **六维评分**：玩法 / 设计 / 剧情 / 美术 / 音乐 / 性能，1–10、0.1 步进滑块。整体 = 六维均值；首条通关记录评分必填，之后的记录可勾选跳过评分。
-- **通关记录**：平台、通关日期（可「无」）、通关程度（主线通关 / 全支线 / 全结局 / 全收集白金 / 多周目 / 速通 / 自定义）、时长（可「无」）、通关内容备注。
-- **日期选择**：macOS 三列滚轮（年 / 月 / 日，自动处理闰年 2 月 29 日与月末钳位；弹性吸附落定、惯性滚动手感对齐系统滚轮）；iOS 用系统日期选择器。
-- **分组**：新建 / 重命名 / 删除；右键（macOS）或菜单（iOS）选择游戏加入；分组统计与分组评价（Markdown 渲染，macOS 可用「写字台」编辑）。
-- **收藏家模式**（设置开关）：详情页「详情 / 持有」分段切换；每个游戏可有多个持有版本（介质 11 档 / 地区 10 档 / 品相 7 档 / 来源 11 档 / 三语价格与估值 / 购买日 / 备注 + 最多 6 张照片），构成**藏品档案**。新建游戏默认**不**建持有档案，须勾选才展开填写并建档。持有页支持网格 / 列表双视图、顶部总览（版本数 / 总数量 / 总花费 / 总估值）、胶囊式元数据展示、完整编辑弹窗；照片用系统查看器查看；随备份导出。
-- **封面与图像**：本地选图（iOS 弹「相册 / 文件 / 拍照」菜单），或通过 [SteamGridDB](https://www.steamgriddb.com) API 搜索下载（需在「关联设置」里填 API Key，即输即搜）；五类图各配**自动匹配**开关（竖版封面 / 方形封面 / 横版封面 / 背景图 / Logo，输入名字停顿约 0.6 秒自动取首条命中，不覆盖已有图，失败静默；改名也会触发补抓）；方形封面只出 1:1 结果（512×512 与 1024×1024 两档都搜）；搜索面板按图类区分文案并预填当前游戏英文名；搜索结果带缩略图。
-- **个性化**：用户名（20 字）、头像（圆形裁切）、macOS app 图标（圆角方形裁切）、自动匹配封面开关、隐藏上方毛玻璃（macOS 15+）、保存原图开关、平台标志开关（默认开启；关闭后各平台不显示品牌 logo 图标）。自定义图标即时反映到 Dock 并重启保持。
-- **分享图（beta 2.4 全面重做）**：品牌化固定深色视觉——暖调近黑底 + 琥珀橙强调；预览面板本身跟随系统明暗（2026-08-27 调整）。三种卡型：
-  - **单卡**：模糊封面垫底 + 清晰海报满框（贴合封面真实比例，SteamGridDB 竖版 2:3 无留白）；信息面板含游戏名 / 平台 / 发售年 / 通关程度胶囊 / 一句话评价（金色）/ 六维迷你条形 / 大字库分；未通关显示彩色状态大徽章。
-  - **总览图**：头部汇总行与游戏格子字段均可在「样式设置」里勾选排序（汇总：款数 / 平均分 / 通关总数 / 收藏价值；格子：平台 / 评分 / 最近通关 / 发售年 / 状态标签），列数随数量自适应，画布随内容拉高。
-  - **分组卡**：标题 + 一句话分组评价引言 + 统计要素（均分 / 游戏数 / 通关数 / 最高分游戏 / 收藏价值，可勾选排序）+ 平台分布条 + 组内封面格；手机 / 桌面两套布局。
-  - 「样式设置」统一配置上述三个要素池，总览格与分组卡格共用同一份格子字段配置；导出格式 JPEG（默认）/ PNG 可选，文件名自动带游戏 / 分组名；iOS 点预览全屏看大图、一键保存到相册（需照片添加权限）；水印（用户名·游戏簿 + 头像）随语言本地化。
-- **统计与排行榜**：通关总数、库平均分（含想玩数）、按平台分布、收藏价值（收藏家模式开启时显示版本数 / 总数量 / 总花费 / 总估值）；平均分榜 + 六维榜（各维度前 5 / 10）；「整体排名」页顶部在**分数榜 / 价值榜**之间切换——分数榜含平均分与六维共 7 个榜单，价值榜含「按游戏价值 / 按机器（平台）价值 / 按分组价值」三页，每页最多 100 条翻页、可按平台过滤。
-- **关联设置（独立入口）**：把三件「不属于本机偏好」的事集中到一处——SteamGridDB API Key、游戏账号、数据备份，与「设置」（语言 / 个性化 / 存储与缓存）分开。**macOS**：菜单栏 app 菜单里「设置…」正下方的「关联设置…」（⌘⇧,），打开独立窗口；**iOS / iPadOS**：底部页签栏新增「关联」（在统计与设置之间）。游戏账号不再是分页：账号列表与逐行同步按钮直接铺在页面上，点某一行才进二级详情页。
-- **游戏账号（实验性）**：绑定 **Nintendo Account / PlayStation Network / Xbox Live**，从服务端读取你的游玩记录——Nintendo 的游玩时长与首次 / 最近游玩日期、PSN 的奖杯（白金 / 金 / 银 / 铜 + 百分比）、Xbox 的成就数与 Gamerscore——再按游戏自动匹配、手动关联或合并进本地库（账号页可搜索记录、可按状态筛选）。**凭证只存本机钥匙串（Keychain），不进 SwiftData、不进备份、不写日志、不上传**；解绑即删除对应凭证。游戏详情页多出一个「**游戏记录**」折叠区，每条绑定的来源记录一张来源卡（PSN 奖杯卡 / Xbox 成就卡 / Nintendo 游玩记录卡），没有绑定记录的条目**不显示这一项**。Xbox 那边「仅 PC 平台且没有游玩时长的记录会被跳过」，被跳过的记录可在「关联设置 → 账号 → 已忽略」里手动绑定回去。
-  > 三点如实说明：① **Xbox 走 [OpenXBL](https://xbl.io)（第三方公开 API，不是微软官方接口）**，API Key 与请求内容会经过该服务；Nintendo / PlayStation 均为本机直连官方服务，无中转。② 本功能不引入任何自有后端（无服务器 / 无账号体系），数据只进你自己的本地库。③ 仍在实验阶段，界面入口带「实验性」标签。
-- **备份**：整个库导出为单个 JSON（封面以 base64 内嵌），用户名 / 头像 / 图标一并导出、可整体还原，兼容旧版备份；导入带确认弹窗，导入在后台执行并显示进度（大库不再卡死），导入期间界面锁定、失败时原库零触碰。iOS 导出走系统分享单（AirDrop / 存储到文件等），导出文件名带时间戳。
-- **自动备份**：每次数据改动后自动在本地写完整备份（覆盖式单文件）；版本升级前自动留存旧版快照；库为空但备份有数据时启动弹窗询问恢复；恢复 / 导入前自动留快照可反悔。iOS 备份存 Documents/Backups（「文件」App 可见），签名过期等打不开 app 时也能取走文件。
-- **清除缓存**：设置 → 存储与缓存 显示当前缓存占用并可一键清除（封面/图片解码缓存、网络缓存、临时文件），不影响任何游戏数据与备份。
-- **开屏界面**：启动即显示品牌开屏（图标 + 应用名 + 进度条），主界面就绪后淡入接管；iOS 额外有同色系统静态开屏，点图标瞬间有画面。
-- **大库性能**：图片以外部文件存储、按需懒加载（数百 MB 库不再随编辑/切页整体卡顿）；备份在后台流式写出（逐游戏分片编码，主线程零阻塞，编辑保存不再引发卡顿）。
+---
 
-## 平台
+## 🌟 核心特色
 
-| 平台 | 部署目标 | 说明 |
+### 🎮 游戏库与沉浸式浏览
+- **全方位检索与管理**：支持游戏原名、多语言译名及自定义别名即时搜索；可按状态、平台、分组多维度精准筛选。
+- **丰富的排序规则**：支持按名称、发售日期、通关日期、评分高低、**最近编辑**及**收藏价值**自由排序。
+- **首页精彩轮播（五页画卷）**：
+  1. **个性化横幅**：展示自定义标题、签名、背景图与个人头像；
+  2. **随机探索**：全库随机漫游一款游戏，支持全幅横屏封面与即时再随机；
+  3. **我的最爱**：专属特写置顶，快速重温心头挚爱；
+  4. **全库速览**：可视化展示通关总数、平均分与六种状态分布；
+  5. **收藏家概览**：快速统计藏品总版本数、数量、总花费与当前估值。
+- **多元视图模式**：提供标准海报网格、紧凑列表、**方形封面网格**以及**极简纯图模式**，契合不同审美偏好。
+
+### 🏆 通关记录与多维评分
+- **完整流转状态**：想玩、在玩、搁置、弃坑、已通关、长线游玩等 6 种状态自由流转。
+- **详尽通关档案**：每次通关均可独立记录平台、日期、通关程度（主线、全结局、白金全收集、速通等）、游玩时长及通关内容。
+- **维度评分体系**：提供玩法、设计、剧情、美术、音乐、性能六大维度的 1–10 分细致打分，自动计算综合平均分与专属彩色维度条形图。
+- **Markdown 长篇评测**：支持一句话点睛评语（Tagline）与富文本评测正文（标题、加粗、斜体、列表）。macOS 端提供独立“写字台”沉浸式编辑器。
+
+### 🔗 外部账号游玩数据同步（实验性）
+- **三大主流平台互联**：支持绑定 **Nintendo Account**、**PlayStation Network** 及 **Xbox Live**。
+- **自动抓取游玩事实**：自动同步任天堂首次/最近游玩日期与时长、PlayStation 奖杯进度（白金/金/银/铜）、Xbox 成就数与 Gamerscore。
+- **智能关联与合并**：同步记录可自动对齐本地游戏库，支持手动关联、条目合并或设置规则忽略。
+- **详情页来源卡**：游戏详情页内嵌专属来源卡（奖杯卡、成就卡、游玩记录卡），直观呈现官方游玩痕迹。
+
+### 📦 实体藏品档案（收藏家模式）
+- **专为实体玩家定制**：在游戏详情页一键开启「持有」档案，专为实体卡带、光盘、典藏版管理打造。
+- **多维度版本参数**：细致记录介质类型（标准版、限定版、铁盒、兑换码等）、发行地区（日版、美版、欧版、港台等）、品相状态、购入渠道及入手价格/当前估值。
+- **实物照片图鉴**：支持为每份藏品上传多张实拍照片，随时在设备上翻阅真机开箱与收藏品鉴。
+- **藏品价值统计**：自动统计全库实体版本总数、藏品总支出与资产总估值。
+
+### 🎨 典雅品牌分享卡生成
+- **深色美学视觉**：采用暖调近黑底色搭配品牌琥珀橙强调，带来杂志封面般的导出质感。
+- **三种分享版式**：
+  - **单游戏海报卡**：电影海报级构图，融合封面虚化底色、通关程度胶囊、金色评语与维度条形图；
+  - **综合总览图**：随游戏数量自适应列数排布，支持自由配置与排序表头汇总要素与格子字段；
+  - **系列分组卡**：专为游戏系列或专题定制，整合分组长评、系列均分、平台分布与游戏矩阵。
+- **灵活导出**：支持手机（9:16）与桌面（16:9）规格，提供 JPEG 与 PNG 无损格式，iOS 支持一键保存至系统相册。
+
+### 🛡️ 绝对隐私与纯本地存储
+- **零外部服务器**：无账号体系、无数据上传，所有游戏数据均通过 SwiftData 存储在本地设备中。
+- **凭证仅进 Keychain**：第三方平台登录凭证与 Token 仅安全驻留于系统钥匙串（Keychain），严禁进入数据库、备份文件或日志。
+- **完备的自动化备份**：数据变动时自动在本地保留滚动作业备份；支持单文件完整 JSON 导出导入与 AirDrop 跨端无缝迁移。
+
+---
+
+## 💻 跨平台原生体验
+
+| 平台 | 最低系统 | 原生专属体验 |
 |---|---|---|
-| macOS | 14.0+ | 完整功能：侧边栏、右键菜单、窗口工具栏、自定义 Dock 图标、写字台评价编辑器等 |
-| iOS | 18.0+（iPhone / iPad） | 底部 TabBar（库 / 统计 / 关联 / 设置）；三态库视图、筛选菜单、加图菜单、底部 action sheet 确认等按 iOS 设计规范适配 |
+| **macOS** | macOS 14.0+ | 三栏侧边栏、右键上下文菜单、快捷键系统、写字台 Markdown 编辑器、独立「关联设置」窗口（⌘⇧,）、自定义 Dock 图标即时生效。 |
+| **iOS** | iOS 18.0+ | 原生 TabBar 导航、单列单手操作横向大卡、标题词边界智能断行（防止断词）、原生分享单与相机/相册即时录入。 |
+| **iPadOS** | iPadOS 18.0+ | 双列宽屏大卡展示、横竖屏自适应分栏、横屏 Hero 满幅画卷布局。 |
 
-## 环境要求
+---
 
-- macOS 14.0+；iOS 18.0+（iPhone / iPad）
-- **Xcode 27 beta**（工程依赖 macOS 27 / iOS 27 SDK 与模拟器运行时，构建用 `/Users/abc/Downloads/Xcode-beta.app`）
+## 🚀 快速上手与安装
 
-## 构建与运行
+### 1. 安装应用
+
+#### macOS
+- 从 Release 页面下载 `GameLog-beta-3.2.dmg`，打开并将 `GameLog.app` 拖入 `Applications` 文件夹即可。
+
+#### iOS / iPadOS（无签名 IPA）
+- 从 `dist/` 目录获取 `GameLog-beta-3.2.ipa`（arm64 真机包）。
+- 使用自身证书及工具（如 TrollStore、eSign、AltStore、SideStore 等）重签后安装至真机。
+
+### 2. 导入演示数据（体验 Demo）
+本仓库根目录附带一份官方演示数据 [GameLog-demo-backup.json](GameLog-demo-backup.json)，包含 50 款经典游戏（涵盖中/英/日多语言）、105 条真实通关记录、维度评分及分组范例。
+
+- **导入方式**：打开应用 → 进入**「关联设置」**（macOS 快捷键 `⌘⇧,`；iOS 底部「关联」页签）→ **数据备份** → **导入备份…** → 选择该 JSON 文件即可一键载入。
+
+### 3. 配置 SteamGridDB 高清封面搜索
+1. 前往 [steamgriddb.com](https://www.steamgriddb.com) 免费注册并从个人页面获取 API Key；
+2. 打开应用内的**「关联设置」** → **SteamGridDB** → 填入 API Key（自动校验有效性）；
+3. 在新建或编辑游戏时，点击封面旁边的**「搜索…」**按钮，即可即搜即用，一键匹配竖版海报、方形图标、横版横幅与游戏透明 Logo。
+
+---
+
+## 🛠️ 开发者指南
+
+### 环境需求
+- **macOS 14.0+** / **iOS 18.0+**
+- **Xcode 27 beta**（依赖 macOS 27 / iOS 27 SDK）
+
+### 编译与构建
 
 ```bash
 cd /Users/abc/Documents/gamelog_program
 
-# macOS 构建 + 启动（macOS 27 beta 必须用 beta Xcode）
-DEVELOPER_DIR=/Users/abc/Downloads/Xcode-beta.app/Contents/Developer \
+# 设置 Xcode beta 开发目录
+export DEVELOPER_DIR=/Users/abc/Downloads/Xcode-beta.app/Contents/Developer
+
+# ① 构建 macOS Debug 版本
 xcodebuild -project GameLog.xcodeproj -scheme GameLog -configuration Debug \
   -destination 'platform=macOS' -derivedDataPath /tmp/GameLogDD-mac build
-open /tmp/GameLogDD-mac/Build/Products/Debug/GameLog.app
 
-# iOS 模拟器构建 + 安装 + 启动
-DEVELOPER_DIR=/Users/abc/Downloads/Xcode-beta.app/Contents/Developer \
+# ② 构建 iOS 模拟器 Debug 版本
 xcodebuild -project GameLog.xcodeproj -scheme GameLog-iOS -configuration Debug \
-  -destination 'platform=iOS Simulator' -derivedDataPath /tmp/GameLogDD-ios build
-xcrun simctl install booted /tmp/GameLogDD-ios/Build/Products/Debug-iphonesimulator/GameLog.app
-xcrun simctl launch booted com.abcleg.GameLog
+  -destination 'id=9908C070-47ED-455C-8427-4ED9177591B4' -derivedDataPath /tmp/GameLogDD-ios build
 ```
 
-或在 Xcode 中打开 `GameLog.xcodeproj`，选 `GameLog`（macOS）或 `GameLog-iOS`（iOS）scheme 直接 Run。
+### 独立回归测试集
+本项目内置了 5 套完备的离线自动化测试套件（位于 `Scripts/`，无需网络直连）：
 
-## 在 iPhone 上安装（IPA）
+- `Scripts/ScoreMathSelftest/`：评分算法、四舍五入与库均分运算自检（16 项）；
+- `Scripts/DataSmokeTest/`：数据持久层、模型级联关系、外部账号导入匹配与备份解析冒烟（753 项全自动化断言）；
+- `Scripts/KeychainSelftest/`：系统钥匙串安全隔离与解绑擦除自检（17 项）；
+- `Scripts/ShareRenderTest/`：图片渲染器 ImageRenderer 真实出图尺寸与要素池编排校验（25 项）；
+- `Scripts/RichReviewTest/`：Markdown 与富文本写字台双向互转保真度检验。
 
-本仓库提供一份真机用 Release IPA（`dist/`），未签名，需自行签名（eSign 等工具）后安装：
+---
 
-- `GameLog-beta-3.2.ipa` — 真机 arm64 无签名包，适合用 eSign 等工具重签后装机
+## 📖 术语规范
 
-> 提示：模拟器与日常开发调试直接用 Xcode Run 即可，不出也不需要模拟器 IPA；macOS 直接用 DMG 安装。
+本项目遵循统一的领域模型词汇表，具体参见 [CONTEXT.md](CONTEXT.md)。编写与贡献代码时请严格遵守规范词汇（如 Game 游戏、Alias 别名、Completion 通关记录、Dimension Scores 维度评分、Cover 封面、Review 评价等）。
 
-## 试用 Demo 数据
+---
 
-仓库附带一份生成的演示数据（[GameLog-demo-backup.json](GameLog-demo-backup.json)），可用于演示本 app 的功能：50 款游戏（中 / 英 / 日名 + 发售日期）、105 条通关记录（平台分布 Nintendo Switch 2 / PS5 / Xbox Series X|S / PC，含向下兼容痕迹）、六维评分、9 个分组。
+## 📄 许可证
 
-导入方法：
-
-1. iOS：把 JSON 放进「文件」app；macOS：放到本地
-2. 打开 app → 关联设置 → 数据备份 → **导入** → 选择该文件 → 确定
-
-注意：导入会替换当前数据。
-
-## 使用 SteamGridDB 封面搜索
-
-1. 到 [steamgriddb.com](https://www.steamgriddb.com) 免费注册，从个人页面获取 API Key。
-2. 打开 app 的「关联设置」（macOS：菜单栏最左侧的 app 菜单 →「关联设置…」，快捷键 ⌘⇧,；iOS：底部「关联」页签）→ SteamGridDB → 填入 Key（Key 栏可显示/隐藏、一键复制、改动时自动校验「✓ 有效 / ✗ 无效」）。
-3. 新建 / 编辑游戏时点对应图类的「搜索…」按钮（竖版封面 / 方形封面 / 横版封面 / 背景图 / Logo 各自入口）。
-
-## 项目结构
-
-```
-GameLog/
-├── GameLogApp.swift       # macOS 入口：WindowGroup + Settings/About/写字台/关联设置 场景共享 ModelContainer
-├── iOSRootView.swift      # iOS 入口：底部 TabBar（库 / 统计 / 关联 / 设置）+ AirDrop 备份导入
-├── Models/                # SwiftData 模型（Game / Completion / GameGroup / PhysicalCopy / Presets）
-├── Support/               # 平台抽象 PlatformImage、评分逻辑 ScoreMath、备份 ExportImport/BackupWriter/BackupImporter/AutoBackup、
-│                          #   Game+Backup（Game↔DTO 唯一映射）、个性化 UserCustomization、L10n、SteamGridDB、PriceFormat、
-│                          #   Artwork.swift 在 Models/（五类图 kind 表）、ImageImport（图片导入管线）、
-│                          #   LibraryStats（库统计聚合）、LibraryQuery（库过滤+稳定排序+排序菜单）、
-│                          #   StatusStyle（状态色/图标/游戏徽章）、ImageDecodeCache（图片解码缓存）、
-│                          #   LaunchGate（开屏）、PlatformIcon（平台图标）、PlatformButton（跨平台按钮样式）、
-│                          #   PlatformConfirmDialog（底部 action sheet）、ImageSourcePicker（加图菜单）、
-│                          #   DocumentPicker（iOS 文件选择）、ShareSheetPresenter（iOS 系统分享单）、
-│                          #   MarkdownReview（Markdown 解析/渲染）、MarkdownRichEditor（macOS 写字台）
-├── Share/                 # 分享卡视图（三种卡型 + 要素池配置）+ ImageRenderer 出图管线
-├── Views/                 # 各平台视图（共享 + #if os 适配）
-└── Resources/             # 三语 Localizable.strings + Assets.xcassets（macOS/iOS AppIcon）
-                           #   + PlatformIcons（平台 logo 资源）+ Info-iOS.plist
-Scripts/                   # 独立回归测试（不编进 app，见下）
-```
-
-## 开发验证
-
-`Scripts/` 下有可重复运行的独立回归测试（用 beta Xcode 工具链 `swiftc` 编译，宏插件路径见各文件头注释）：
-
-- `Scripts/ScoreMathSelftest/` — 评分逻辑自检（取整 / 均值 / 库显示分）
-- `Scripts/DataSmokeTest/` — 数据层冒烟：多对多关系、级联删除、评分集成、备份往返、导入幂等与替换、持有档案迁移与备份、日期保真、预设本地化、外部账号记录导入与合并（700+ 断言）
-- `Scripts/KeychainSelftest/` — 钥匙串自检：新增 / 读取 / 更新 / 删除 / 按类型清空（对应「解绑时删除凭证」那条路径）
-- `Scripts/ShareRenderTest/` — 分享卡渲染管线：真实调用 ImageRenderer 出 PNG 校验尺寸 / 列数 / JPEG 编码 / 要素池配置往返
-- `Scripts/RichReviewTest/` — 评价编辑器核心不变式：Markdown → 富文本 → Markdown 往返逐字守恒
-
-新增 UI 文案时，key 必须同时进三个 `Localizable.strings`，并统一用 `L10n.tr` / `LText`（勿用 `String(localized:)`）。改完跑一次 key 覆盖检查，三语必须 0 缺失（检查命令见 HANDOVER.md §2）。
-
-## 术语约定
-
-项目领域术语（Game / Completion / Group / Review / Dimension Scores…）以 `CONTEXT.md` 的词表为准，开发时避免混用。
-
-## License
-
-本项目基于 [MIT](LICENSE) 许可证发布，详见仓库根目录的 `LICENSE` 文件。
+本项目遵循 [MIT License](LICENSE) 协议开源。

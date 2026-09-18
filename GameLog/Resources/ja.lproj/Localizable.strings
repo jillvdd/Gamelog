@@ -19,7 +19,7 @@
 "library.viewMode" = "表示";
 "library.addGame" = "ゲームを追加";
 "library.share" = "共有";
-"library.noGames" = "まだゲームがありません。右上の「ゲームを追加」から始めましょう";
+"library.noGames" = "ゲームがありません。「新規ゲーム」を追加して始めましょう";
 "library.noResult" = "該当するゲームがありません";
 "group.newGroup" = "新しいグループ";
 "group.name" = "グループ名";
@@ -28,7 +28,7 @@
 "game.nameEn" = "英語タイトル";
 "game.nameZh" = "中国語タイトル";
 "game.nameJa" = "日本語タイトル";
-"game.nameHint" = "少なくとも 1 つの言語のタイトルを入力してください。連携したアカウントから取り込んだゲームは中国語題・日本語題だけのことが多く、英語タイトルが空でも問題ありません。";
+"game.nameHint" = "いずれか1つの言語でタイトルを入力してください。";
 "game.aliases" = "別名（検索用）";
 "game.aliasPlaceholder" = "別名を入力";
 "game.aliasAdd" = "追加";
@@ -47,7 +47,7 @@
 "review.edit" = "レビューを編集";
 "review.save" = "保存";
 "review.source" = "Markdown ソース";
-"review.bodyHint" = "Markdown 対応：# 見出し、**太字**、*斜体*、- リスト項目";
+"review.bodyHint" = "Markdown 対応（# 見出し、**太字**、*斜体*、- リスト）";
 "review.main" = "本文";
 "review.title" = "見出し";
 "review.subtitle" = "小見出し";
@@ -64,14 +64,14 @@
 "completion.playtime" = "プレイ時間（時間）";
 "completion.noDate" = "クリア日なし";
 "completion.noPlaytime" = "プレイ時間なし";
-"completion.notes" = "クリアメモ";
-"completion.notesPlaceholder" = "今回の感想や出来事…";
+"completion.notes" = "クリア内容";
+"completion.notesPlaceholder" = "今回のプレイ感想やエピソード…";
 "completion.add" = "クリア記録を追加";
 "completion.edit" = "編集";
 "completion.delete" = "削除";
-"completion.deleteConfirm" = "このクリア記録を削除しますか？この操作は元に戻せません。";
+"completion.deleteConfirm" = "このクリア記録を削除しますか？この操作は取り消せません。";
 "completion.skipScores" = "今回はスコアを付けない";
-"completion.scores" = "6項目のスコア";
+"completion.scores" = "項目別スコア";
 "dimension.gameplay" = "ゲーム性";
 "dimension.design" = "デザイン";
 "dimension.story" = "ストーリー";
@@ -112,8 +112,8 @@
 "share.byGroups" = "グループ別";
 "share.groupTitle" = "グループタイトル";
 "share.noneSelectedGroup" = "グループを1つ以上選択してください";
-"stats.totalGames" = "クリア済みゲーム数";
-"stats.avgScore" = "ライブラリ平均スコア";
+"stats.totalGames" = "クリア総数";
+"stats.avgScore" = "ライブラリ平均";
 "stats.byPlatform" = "プラットフォーム別";
 "stats.noData" = "データなし";
 "stats.rankings" = "ランキング";
@@ -123,7 +123,7 @@
 "stats.scoreBoards" = "スコア順";
 "stats.valueBoards" = "価値順";
 "stats.byGameValue" = "ゲーム価値順";
-"stats.byPlatformValue" = "機種価値順";
+"stats.byPlatformValue" = "プラットフォーム価値順";
 "stats.byGroupValue" = "グループ価値順";
 "settings.language" = "表示言語";
 // 連携設定（外部サービス：SteamGridDB / ゲームアカウント / データバックアップ）
@@ -131,7 +131,7 @@
 "links.menu" = "連携設定…";
 "links.steamgriddb" = "SteamGridDB";
 "links.steamGridDBKey" = "API Key";
-"links.steamGridDBHint" = "steamgriddb.com に無料登録し、プロフィールからキーを取得してください";
+"links.steamGridDBHint" = "steamgriddb.com のプロフィールから API Key を取得できます。";
 "links.showKey" = "表示";
 "links.hideKey" = "隠す";
 "links.copyKey" = "コピー";
@@ -146,20 +146,20 @@
 "settings.removeAvatar" = "アバターを削除";
 "settings.restoreIcon" = "デフォルトアイコンに戻す";
 "settings.autoMatchCover" = "カバーを自動取得";
-"settings.autoMatchCoverHint" = "ゲーム名を入力すると SteamGridDB を検索し、最初に見つかったカバーを自動設定します。スイッチを開いていて未設定のスクエアカバー／横カバー／背景画像／ロゴも一緒に設定されます（「連携設定」で API Key の設定が必要です）。";
+"settings.autoMatchCoverHint" = "ゲーム名入力時に SteamGridDB からカバーや画像を自動取得します（「連携設定」で API Key が必要）。";
 "settings.spotlightBackdrop" = "ランダムゲーム背景";
 "settings.spotlightBackdropAuto" = "自動（横画像優先）";
 "settings.spotlightBackdropPadLandscape" = "ランダムゲーム背景（横画面）";
 "settings.minimalGrid" = "グリッド最小表示";
-"settings.minimalGridHint" = "グリッドはカバーと右上のスコア/状態カプセルのみ表示し、名前・プラットフォーム・日付は隠します。";
+"settings.minimalGridHint" = "グリッド表示でカバーとステータスバッジのみを表示";
 "settings.hideToolbarGlass" = "上部ツールバーの背景を隠す";
-"settings.hideToolbarGlassHint" = "すべてのページ（ライブラリ / 詳細 / 統計）の上部ツールバーにあるすりガラスの背景を隠し、すっきりした表示にします。（macOS 15 以降）";
+"settings.hideToolbarGlassHint" = "ツールバーのすりガラス背景を非表示（macOS 15以降）";
 "settings.collectorMode" = "コレクターモード";
-"settings.collectorModeHint" = "ゲーム詳細に「所持」タブを追加し、現物ゲームのエディションとコレクション写真を記録します。";
+"settings.collectorModeHint" = "ゲーム詳細に「所持品」タブを追加し、パッケージ版のエディションや写真を記録します。";
 "settings.platformIcons" = "プラットフォームロゴ";
-"settings.platformIconsHint" = "プラットフォーム選択画面とグループ表示でブランドロゴを表示します。";
+"settings.platformIconsHint" = "プラットフォーム選択やグループでアイコンを表示";
 "settings.keepOriginalImages" = "元画像を保存";
-"settings.keepOriginalImagesHint" = "コレクション写真を圧縮せず元のまま保存します（今後追加する写真にのみ適用されます）。";
+"settings.keepOriginalImagesHint" = "コレクション写真を圧縮せず原寸画質で保存（今後追加する写真のみ）";
 "detail.details" = "詳細";
 "detail.holdings" = "所持";
 "copy.addVersion" = "エディションを追加";
@@ -178,28 +178,28 @@
 "crop.zoom" = "ズーム";
 "crop.reset" = "リセット";
 "share.brandUser" = "%@のGamelog";
-"about.menu" = "Gamelogについて";
+"about.menu" = "My Gamelog について";
 "about.version" = "バージョン";
-"about.developer" = "Developer";
+"about.developer" = "開発者";
 "backup.export" = "バックアップを書き出す…";
 "backup.import" = "バックアップを読み込む…";
 "backup.exportDone" = "バックアップを書き出しました";
 "backup.exportFailed" = "書き出しに失敗しました";
 "backup.importDone" = "バックアップを読み込みました";
-"backup.importFailed" = "読み込みに失敗しました。有効なバックアップファイルか確認してください";
+"backup.importFailed" = "読み込みに失敗しました：無効または破損したバックアップです";
 "backup.importConfirm" = "読み込むと現在のデータがすべて置き換えられます。続けますか？";
 "backup.share" = "バックアップを共有…";
 "validation.nameRequired" = "少なくとも 1 つの言語のタイトルを入力してください";
 "validation.reviewTitleRequired" = "レビュータイトルは必須です";
-"validation.scoreRequired" = "少なくとも1つの軸を評価してください";
+"validation.scoreRequired" = "少なくとも1つの項目を評価してください";
 "validation.scoresRequired" = "初回記録には4項目のスコアが必要です";
 "validation.playtimeInvalid" = "プレイ時間は0以上の数値（時間）で入力してください";
 "title.newGame" = "新規ゲーム";
 "title.editGame" = "ゲームを編集";
 "title.addCompletion" = "クリア記録を追加";
 "title.editCompletion" = "クリア記録を編集";
-"share.singleNote" = "ゲームを1つ選択：そのゲームのカード画像を生成";
-"share.multiNote" = "複数選択：1枚の概要画像を生成";
+"share.singleNote" = "個別ゲーム：専用カード画像を生成";
+"share.multiNote" = "複数ゲーム：総合概要画像を生成";
 "share.releasedIn" = "%@年発売";
 "share.playtimeHours" = "%@時間";
 "share.clearTimes" = "クリア %d回";
@@ -220,7 +220,7 @@
 "share.field.date" = "最近のクリア";
 "share.field.releaseYear" = "発売年";
 "share.field.status" = "ステータス";
-"share.tapToEnlarge" = "タップで拡大";
+"share.tapToEnlarge" = "拡大表示";
 "app.menu" = "My Gamelog";
 "common.confirm" = "OK";
 "group.rename" = "グループ名を変更";
@@ -269,18 +269,18 @@
 "cover.noLogo" = "このゲームのロゴが見つかりません";
 
 // 所持 / コレクションアーカイブ（beta 2.2）
-"copy.media.physicalStandard" = "物理標準版";
-"copy.media.physicalSpecial" = "物理特別版（初回版、スリーブ、虹色、スチールブックなど）";
-"copy.media.physicalLimited" = "物理限定版（限定版、コレクターズエディションなど）";
+"copy.media.physicalStandard" = "パッケージ通常版";
+"copy.media.physicalSpecial" = "パッケージ特別版（初回版・スチールブック等）";
+"copy.media.physicalLimited" = "パッケージ限定版（コレクターズ版等）";
 "copy.media.digitalStandard" = "デジタル標準版";
 "copy.media.digitalPremium" = "デジタル上級版（デラックス、プレミアムなど）";
-"copy.media.digitalUpgrade" = "デジタルアップグレード（Game Pass、物理版などの追加パック）";
-"copy.media.physicalCode" = "物理版（コード付き）";
+"copy.media.digitalUpgrade" = "デジタルアップグレード（Game Pass・パッケージ版対応）";
+"copy.media.physicalCode" = "パッケージ版（DLコード封入）";
 "copy.media.limitedMachine" = "限定版本体";
 "copy.media.limitedController" = "限定版コントローラー";
 "copy.media.limitedAccessory" = "限定版アクセサリー";
 "copy.media.relatedMerch" = "関連グッズ";
-"copy.regional.jp" = "日本（CERO）";
+"copy.regional.jp" = "日本版（CERO）";
 "copy.regional.us" = "北米（ESRB）";
 "copy.regional.euPegi" = "欧州（PEGI）";
 "copy.regional.euUsk" = "欧州（USK）";
@@ -297,11 +297,11 @@
 "copy.condition.usedMissingParts" = "中古（付属品欠品）";
 "copy.condition.usedSoftwareOnly" = "中古（ソフトのみ）";
 "copy.condition.usedDamaged" = "中古（破損）";
-"copy.acquisition.officialChannelOverseas" = "海外公式チャンネル";
-"copy.acquisition.dealerChannelOverseas" = "海外販売店";
+"copy.acquisition.officialChannelOverseas" = "公式通販（海外）";
+"copy.acquisition.dealerChannelOverseas" = "正規販売店（海外）";
 "copy.acquisition.overseasDirectShipping" = "海外直送";
 "copy.acquisition.proxy" = "代理購入";
-"copy.acquisition.thirdPartyStore" = "サードパーティ店";
+"copy.acquisition.thirdPartyStore" = "一般販売店";
 "copy.acquisition.secondHandStoreOverseas" = "海外中古店";
 "copy.acquisition.personalSecondHandOverseas" = "個人中古（海外）";
 "copy.acquisition.personalSecondHand" = "個人中古";
@@ -332,7 +332,7 @@
 "stats.collectorValue" = "コレクション価値";
 "game.holdingArchive" = "所持アーカイブ";
 "game.createHolding" = "これを所持（アーカイブ作成）";
-"game.holdingArchiveHint" = "新規ゲームと一緒に物理的な所持（エディション、メディア、入手元、価格…）を記録します。";
+"game.holdingArchiveHint" = "同時にパッケージ所持記録（エディション、メディア、価格等）を追加します。";
 
 "date.year" = "年";
 "date.day" = "日";
@@ -355,7 +355,7 @@
 "library.filter" = "絞り込み";
 
 "game.status" = "ステータス";
-"game.statusHint" = "プレイ予定・プレイ中などの軽量な状態では、クリア記録やスコアは不要です。「クリア済み」にしたときに記録します。";
+"game.statusHint" = "「クリア済み」に設定すると、クリア記録とスコアを登録できます。";
 "status.backlog" = "プレイ予定";
 "status.playing" = "プレイ中";
 "status.paused" = "中断";
@@ -367,26 +367,26 @@
 
 // 自動バックアップ + キャッシュ
 "links.autoBackup" = "自動バックアップ";
-"links.autoBackupHint" = "データを変更するたびに完全なバックアップを自動でローカルに保存します。いつでも復元できます。";
+"links.autoBackupHint" = "データ変更時にローカルへ自動でバックアップを作成します。いつでも復元できます。";
 "backup.lastBackup" = "前回のバックアップ：%@";
 "backup.backupNow" = "今すぐバックアップ";
 "backup.autobackupRestore" = "自動バックアップから復元…";
 "backup.autobackupRestoreConfirm" = "自動バックアップで現在のデータをすべて置き換えます。続けますか？";
 "backup.restoreDone" = "自動バックアップから復元しました";
-"backup.restoreFailed" = "復元に失敗しました。自動バックアップファイルが破損している可能性があります";
+"backup.restoreFailed" = "復元に失敗しました：自動バックアップファイルが破損しています";
 "backup.snapshotSaved" = "復元前のスナップショットを保存しました";
 "backup.emptyRestoreTitle" = "空のライブラリが見つかりました";
-"backup.emptyRestoreMessage" = "ライブラリは空ですが、ローカルの自動バックアップには %lld 本のゲームがあります。自動バックアップから復元しますか？（キャンセルすると空のままになります）";
+"backup.emptyRestoreMessage" = "現在のライブラリは空ですが、自動バックアップに %lld 件のゲームがあります。復元しますか？";
 "backup.restoreNow" = "バックアップから復元";
 "backup.keepEmpty" = "空のままにする";
 "backup.nowDone" = "バックアップを保存しました";
-"backup.nowFailed" = "バックアップに失敗しました。ディスク容量を確認してください";
+"backup.nowFailed" = "バックアップに失敗しました：ディスク空き容量を確認してください";
 "backup.importing" = "バックアップを読み込み中…";
 "backup.noBackupYet" = "まだバックアップはありません";
 "settings.storage" = "ストレージとキャッシュ";
 "settings.cacheSize" = "キャッシュ容量：%@";
 "settings.cacheClear" = "キャッシュを削除";
-"settings.cacheClearConfirm" = "キャッシュを削除しますか？キャッシュは自動で再生成できる一時データ（カバー検索のダウンロード、画像デコードキャッシュ、一時ファイル）です。ゲームデータとバックアップには影響しません。";
+"settings.cacheClearConfirm" = "キャッシュを消去しますか？一時データのみが削除され、ゲームデータやバックアップには影響しません。";
 "settings.cacheCleared" = "キャッシュを削除しました（%@ を解放）";
 "settings.cacheClearFailed" = "削除に失敗しました";
 
@@ -395,23 +395,23 @@
 "home.statsTitle" = "ライブラリ概要";
 "home.holdingsTitle" = "コレクション概要";
 "home.spotlightNoReview" = "レビュータイトルはまだありません";
-"home.favoritesHint" = "お気に入りはまだありません — カードを右クリックまたは長押しして「お気に入り」を選択してください";
-"home.holdingsHint" = "所持記録を追加すると、ここにコレクション概要が表示されます";
+"home.favoritesHint" = "お気に入りはまだありません — ゲームカードを右クリックまたは長押しして追加";
+"home.holdingsHint" = "所持品を追加すると、ここにコレクション概要が表示されます";
 "settings.bannerTitle" = "ホームバナータイトル";
 "settings.bannerSubtitle" = "ホームバナーサブタイトル";
 "settings.bannerBackground" = "ホームバナー背景";
 "settings.removeBanner" = "背景を削除";
 "settings.bannerHint" = "「すべてのゲーム」ページ上部のカルーセル 1 ページ目に表示されます";
 "crop.titleBanner" = "バナー背景を切り抜き";
-"crop.titleBannerHint" = "使いたい部分をウィンドウ内に収めてください";
+"crop.titleBannerHint" = "ドラッグしてバナーの表示位置を調整";
 
 /* ===== ゲームアカウント（実験的機能） ===== */
 
 "links.accounts" = "ゲームアカウント";
-"links.accountsHint" = "Nintendo / PlayStation の公式サービスから、Xbox はサードパーティのゲートウェイ（OpenXBL、アカウント追加時の Xbox セクションを参照）経由でプレイ記録を読み取ります。認証情報は端末のキーチェーンにのみ保存され、送信もバックアップもされません。";
+"links.accountsHint" = "Nintendo、PlayStation、Xbox（OpenXBL）からプレイ記録を同期します。認証情報は端末のキーチェーンにのみ安全に保存されます。";
 "account.experimental" = "実験的";
 "account.empty" = "まだアカウントを連携していません。";
-"account.experimentalHint" = "実験的機能：公式クライアントが利用する非公開のエンドポイントを使用しているため、仕様変更で使えなくなる可能性があります。Nintendo と PlayStation の通信は端末から公式サービスへ直接行われますが、Xbox の通信はサードパーティのゲートウェイ OpenXBL を経由します（本アプリが関与できる相手ではありません）。本アプリ独自のサーバーは存在しません。";
+"account.experimentalHint" = "実験的機能：非公開または外部 API を利用しているため、仕様変更により同期できなくなる場合があります。外部サーバーは介しません。";
 "account.add" = "アカウントを追加";
 "account.syncAll" = "すべて同期";
 "account.syncing" = "同期中…";
@@ -441,8 +441,8 @@
 /* ルールにより「ライブラリに入れない」と判定された理由（短句：行内ラベルと詳細シートで共用）。 */
 "account.skip.xboxPC" = "PC のみ・プレイ時間なし";
 
-"account.linkError.invalidInput" = "有効な認証情報ではないようです。もう一度コピーしてください。";
-"account.linkError.staleCallback" = "このリンクは今回のログインのものではありません（前回のものと思われます）。もう一度ログインしてください。";
+"account.linkError.invalidInput" = "有効な認証情報ではありません。再度コピーしてください。";
+"account.linkError.staleCallback" = "ログイン連携の期限が切れました。再度ログインしてください。";
 
 /* ---- アカウント追加 ---- */
 
@@ -455,19 +455,19 @@
 "account.add.nintendoPasteLabel" = "手動貼り付け（予備手段）";
 "account.add.nintendoPastePlaceholder" = "ログイン後に遷移した URL を貼り付け";
 "account.add.nintendoPasteConfirm" = "この URL で連携する";
-"account.add.nintendoPasteHint" = "ログイン後に「リンクを開けません」と表示されたら、アドレスバーの URL をここに貼り付けてください。自動で戻るのと同じ結果になります。この予備手段が必要な理由：システムのログインセッションはコールバックスキームに依存するため、システムが遷移を本アプリに渡せない場合、貼り付けが唯一の経路になります。";
+"account.add.nintendoPasteHint" = "ログイン後に自動で戻らない場合は、ブラウザのアドレスバーのURLをコピーしてここに貼り付けてください。";
 "account.add.npssoPlaceholder" = "64 文字";
 "account.add.npssoConfirm" = "このアカウントを連携";
-"account.add.npssoHint" = "取得方法：まず上の「PlayStation のログインページを開く」でログインし、次に「NPSSO 取得ページを開く」を押して、ページ内の npsso の値をここに貼り付けてください。Sony のログインコールバックは同社の PS App にしか送られないため、この貼り付けが必要です。本アプリは Sony のパスワードを取得できませんし、要求しません。";
+"account.add.npssoHint" = "PlayStation にログイン後、NPSSO 取得ページを開いてコードを貼り付けてください。パスワードを取得することはありません。";
 "account.add.psnSignIn" = "PlayStation のログインページを開く";
 "account.add.psnNpssoPage" = "NPSSO 取得ページを開く";
-"account.add.psnBrowserHint" = "2 つのボタンは同じブラウザで開いてください。先にログインし、その後 NPSSO を取得します。NPSSO はブラウザのセッションから作られるため、別のブラウザやアプリ内ページでは未ログインのままになります。";
+"account.add.psnBrowserHint" = "セッション維持のため、同一ブラウザでログインと NPSSO 取得を行ってください。";
 "account.add.xboxDashboard" = "OpenXBL ダッシュボードを開く";
-"account.add.xboxBrowserHint" = "取得方法：OpenXBL のダッシュボードで Personal API Key を作成し、下に貼り付けてください。その前に一つだけ：個人の Microsoft アカウントでは Xbox のプレイデータを直接取得できないため、このアカウントだけはサードパーティの OpenXBL を経由して読み取ります。API キーとリクエストの内容はそのサーバーを通過します。アプリに表示されるのは Microsoft 自身のデータ（Gamertag、Gamerscore、実績）です。";
+"account.add.xboxBrowserHint" = "OpenXBL ダッシュボードで Personal API Key を作成して入力してください。※Xbox データはサードパーティ経由で取得されます。";
 "account.add.xboxKeyHeader" = "OpenXBL API キー";
 "account.add.xboxKeyPlaceholder" = "OpenXBL Personal API Key";
 "account.add.xboxKeyConfirm" = "このアカウントを連携";
-"account.add.xboxKeyHint" = "キーは端末のキーチェーンにのみ保存され、それ以外のどこにも残りません。本アプリが送信することも、バックアップに含めることもありません。OpenXBL のダッシュボードからいつでも無効化できます。";
+"account.add.xboxKeyHint" = "キーは端末のキーチェーンにのみ安全に保存され、バックアップにも含まれません。OpenXBL でいつでも無効化できます。";
 "account.detail.trophyUnavailable" = "今回のトロフィーデータは全部取得できませんでした（トロフィーと PS3 / PS Vita のゲームは同じエンドポイントから取得しています）。プレイ記録は正常に更新されています。しばらくしてからもう一度同期してください。";
 "account.detail.playtimeUnavailable" = "今回、プレイ時間を取得できませんでした（別のエンドポイントから取得しています）。プレイ記録は正常に更新されています。しばらくしてからもう一度同期してください。";
 
@@ -486,7 +486,7 @@
 "account.detail.filter.all" = "すべて %1$d";
 "account.detail.noRecords" = "まだ記録がありません。上の「今すぐ同期」を押してください。";
 "account.detail.records" = "プレイ記録";
-"account.detail.recordsHint" = "任意の行をタップすると、ライブラリの項目に関連付けたり、統合したり、取り込みを止めたりできます。記録が多いときは上の検索欄が使えます。";
+"account.detail.recordsHint" = "記録を選択してゲームへの関連付け、統合、または除外を設定できます。";
 "account.detail.search" = "プレイ記録を検索";
 "account.detail.noSearchMatch" = "一致する記録がありません。";
 "account.detail.pruned" = "ライブラリ全体の残留 %1$d 件も整理しました";
@@ -511,8 +511,8 @@
 "account.titleLocale.header" = "タイトルとアートワークの言語";
 "account.titleLocale.hint" = "提供元は要求した言語でタイトルとアートワークを返そうとします。「アプリの言語に合わせる」は設定の表示言語に追従します。";
 "account.titleLocale.refresh" = "再同期してタイトルとアートワークを更新";
-"account.titleLocale.fallback" = "Nintendo は「%1$@」を受け付けませんでした。今回の同期は「%2$@」にフォールバックしました。";
-"account.titleLocale.coverage" = "ソース側の %2$d 件のタイトルのうち %1$d 件が %3$@ です。残りはソースにその言語の名称が無いものです（原文のまま。編集画面で手動入力できます）。";
+"account.titleLocale.fallback" = "サービスが「%1$@」に対応していないため、「%2$@」にフォールバックしました。";
+"account.titleLocale.coverage" = "ソース側の %2$d 件中 %1$d 件のタイトルが %3$@ です。他言語版がないタイトルは原文のまま保持されます（編集画面で補完可能）。";
 "account.titleLocale.followApp" = "アプリの言語に合わせる";
 "account.titleLocale.zhHant" = "繁體中文";
 "account.titleLocale.zhHans" = "简体中文";
@@ -523,9 +523,9 @@
 
 "account.purge.action" = "取り込んだデータをすべて削除…";
 "account.purge.confirmTitle" = "取り込みデータを削除";
-"account.purge.confirm" = "このアカウントから同期したすべてのプレイ記録と、この取り込みが作成し、あなたがまだ手を加えていないライブラリ項目を削除します。自分で書いたデータ（クリア記録・所持・グループ・レビュー・お気に入り・追加の画像）がある項目は残します。連携は維持されるので、このあと再同期するときれいな状態から始められます。";
+"account.purge.confirm" = "このアカウントの全同期記録と、未編集の自動作成項目を削除します。クリア記録・レビュー・所持品があるゲームは保持されます。";
 "account.purge.done" = "記録を %1$d 件削除 · 取り込み項目を %2$d 件削除 · 自分のデータがある項目 %3$d 件は保持しました。";
-"account.syncBusy" = "このアカウントはすでに同期中です。完了までお待ちください。";
+"account.syncBusy" = "同期処理中です。完了までお待ちください。";
 
 /* ---- 記録の関連付け ---- */
 
@@ -538,29 +538,29 @@
 "account.link.skipReason" = "スキップ理由";
 "account.link.current" = "現在の関連付け";
 "account.link.unbind" = "関連付けを解除";
-"account.link.unbindHint" = "解除は関連を外すだけで、やり直せます。次回の同期で再び一致すれば、自動的に関連付けられます。";
+"account.link.unbindHint" = "現在の関連付けのみを解除します。次回の同期で再び一致した場合は自動で再連携されます。";
 "account.link.merge" = "別のゲームと統合…";
 "account.link.suggestions" = "候補";
-"account.link.suggestionsHint" = "タイトル名のあいまい一致による候補です。参考程度にお使いください。";
+"account.link.suggestionsHint" = "タイトル名の一致に基づく候補一覧です。";
 "account.link.search" = "ゲームを検索";
 "account.link.noMatch" = "一致するゲームがありません。";
 "account.link.allGames" = "すべてのゲーム";
 "account.link.autoImport" = "自動での取り込み";
 "account.link.ignore" = "この記録を取り込まない";
 "account.link.unignore" = "この記録を取り込む";
-"account.link.ignoreHint" = "この記録だけに適用されます。以後の同期ではスキップされ、自動作成も確認も行われません。すでに関連付けたゲームが外れることはありませんが、解除したあとは、この設定を戻すまで取り込まれません。";
-"account.link.ruleSkippedHint" = "この記録は手動ではなくルールによってスキップされたものです（理由は上記）。そのためここに切り替えはありません。いずれかのゲームに紐づけるとライブラリに戻ります。";
+"account.link.ignoreHint" = "今後の同期でこの記録をスキップし、自動作成を行いません。すでに関連付けられたゲームには影響しません。";
+"account.link.ruleSkippedHint" = "この記録はルールにより除外されています（理由は上記）。既存のゲームに関連付けるとライブラリに復帰します。";
 
 /* ---- 統合 ---- */
 
 "account.merge.title" = "ゲームを統合";
-"account.merge.source" = "統合して消える項目";
-"account.merge.target" = "残す項目";
+"account.merge.source" = "統合元（削除される項目）";
+"account.merge.target" = "統合先（保持される項目）";
 "account.merge.search" = "残す項目を検索";
 "account.merge.choose" = "どちらを残すか選択";
-"account.merge.explain" = "残す項目が優先されます。既に入っている項目は上書きされず、空欄だけがもう一方で埋められます。クリア記録・所持・グループ・提供元の記録はすべて統合されます。";
+"account.merge.explain" = "統合先が優先されます。既存の項目は保持され、未入力項目のみ統合元から補完されます。記録・所持品・グループはすべて引き継がれます。";
 "account.merge.confirm" = "統合";
-"account.merge.confirmHint" = "統合すると「統合して消える項目」は削除されます。元に戻せません。";
+"account.merge.confirmHint" = "統合後、統合元の項目は削除されます。この操作は取り消せません。";
 "account.merge.counts" = "クリア %1$d · 提供元 %2$d";
 
 /* ---- 詳細ページの「ゲーム記録」開閉区画（外部ソースカードの入れ物） ---- */

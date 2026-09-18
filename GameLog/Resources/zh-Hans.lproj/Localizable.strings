@@ -19,7 +19,7 @@
 "library.viewMode" = "视图";
 "library.addGame" = "新建游戏";
 "library.share" = "分享";
-"library.noGames" = "还没有游戏，点击右上角「新建游戏」开始记录";
+"library.noGames" = "游戏库为空，添加新游戏开始记录";
 "library.noResult" = "没有匹配的游戏";
 "group.newGroup" = "新建分组";
 "group.name" = "分组名称";
@@ -28,7 +28,7 @@
 "game.nameEn" = "英文名";
 "game.nameZh" = "中文名";
 "game.nameJa" = "日文名";
-"game.nameHint" = "至少填写一种语言的名称；从账号同步来的游戏常常只有中文名或日文名，英文名留空是正常的。";
+"game.nameHint" = "至少输入一种语言的名称。";
 "game.aliases" = "别名（用于搜索）";
 "game.aliasPlaceholder" = "输入别名";
 "game.aliasAdd" = "添加";
@@ -47,7 +47,7 @@
 "review.edit" = "编辑评价";
 "review.save" = "保存";
 "review.source" = "Markdown 源码";
-"review.bodyHint" = "支持 Markdown：标题用 #，加粗用 **文字**，斜体用 *文字*，列表用 - 项";
+"review.bodyHint" = "支持 Markdown 格式（# 标题、**加粗**、*斜体*、- 列表）";
 "review.main" = "正文";
 "review.title" = "大标题";
 "review.subtitle" = "副标题";
@@ -61,17 +61,17 @@
 "completion.date" = "通关日期";
 "completion.platform" = "平台";
 "completion.degree" = "通关程度";
-"completion.playtime" = "游戏时长（小时）";
+"completion.playtime" = "时长（小时）";
 "completion.noDate" = "无通关日期";
 "completion.noPlaytime" = "无时长";
-"completion.notes" = "通关备注";
-"completion.notesPlaceholder" = "这次的游玩感受、趣事…";
+"completion.notes" = "通关内容";
+"completion.notesPlaceholder" = "记录本次通关的感想与体验…";
 "completion.add" = "追加通关记录";
 "completion.edit" = "编辑";
 "completion.delete" = "删除";
-"completion.deleteConfirm" = "确定删除这条通关记录吗？此操作无法撤销。";
+"completion.deleteConfirm" = "确定删除此通关记录吗？此操作无法撤销。";
 "completion.skipScores" = "本次跳过评分";
-"completion.scores" = "六维评分";
+"completion.scores" = "维度评分";
 "dimension.gameplay" = "玩法";
 "dimension.design" = "设计";
 "dimension.story" = "剧情";
@@ -123,7 +123,7 @@
 "stats.scoreBoards" = "分数榜";
 "stats.valueBoards" = "价值榜";
 "stats.byGameValue" = "按游戏价值";
-"stats.byPlatformValue" = "按机器价值";
+"stats.byPlatformValue" = "按平台价值";
 "stats.byGroupValue" = "按分组价值";
 "settings.language" = "界面语言";
 // 关联设置（外部服务：SteamGridDB / 游戏账号 / 数据备份）
@@ -131,7 +131,7 @@
 "links.menu" = "关联设置…";
 "links.steamgriddb" = "SteamGridDB";
 "links.steamGridDBKey" = "API Key";
-"links.steamGridDBHint" = "在 steamgriddb.com 免费注册后，从个人页面获取";
+"links.steamGridDBHint" = "在 steamgriddb.com 个人偏好设置中获取 API Key";
 "links.showKey" = "显示";
 "links.hideKey" = "隐藏";
 "links.copyKey" = "复制";
@@ -146,20 +146,20 @@
 "settings.removeAvatar" = "移除头像";
 "settings.restoreIcon" = "恢复默认图标";
 "settings.autoMatchCover" = "自动匹配封面";
-"settings.autoMatchCoverHint" = "输入游戏名后，自动搜索 SteamGridDB 并填入第一张封面；已展开开关且未设置的方形封面/横向封面/背景图/Logo 也会一并匹配（需在「关联设置」里配置 API Key）。";
+"settings.autoMatchCoverHint" = "输入游戏名称后自动从 SteamGridDB 匹配封面与图像素材（需在「关联设置」中配置 API Key）。";
 "settings.spotlightBackdrop" = "随机游戏底图";
 "settings.spotlightBackdropAuto" = "自动（横图优先）";
 "settings.spotlightBackdropPadLandscape" = "随机游戏底图（横屏）";
 "settings.minimalGrid" = "网格极简模式";
-"settings.minimalGridHint" = "网格视图只显示封面与右上角评分/状态胶囊，隐藏名称、平台、日期等信息。";
+"settings.minimalGridHint" = "网格视图仅展示封面与角标信息，隐藏标题与日期";
 "settings.hideToolbarGlass" = "隐藏上方毛玻璃";
-"settings.hideToolbarGlassHint" = "隐藏所有页面（库/详情/统计）顶部工具栏的毛玻璃背景，界面更简洁。（macOS 15 及以上可启用）";
+"settings.hideToolbarGlassHint" = "隐藏顶部工具栏毛玻璃背景（仅支持 macOS 15+）";
 "settings.collectorMode" = "收藏家模式";
 "settings.collectorModeHint" = "在游戏详情页启用「持有」页签，记录实体游戏的版本与收藏照片。";
 "settings.platformIcons" = "平台图标";
-"settings.platformIconsHint" = "在各平台选择与分组中显示品牌标志图标。";
+"settings.platformIconsHint" = "在平台选择与分组中显示品牌图标";
 "settings.keepOriginalImages" = "保存原图";
-"settings.keepOriginalImagesHint" = "收藏照片按原样保存、不压缩（默认压缩以节省空间；只影响之后新增的图）。";
+"settings.keepOriginalImagesHint" = "以原始画质保存收藏照片，不进行压缩（仅对新增照片生效）";
 "detail.details" = "详情";
 "detail.holdings" = "持有";
 "copy.addVersion" = "新增版本";
@@ -186,7 +186,7 @@
 "backup.exportDone" = "备份已导出";
 "backup.exportFailed" = "导出失败";
 "backup.importDone" = "备份已导入";
-"backup.importFailed" = "导入失败，请检查文件是否为有效备份";
+"backup.importFailed" = "导入失败：备份文件无效或已损坏";
 "backup.importConfirm" = "导入将替换当前全部数据，确定继续吗？";
 "backup.share" = "分享备份…";
 "validation.nameRequired" = "请至少填写一种语言的名称";
@@ -198,8 +198,8 @@
 "title.editGame" = "编辑游戏";
 "title.addCompletion" = "追加通关记录";
 "title.editCompletion" = "编辑通关记录";
-"share.singleNote" = "分享一个游戏：生成该游戏的一张卡片";
-"share.multiNote" = "分享多个游戏：生成一张总览图";
+"share.singleNote" = "单款游戏：生成专属分享卡片";
+"share.multiNote" = "多款游戏：生成综合总览图";
 "share.releasedIn" = "%@ 年发售";
 "share.playtimeHours" = "%@ 小时";
 "share.clearTimes" = "通关 %d 次";
@@ -270,17 +270,17 @@
 
 // 持有 / 藏品档案（beta 2.2）
 "copy.media.physicalStandard" = "实体标准版";
-"copy.media.physicalSpecial" = "实体特别版（首发、封套、幻彩、铁盒等）";
-"copy.media.physicalLimited" = "实体限定版（限定版、收藏版等）";
+"copy.media.physicalSpecial" = "实体特别版（首发、封套、铁盒等）";
+"copy.media.physicalLimited" = "实体限定版（限定版、典藏版等）";
 "copy.media.digitalStandard" = "数字标准版";
 "copy.media.digitalPremium" = "数字高级版（豪华版、高级版等）";
-"copy.media.digitalUpgrade" = "数字升级包（用于 Game Pass、实体版等的附加包）";
+"copy.media.digitalUpgrade" = "数字升级包（适用 Game Pass、实体版等）";
 "copy.media.physicalCode" = "实体版（内附兑换码）";
-"copy.media.limitedMachine" = "限定版机器";
+"copy.media.limitedMachine" = "限定版主机";
 "copy.media.limitedController" = "限定版控制器";
 "copy.media.limitedAccessory" = "限定版配件";
 "copy.media.relatedMerch" = "相关周边";
-"copy.regional.jp" = "日本（CERO）";
+"copy.regional.jp" = "日版（CERO）";
 "copy.regional.us" = "北美（ESRB）";
 "copy.regional.euPegi" = "欧版（PEGI）";
 "copy.regional.euUsk" = "欧版（USK）";
@@ -297,11 +297,11 @@
 "copy.condition.usedMissingParts" = "二手（附件缺失）";
 "copy.condition.usedSoftwareOnly" = "二手（仅软件）";
 "copy.condition.usedDamaged" = "二手（损坏）";
-"copy.acquisition.officialChannelOverseas" = "官方渠道海淘";
-"copy.acquisition.dealerChannelOverseas" = "经销商渠道海淘";
+"copy.acquisition.officialChannelOverseas" = "官方直购/海淘";
+"copy.acquisition.dealerChannelOverseas" = "零售商海淘";
 "copy.acquisition.overseasDirectShipping" = "境外直邮";
 "copy.acquisition.proxy" = "代购";
-"copy.acquisition.thirdPartyStore" = "第三方店铺购入";
+"copy.acquisition.thirdPartyStore" = "第三方店铺";
 "copy.acquisition.secondHandStoreOverseas" = "二手店海淘";
 "copy.acquisition.personalSecondHandOverseas" = "个人二手海淘";
 "copy.acquisition.personalSecondHand" = "个人二手";
@@ -332,7 +332,7 @@
 "stats.collectorValue" = "收藏价值";
 "game.holdingArchive" = "持有档案";
 "game.createHolding" = "我拥有这份（建持有档案）";
-"game.holdingArchiveHint" = "随新建游戏一起记录一份实体持有（版本、介质、来源、价格等）。";
+"game.holdingArchiveHint" = "同时添加实体收藏记录（版本、介质、价格等）。";
 
 "date.year" = "年";
 "date.day" = "日";
@@ -355,7 +355,7 @@
 "library.filter" = "筛选";
 
 "game.status" = "状态";
-"game.statusHint" = "想玩/在玩/搁置/弃坑无需通关记录与评分，流转到「已通关」时再补。";
+"game.statusHint" = "标记为「已通关」时可添加通关记录与评分。";
 "status.backlog" = "想玩";
 "status.playing" = "在玩";
 "status.paused" = "搁置";
@@ -367,26 +367,26 @@
 
 // 自动备份 + 缓存
 "links.autoBackup" = "自动备份";
-"links.autoBackupHint" = "每次数据改动后自动在本地保存完整备份，可随时恢复。";
+"links.autoBackupHint" = "数据变动时自动在本地创建完整备份，可随时恢复。";
 "backup.lastBackup" = "上次备份：%@";
 "backup.backupNow" = "立即备份";
 "backup.autobackupRestore" = "从自动备份恢复…";
 "backup.autobackupRestoreConfirm" = "将用自动备份替换当前全部数据，确定继续吗？";
 "backup.restoreDone" = "已从自动备份恢复";
-"backup.restoreFailed" = "恢复失败，自动备份文件可能已损坏";
+"backup.restoreFailed" = "恢复失败：自动备份文件已损坏";
 "backup.snapshotSaved" = "恢复前快照已保留";
 "backup.emptyRestoreTitle" = "检测到库为空";
-"backup.emptyRestoreMessage" = "当前库为空，但本地自动备份包含 %lld 款游戏。是否从自动备份恢复？（取消将保留空库）";
+"backup.emptyRestoreMessage" = "当前库为空，本地自动备份包含 %lld 款游戏。是否从自动备份恢复？";
 "backup.restoreNow" = "从备份恢复";
 "backup.keepEmpty" = "保留空库";
 "backup.nowDone" = "已保存备份";
-"backup.nowFailed" = "备份失败，请检查磁盘空间";
+"backup.nowFailed" = "备份失败：请检查可用磁盘空间";
 "backup.importing" = "正在导入备份…";
 "backup.noBackupYet" = "尚未备份";
 "settings.storage" = "存储与缓存";
 "settings.cacheSize" = "当前缓存占用：%@";
 "settings.cacheClear" = "清除缓存";
-"settings.cacheClearConfirm" = "清除缓存？缓存仅为可自动重建的临时数据（封面搜索下载、图片解码缓存、临时文件），不会影响游戏数据与备份。";
+"settings.cacheClearConfirm" = "确定清除缓存？临时缓存数据将被清除，不会影响游戏数据与备份。";
 "settings.cacheCleared" = "已清除缓存（释放 %@）";
 "settings.cacheClearFailed" = "清除失败";
 
@@ -395,23 +395,23 @@
 "home.statsTitle" = "库内速览";
 "home.holdingsTitle" = "收藏家速览";
 "home.spotlightNoReview" = "还没有写评价标题";
-"home.favoritesHint" = "还没有「我的最爱」——右键或长按卡片，选「我的最爱」加入";
-"home.holdingsHint" = "添加一些持有记录后，这里会显示收藏统计";
+"home.favoritesHint" = "暂无最爱游戏：右键或长按游戏卡片加入";
+"home.holdingsHint" = "添加实体收藏后将在此展示统计";
 "settings.bannerTitle" = "主页标题";
 "settings.bannerSubtitle" = "主页副标题";
 "settings.bannerBackground" = "主页背景图";
 "settings.removeBanner" = "移除背景图";
 "settings.bannerHint" = "显示在「全部游戏」页顶端的轮播第 1 页";
 "crop.titleBanner" = "裁切横幅背景";
-"crop.titleBannerHint" = "把想要的背景部分放进窗口";
+"crop.titleBannerHint" = "拖动以调整背景展示区域";
 
 /* ===== 游戏账号（实验性功能） ===== */
 
 "links.accounts" = "游戏账号";
-"links.accountsHint" = "从 Nintendo / PlayStation 官方服务读取你的游玩记录，Xbox 则经由第三方网关（OpenXBL，详见添加账号时的 Xbox 分区）。凭证只保存在本机钥匙串，不上传、不进备份。";
+"links.accountsHint" = "支持同步 Nintendo、PlayStation 及 Xbox（OpenXBL）游玩记录。凭证仅保存在本机钥匙串中，安全不上传。";
 "account.experimental" = "实验性";
 "account.empty" = "还没有绑定任何账号。";
-"account.experimentalHint" = "实验性功能：用的是官方客户端调用、但未公开的接口，任一方调整后可能失效。Nintendo 与 PlayStation 的请求由本机直接发往官方服务；Xbox 的请求会经过 OpenXBL 这台第三方网关（本应用控制不了它）。本应用没有自己的服务器。";
+"account.experimentalHint" = "实验性功能：依赖非公开或第三方接口，接口变动可能导致同步失效。数据纯本地直连，无自有服务器。";
 "account.add" = "添加账号";
 "account.syncAll" = "同步全部";
 "account.syncing" = "正在同步…";
@@ -442,8 +442,8 @@
    目前只有一条规则 —— Xbox「设备里没有主机 + 游玩时长 0」，见 HANDOVER §69。 */
 "account.skip.xboxPC" = "仅 PC 平台且无时长";
 
-"account.linkError.invalidInput" = "这段内容看起来不是有效的登录凭证，请重新复制一次。";
-"account.linkError.staleCallback" = "这个链接不属于本次登录（多半是上一次的），请重新登录一次。";
+"account.linkError.invalidInput" = "登录凭证无效，请重新复制。";
+"account.linkError.staleCallback" = "登录回调已失效，请重新登录。";
 
 /* ---- 添加账号 ---- */
 
@@ -456,19 +456,19 @@
 "account.add.nintendoPasteLabel" = "手工粘贴兜底";
 "account.add.nintendoPastePlaceholder" = "粘贴登录后跳转到的完整链接";
 "account.add.nintendoPasteConfirm" = "用这段链接完成绑定";
-"account.add.nintendoPasteHint" = "如果登录完成后页面停在「无法打开链接」，把地址栏里的完整链接复制到这里即可，效果与自动跳回完全相同。之所以需要这条兜底：系统登录会话依赖回调 scheme，若系统未能把跳转交回本应用，粘贴是唯一不依赖它的通路。";
+"account.add.nintendoPasteHint" = "若登录后未自动返回应用，请复制浏览器地址栏的完整链接粘贴至此处。";
 "account.add.npssoPlaceholder" = "64 位字符";
 "account.add.npssoConfirm" = "绑定这个账号";
-"account.add.npssoHint" = "获取方式：先点上面的「打开 PlayStation 登录页」登录，再点「打开 NPSSO 获取页」，把页面里的 npsso 值复制到这里。Sony 的登录回调只发给自家的 PS App，本应用收不到，所以只能手工粘贴这一步。本应用不会、也无法拿到你的 Sony 密码。";
+"account.add.npssoHint" = "登录 PlayStation 账号后，打开 NPSSO 页面复制 npsso 令牌粘贴至此处。应用不会获取您的密码。";
 "account.add.psnSignIn" = "打开 PlayStation 登录页";
 "account.add.psnNpssoPage" = "打开 NPSSO 获取页";
-"account.add.psnBrowserHint" = "两个按钮请用同一个浏览器打开：先登录，再取 NPSSO。NPSSO 是浏览器会话的产物，换个浏览器或改用应用内页面都会是未登录状态。";
+"account.add.psnBrowserHint" = "请在同一浏览器中依次完成登录与获取 NPSSO，以保持登录状态。";
 "account.add.xboxDashboard" = "打开 OpenXBL 面板";
-"account.add.xboxBrowserHint" = "获取方式：在 OpenXBL 面板上建一把 Personal API Key，复制到下面。动手前请先看这一句：个人微软账号拿不到 Xbox 的游玩数据，所以这一家只能经由 OpenXBL 这台第三方服务读取 —— 你的 API key 与请求内容会经过那台服务器。你在应用里看到的仍然是微软自己的数据（Gamertag、Gamerscore、成就）。";
+"account.add.xboxBrowserHint" = "在 OpenXBL 控制台创建 Personal API Key 并填入下方。注意：Xbox 数据通过第三方网关（OpenXBL）中转获取。";
 "account.add.xboxKeyHeader" = "OpenXBL API Key";
 "account.add.xboxKeyPlaceholder" = "OpenXBL Personal API Key";
 "account.add.xboxKeyConfirm" = "绑定这个账号";
-"account.add.xboxKeyHint" = "这把 key 只存进本机钥匙串，别处都没有：本应用不上传它，也不会把它写进备份。你随时可以在 OpenXBL 面板上吊销它。";
+"account.add.xboxKeyHint" = "Key 仅保存在本机钥匙串中，不上传、不进备份，可随时在 OpenXBL 吊销。";
 "account.detail.trophyUnavailable" = "本次的奖杯数据没取全（奖杯与 PS3 / PS Vita 游戏来自同一个接口）。游玩记录已正常更新，可以稍后再同步一次。";
 "account.detail.playtimeUnavailable" = "本次的游玩时长没取到（它来自另一个接口）。游玩记录已正常更新，可以稍后再同步一次。";
 
@@ -487,7 +487,7 @@
 "account.detail.filter.all" = "全部 %1$d";
 "account.detail.noRecords" = "这里还没有记录。先点上面的「立即同步」。";
 "account.detail.records" = "游玩记录";
-"account.detail.recordsHint" = "点任意一条可以把它关联到游戏库里的条目、合并到另一个游戏，或者设为不再导入；记录多时用上面的搜索框。";
+"account.detail.recordsHint" = "选择任意记录可关联至游戏、合并条目或设为忽略。";
 "account.detail.search" = "搜索游玩记录";
 "account.detail.noSearchMatch" = "没有匹配的记录。";
 "account.detail.pruned" = "顺带清理全库残留 %1$d 个条目";
@@ -512,8 +512,8 @@
 "account.titleLocale.header" = "标题与封面语言";
 "account.titleLocale.hint" = "来源平台会尽量按你要求的语言返回标题与封面。「跟随 App 语言」跟着设置里的界面语言走。";
 "account.titleLocale.refresh" = "重新同步并刷新标题与封面";
-"account.titleLocale.fallback" = "任天堂不接受「%1$@」，本次已回退到「%2$@」。";
-"account.titleLocale.coverage" = "来源侧 %2$d 条标题里 %1$d 条是 %3$@。其余是来源本身没有该语言的名称（保留原文，可在编辑页手动补）。";
+"account.titleLocale.fallback" = "服务不支持「%1$@」，已回退至「%2$@」。";
+"account.titleLocale.coverage" = "来源平台中 %2$d 条标题里 %1$d 条是 %3$@。其余无该语言版本的标题保留原文（可在编辑页手动补充）。";
 "account.titleLocale.followApp" = "跟随 App 语言";
 "account.titleLocale.zhHant" = "繁體中文";
 "account.titleLocale.zhHans" = "简体中文";
@@ -524,9 +524,9 @@
 
 "account.purge.action" = "清空该账号导入数据…";
 "account.purge.confirmTitle" = "清空导入数据";
-"account.purge.confirm" = "会删除该账号同步下来的全部游玩记录，以及由导入创建、你还没动过的库条目。写过自己数据（通关记录 / 持有 / 分组 / 评价 / 最爱 / 封面以外的图）的条目一律保留。账号本身绑定不变，清空之后再同步一次即可得到干净的一份。";
+"account.purge.confirm" = "将清空该账号同步的所有游玩记录，并删除未编辑过的自动建库条目。已有通关记录、评价或收藏的游戏将完整保留。";
 "account.purge.done" = "已清空 %1$d 条记录 · 删掉 %2$d 个导入条目 · 保留 %3$d 个含你自己数据的条目。";
-"account.syncBusy" = "这个账号正在同步，请等它跑完。";
+"account.syncBusy" = "正在同步中，请稍候…";
 
 /* ---- 记录绑定 ---- */
 
@@ -539,29 +539,29 @@
 "account.link.skipReason" = "跳过原因";
 "account.link.current" = "当前关联";
 "account.link.unbind" = "解除关联";
-"account.link.unbindHint" = "解除关联只是把关联摘掉，可以反悔：下次同步若又匹配上，会自动重新关联。";
+"account.link.unbindHint" = "解除后仅移除当前关联；若后续同步中重新匹配，将自动恢复关联。";
 "account.link.merge" = "合并到另一个游戏…";
 "account.link.suggestions" = "建议";
-"account.link.suggestionsHint" = "按标题名模糊匹配出来的候选，仅供参考。";
+"account.link.suggestionsHint" = "根据游戏标题模糊匹配的候选列表。";
 "account.link.search" = "搜索游戏";
 "account.link.noMatch" = "没有匹配的游戏。";
 "account.link.allGames" = "全部游戏";
 "account.link.autoImport" = "自动导入";
 "account.link.ignore" = "忽略此条（不再导入）";
 "account.link.unignore" = "恢复导入此条";
-"account.link.ignoreHint" = "只影响这一条：以后同步会跳过它，既不自动建库也不会再问你。它不会把已经关联的游戏摘掉；但解除关联之后，只要还勾着这个，就不会再自动接回来。";
-"account.link.ruleSkippedHint" = "这条记录是按规则跳过的（原因见上方），不是手动忽略的，所以这里没有开关。把它绑定到某个游戏即可让它回到库里。";
+"account.link.ignoreHint" = "后续同步将跳过此记录，不再自动建库。已关联的游戏条目不受影响。";
+"account.link.ruleSkippedHint" = "此记录由规则跳过（详见上方原因）。将其绑定至已有游戏即可恢复入库。";
 
 /* ---- 合并 ---- */
 
 "account.merge.title" = "合并游戏";
-"account.merge.source" = "要并入的条目";
-"account.merge.target" = "保留的条目";
+"account.merge.source" = "合并源条目";
+"account.merge.target" = "保留目标条目";
 "account.merge.search" = "搜索要保留的条目";
 "account.merge.choose" = "选择保留哪一个";
-"account.merge.explain" = "保留的那个条目优先：它已有的字段不会被覆盖，只有空着的才用另一条补齐。通关记录、持有、分组、来源记录全部合并过来。";
+"account.merge.explain" = "目标条目优先：保留已有字段，仅以源条目补齐空白项。通关记录、收藏、分组与关联记录全部合并。";
 "account.merge.confirm" = "合并";
-"account.merge.confirmHint" = "合并后「要并入的条目」会被删除，此操作不可撤销。";
+"account.merge.confirmHint" = "合并后源条目将被删除，此操作无法撤销。";
 "account.merge.counts" = "通关 %1$d · 来源 %2$d";
 
 /* ---- 详情页「游戏记录」折叠区（外部来源卡片的容器） ---- */

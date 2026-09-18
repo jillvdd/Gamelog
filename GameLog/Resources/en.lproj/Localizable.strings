@@ -19,7 +19,7 @@
 "library.viewMode" = "View";
 "library.addGame" = "Add Game";
 "library.share" = "Share";
-"library.noGames" = "No games yet. Click “Add Game” in the top-right to get started.";
+"library.noGames" = "Your library is empty. Add a game to get started.";
 "library.noResult" = "No Matching Games";
 "group.newGroup" = "New Group";
 "group.name" = "Group Name";
@@ -28,7 +28,7 @@
 "game.nameEn" = "English Title";
 "game.nameZh" = "Chinese Title";
 "game.nameJa" = "Japanese Title";
-"game.nameHint" = "Fill in at least one language. Games imported from a linked account often have only a Chinese or Japanese title — leaving the English title empty is fine.";
+"game.nameHint" = "Enter a title in at least one language.";
 "game.aliases" = "Aliases (for search)";
 "game.aliasPlaceholder" = "Enter an alias";
 "game.aliasAdd" = "Add";
@@ -47,7 +47,7 @@
 "review.edit" = "Edit Review";
 "review.save" = "Save";
 "review.source" = "Markdown Source";
-"review.bodyHint" = "Markdown supported: # heading, **bold**, *italic*, - list item";
+"review.bodyHint" = "Markdown supported (# heading, **bold**, *italic*, - list)";
 "review.main" = "Body";
 "review.title" = "Heading";
 "review.subtitle" = "Subheading";
@@ -60,16 +60,16 @@
 "game.noCover" = "No Cover Set";
 "completion.date" = "Completion date";
 "completion.platform" = "Platform";
-"completion.degree" = "Completion level";
-"completion.playtime" = "Playtime (hours)";
+"completion.degree" = "Completion Degree";
+"completion.playtime" = "Playtime (Hours)";
 "completion.noDate" = "No completion date";
 "completion.noPlaytime" = "No playtime";
-"completion.notes" = "Completion notes";
+"completion.notes" = "Completion Notes";
 "completion.notesPlaceholder" = "Thoughts and highlights from this run…";
 "completion.add" = "Add Completion";
 "completion.edit" = "Edit";
 "completion.delete" = "Delete";
-"completion.deleteConfirm" = "Delete this completion? This cannot be undone.";
+"completion.deleteConfirm" = "Delete this completion record? This cannot be undone.";
 "completion.skipScores" = "Skip scoring this run";
 "completion.scores" = "Dimension Scores";
 "dimension.gameplay" = "Gameplay";
@@ -80,7 +80,7 @@
 "dimension.performance" = "Performance";
 "score.average" = "Average Score";
 "score.unrated" = "Unrated";
-"card.clearedDate" = "Cleared";
+"card.clearedDate" = "Clear Date";
 "card.cleared" = "Cleared %@";
 "card.released" = "Released %@";
 "common.save" = "Save";
@@ -113,7 +113,7 @@
 "share.groupTitle" = "Group Title";
 "share.noneSelectedGroup" = "Select at least one group";
 "stats.totalGames" = "Games Cleared";
-"stats.avgScore" = "Library Average Score";
+"stats.avgScore" = "Library Average";
 "stats.byPlatform" = "By Platform";
 "stats.noData" = "No Data";
 "stats.rankings" = "Rankings";
@@ -131,7 +131,7 @@
 "links.menu" = "Link Settings…";
 "links.steamgriddb" = "SteamGridDB";
 "links.steamGridDBKey" = "API Key";
-"links.steamGridDBHint" = "Register for free at steamgriddb.com, then get the key from your profile.";
+"links.steamGridDBHint" = "Get your API Key from your profile at steamgriddb.com.";
 "links.showKey" = "Show";
 "links.hideKey" = "Hide";
 "links.copyKey" = "Copy";
@@ -146,20 +146,20 @@
 "settings.removeAvatar" = "Remove Avatar";
 "settings.restoreIcon" = "Restore Default Icon";
 "settings.autoMatchCover" = "Automatically Match Cover";
-"settings.autoMatchCoverHint" = "When you enter a game name, automatically searches SteamGridDB and sets the first cover found; square / landscape covers / hero images / logos whose toggle is on and unset are matched too (requires an API key — set it in Link Settings).";
+"settings.autoMatchCoverHint" = "Automatically fetch covers and artwork from SteamGridDB when entering title (requires API Key in Link Settings).";
 "settings.spotlightBackdrop" = "Spotlight Backdrop";
 "settings.spotlightBackdropAuto" = "Auto (landscape first)";
 "settings.spotlightBackdropPadLandscape" = "Spotlight Backdrop (Landscape)";
 "settings.minimalGrid" = "Minimal Grid Mode";
-"settings.minimalGridHint" = "Grid shows only covers with the score/status capsule; name, platform, and dates are hidden.";
+"settings.minimalGridHint" = "Grid view shows only covers and status badges, hiding titles and dates";
 "settings.hideToolbarGlass" = "Hide Top Toolbar Background";
-"settings.hideToolbarGlassHint" = "Hides the frosted-glass background of the top toolbar on all pages (Library / Detail / Stats) for a cleaner look. (macOS 15 and later)";
+"settings.hideToolbarGlassHint" = "Hide frosted-glass toolbar background (macOS 15+)";
 "settings.collectorMode" = "Collector Mode";
-"settings.collectorModeHint" = "Adds an “Owned” tab to game details for recording physical game editions and collection photos.";
+"settings.collectorModeHint" = "Adds an \"Owned\" tab to game details for recording physical editions and collection photos.";
 "settings.platformIcons" = "Platform Logos";
-"settings.platformIconsHint" = "Show platform brand logos in platform pickers and group views.";
+"settings.platformIconsHint" = "Show platform brand icons in pickers and groups";
 "settings.keepOriginalImages" = "Keep Original Images";
-"settings.keepOriginalImagesHint" = "Saves collection photos unmodified instead of compressing them (only affects photos added from now on).";
+"settings.keepOriginalImagesHint" = "Save collection photos at original quality without compression (affects new photos only)";
 "detail.details" = "Details";
 "detail.holdings" = "Owned";
 "copy.addVersion" = "Add Edition";
@@ -186,7 +186,7 @@
 "backup.exportDone" = "Backup Exported";
 "backup.exportFailed" = "Export Failed";
 "backup.importDone" = "Backup Imported";
-"backup.importFailed" = "Import failed. Check that the file is a valid backup.";
+"backup.importFailed" = "Import failed: Invalid or corrupted backup file.";
 "backup.importConfirm" = "Importing will replace all current data. Continue?";
 "backup.share" = "Share Backup…";
 "validation.nameRequired" = "Enter a title in at least one language";
@@ -198,8 +198,8 @@
 "title.editGame" = "Edit Game";
 "title.addCompletion" = "Add Completion";
 "title.editCompletion" = "Edit Completion";
-"share.singleNote" = "One game selected: creates a card for it";
-"share.multiNote" = "Multiple selected: creates one overview image";
+"share.singleNote" = "Single game: generates a detail card";
+"share.multiNote" = "Multiple games: generates an overview image";
 "share.releasedIn" = "Released %@";
 "share.playtimeHours" = "%@ hrs";
 "share.clearTimes" = "%d clears";
@@ -220,7 +220,7 @@
 "share.field.date" = "Last Clear";
 "share.field.releaseYear" = "Release Year";
 "share.field.status" = "Status Badge";
-"share.tapToEnlarge" = "Tap to Enlarge";
+"share.tapToEnlarge" = "View Full Size";
 "app.menu" = "My Gamelog";
 "common.confirm" = "OK";
 "group.rename" = "Rename Group";
@@ -270,12 +270,12 @@
 
 // Holdings / Collection Archive (beta 2.2)
 "copy.media.physicalStandard" = "Physical Standard";
-"copy.media.physicalSpecial" = "Physical Special (first-run, sleeve, iridescent, steelbook, etc.)";
-"copy.media.physicalLimited" = "Physical Limited Edition (limited edition, collector's edition, etc.)";
+"copy.media.physicalSpecial" = "Physical Special (First-Run, Steelbook, etc.)";
+"copy.media.physicalLimited" = "Physical Limited Edition (Limited, Collector's, etc.)";
 "copy.media.digitalStandard" = "Digital Standard";
 "copy.media.digitalPremium" = "Digital Premium (deluxe, premium, etc.)";
-"copy.media.digitalUpgrade" = "Digital Upgrade Pack (add-on for Game Pass, physical edition, etc.)";
-"copy.media.physicalCode" = "Physical (with code)";
+"copy.media.digitalUpgrade" = "Digital Upgrade Pack (Add-on for Game Pass, Physical, etc.)";
+"copy.media.physicalCode" = "Physical (Code in Box)";
 "copy.media.limitedMachine" = "Limited Edition Console";
 "copy.media.limitedController" = "Limited Edition Controller";
 "copy.media.limitedAccessory" = "Limited Edition Accessory";
@@ -297,11 +297,11 @@
 "copy.condition.usedMissingParts" = "Used (missing parts)";
 "copy.condition.usedSoftwareOnly" = "Used (software only)";
 "copy.condition.usedDamaged" = "Used (damaged)";
-"copy.acquisition.officialChannelOverseas" = "Overseas Official Channel";
-"copy.acquisition.dealerChannelOverseas" = "Overseas Dealer";
+"copy.acquisition.officialChannelOverseas" = "Official Store (Overseas)";
+"copy.acquisition.dealerChannelOverseas" = "Authorized Retailer (Overseas)";
 "copy.acquisition.overseasDirectShipping" = "Direct Overseas Shipping";
 "copy.acquisition.proxy" = "Proxy Buyer";
-"copy.acquisition.thirdPartyStore" = "Third-Party Store";
+"copy.acquisition.thirdPartyStore" = "Third-Party Retailer";
 "copy.acquisition.secondHandStoreOverseas" = "Overseas Second-Hand Store";
 "copy.acquisition.personalSecondHandOverseas" = "Personal Second-Hand (Overseas)";
 "copy.acquisition.personalSecondHand" = "Personal Second-Hand";
@@ -332,7 +332,7 @@
 "stats.collectorValue" = "Collection Value";
 "game.holdingArchive" = "Holding Archive";
 "game.createHolding" = "I own this (create holding)";
-"game.holdingArchiveHint" = "Record a physical holding (edition, media, source, price…) with the new game.";
+"game.holdingArchiveHint" = "Record physical copies (edition, media, price...) with this game.";
 
 "date.year" = "Year";
 "date.day" = "Day";
@@ -355,7 +355,7 @@
 "library.filter" = "Filter";
 
 "game.status" = "Status";
-"game.statusHint" = "Lightweight statuses (Backlog, Playing, etc.) don't require completion records or scores. Add them when you mark the game as Completed.";
+"game.statusHint" = "Add completion records and scores when marked as Completed.";
 "status.backlog" = "Backlog";
 "status.playing" = "Playing";
 "status.paused" = "Paused";
@@ -367,26 +367,26 @@
 
 // Auto backup + cache
 "links.autoBackup" = "Auto Backup";
-"links.autoBackupHint" = "Automatically saves a full backup locally whenever your data changes. Restore anytime.";
+"links.autoBackupHint" = "Automatically saves a full local backup whenever data changes. Restore anytime.";
 "backup.lastBackup" = "Last backup: %@";
 "backup.backupNow" = "Back Up Now";
 "backup.autobackupRestore" = "Restore from Auto Backup…";
 "backup.autobackupRestoreConfirm" = "This will replace all current data with the auto backup. Continue?";
 "backup.restoreDone" = "Restored from Auto Backup";
-"backup.restoreFailed" = "Restore failed. The auto backup file may be corrupted.";
+"backup.restoreFailed" = "Restore failed: Auto-backup file is corrupted.";
 "backup.snapshotSaved" = "Pre-restore snapshot saved";
 "backup.emptyRestoreTitle" = "Empty Library Detected";
-"backup.emptyRestoreMessage" = "Your library is empty, but the local auto backup contains %lld games. Restore it? (Cancel keeps the library empty)";
+"backup.emptyRestoreMessage" = "Your library is empty, but the local auto-backup contains %lld games. Restore from backup?";
 "backup.restoreNow" = "Restore from Backup";
 "backup.keepEmpty" = "Keep Empty";
 "backup.nowDone" = "Backup Saved";
-"backup.nowFailed" = "Backup failed — check available disk space";
+"backup.nowFailed" = "Backup failed: Check available disk space.";
 "backup.importing" = "Importing Backup…";
 "backup.noBackupYet" = "No Backup Yet";
 "settings.storage" = "Storage & Cache";
 "settings.cacheSize" = "Cache Size: %@";
 "settings.cacheClear" = "Clear Cache";
-"settings.cacheClearConfirm" = "Clear Caches? Caches are temporary data that can be rebuilt automatically (cover search downloads, image decoding cache, and temporary files). Your game data and backups are not affected.";
+"settings.cacheClearConfirm" = "Clear cache? Temporary cached files will be removed. Game data and backups are unaffected.";
 "settings.cacheCleared" = "Cache Cleared (%@ Freed)";
 "settings.cacheClearFailed" = "Clear Failed";
 
@@ -395,23 +395,23 @@
 "home.statsTitle" = "Library Overview";
 "home.holdingsTitle" = "Collection Overview";
 "home.spotlightNoReview" = "No review title yet";
-"home.favoritesHint" = "No favorites yet — right-click or long-press a card and choose \"Favorites\"";
-"home.holdingsHint" = "Add some collection copies to see the collector overview here";
+"home.favoritesHint" = "No favorites yet — right-click or long-press a card to add";
+"home.holdingsHint" = "Add physical copies to view collection stats";
 "settings.bannerTitle" = "Home Banner Title";
 "settings.bannerSubtitle" = "Home Banner Subtitle";
 "settings.bannerBackground" = "Home Banner Background";
 "settings.removeBanner" = "Remove Background";
 "settings.bannerHint" = "Shown on the first carousel page at the top of \"All Games\"";
 "crop.titleBanner" = "Crop Banner Background";
-"crop.titleBannerHint" = "Position the part you want inside the window";
+"crop.titleBannerHint" = "Drag to adjust banner area";
 
 /* ===== Game Accounts (experimental) ===== */
 
 "links.accounts" = "Game Accounts";
-"links.accountsHint" = "Reads your play records from the Nintendo / PlayStation official services, and for Xbox through a third-party gateway (OpenXBL — see the Xbox section when you add an account). Credentials stay in this device's Keychain — never uploaded, never in backups.";
+"links.accountsHint" = "Sync play records from Nintendo, PlayStation, and Xbox (OpenXBL). Credentials stay securely in Keychain and are never uploaded.";
 "account.experimental" = "Experimental";
 "account.empty" = "No account linked yet.";
-"account.experimentalHint" = "Experimental: these are endpoints called by the official clients but not publicly documented, so either side may change them. Nintendo and PlayStation requests go from this device straight to the official service; Xbox requests go through OpenXBL, a third-party gateway this app does not control. This app has no server of its own.";
+"account.experimentalHint" = "Experimental: Relies on unofficial or third-party APIs. Operates purely locally with no proprietary servers.";
 "account.add" = "Add Account";
 "account.syncAll" = "Sync All";
 "account.syncing" = "Syncing…";
@@ -441,8 +441,8 @@
 /* Why a rule decided this record does not enter the library (short form: row tag + detail sheet). */
 "account.skip.xboxPC" = "PC only · no play time";
 
-"account.linkError.invalidInput" = "That does not look like a valid credential. Please copy it again.";
-"account.linkError.staleCallback" = "This link belongs to an earlier sign-in. Please sign in again.";
+"account.linkError.invalidInput" = "Invalid credential. Please verify and copy again.";
+"account.linkError.staleCallback" = "Sign-in session expired. Please sign in again.";
 
 /* ---- Add account ---- */
 
@@ -455,19 +455,19 @@
 "account.add.nintendoPasteLabel" = "Paste manually (fallback)";
 "account.add.nintendoPastePlaceholder" = "Paste the full URL you were redirected to";
 "account.add.nintendoPasteConfirm" = "Link with this URL";
-"account.add.nintendoPasteHint" = "If the page stops at \"cannot open link\" after signing in, copy the full URL from the address bar into here — the result is identical to the automatic return. Why this fallback exists: the system sign-in session depends on a callback scheme, so if the system cannot hand the redirect back to this app, pasting is the only path that does not depend on it.";
+"account.add.nintendoPasteHint" = "If not redirected automatically after sign-in, copy and paste the full URL from your browser's address bar here.";
 "account.add.npssoPlaceholder" = "64 characters";
 "account.add.npssoConfirm" = "Link this account";
-"account.add.npssoHint" = "How to get it: press \"Open PlayStation sign-in page\" above and sign in, then press \"Open NPSSO page\" and copy the npsso value into here. Sony only sends its sign-in callback to its own PS App, so this manual step is unavoidable. This app cannot and will not obtain your Sony password.";
+"account.add.npssoHint" = "Sign in to PlayStation, open the NPSSO page, and paste your npsso token here. Your password is never accessed.";
 "account.add.psnSignIn" = "Open PlayStation sign-in page";
 "account.add.psnNpssoPage" = "Open NPSSO page";
-"account.add.psnBrowserHint" = "Open both buttons in the same browser: sign in first, then get the NPSSO. The NPSSO comes from a browser session, so a different browser or an in-app page will still look signed out.";
+"account.add.psnBrowserHint" = "Please use the same browser for both sign-in and fetching NPSSO to maintain your session.";
 "account.add.xboxDashboard" = "Open OpenXBL dashboard";
-"account.add.xboxBrowserHint" = "How to get it: on the OpenXBL dashboard, create a Personal API Key and paste it below. Please read this first: Xbox play data cannot be fetched with a personal Microsoft account directly, so this one account type is read through OpenXBL, a third-party service — your API key and your requests pass through that server. What you see in the app is still Microsoft's own data (Gamertag, Gamerscore, achievements).";
+"account.add.xboxBrowserHint" = "Create a Personal API Key on OpenXBL and enter it below. Note: Xbox data is retrieved via a third-party gateway (OpenXBL).";
 "account.add.xboxKeyHeader" = "OpenXBL API Key";
 "account.add.xboxKeyPlaceholder" = "OpenXBL Personal API Key";
 "account.add.xboxKeyConfirm" = "Link this account";
-"account.add.xboxKeyHint" = "The key is stored in this device's Keychain and nowhere else: this app never uploads it and never puts it in backups. You can revoke it at any time from the OpenXBL dashboard.";
+"account.add.xboxKeyHint" = "Key is stored securely in local Keychain only and excluded from backups. Revoke anytime on OpenXBL.";
 "account.detail.trophyUnavailable" = "Trophy data was incomplete this time (trophies and PS3 / PS Vita games come from the same endpoint). Your play records updated normally — try syncing again later.";
 "account.detail.playtimeUnavailable" = "Play time was not fetched this time (it comes from a separate endpoint). Your play records updated normally — try syncing again later.";
 
@@ -486,7 +486,7 @@
 "account.detail.filter.all" = "All %1$d";
 "account.detail.noRecords" = "No records yet. Tap \"Sync Now\" above.";
 "account.detail.records" = "Play Records";
-"account.detail.recordsHint" = "Tap any row to link it to an entry in your library, merge it, or stop importing it. With many records, use the search field above.";
+"account.detail.recordsHint" = "Select any record to link to a game, merge, or ignore.";
 "account.detail.search" = "Search play records";
 "account.detail.noSearchMatch" = "No matching records.";
 "account.detail.pruned" = "Also cleaned up %1$d leftover entries library-wide";
@@ -511,8 +511,8 @@
 "account.titleLocale.header" = "Title & Artwork Language";
 "account.titleLocale.hint" = "The source returns titles and artwork in the language you ask for where it can. \"Follow App Language\" tracks the interface language set in Settings.";
 "account.titleLocale.refresh" = "Re-sync and refresh titles & artwork";
-"account.titleLocale.fallback" = "Nintendo does not accept \"%1$@\" — this sync fell back to \"%2$@\".";
-"account.titleLocale.coverage" = "%1$d of %2$d source titles are in %3$@. The rest have no name in that language on the source side (kept as-is; you can fill them in on the edit page).";
+"account.titleLocale.fallback" = "Locale \"%1$@\" is not supported by service — fell back to \"%2$@\".";
+"account.titleLocale.coverage" = "%1$d of %2$d titles from source are in %3$@. Other titles retain original names (can be added manually in edit view).";
 "account.titleLocale.followApp" = "Follow App Language";
 "account.titleLocale.zhHant" = "繁體中文";
 "account.titleLocale.zhHans" = "简体中文";
@@ -523,9 +523,9 @@
 
 "account.purge.action" = "Delete All Imported Data…";
 "account.purge.confirmTitle" = "Delete Imported Data";
-"account.purge.confirm" = "Deletes every play record synced from this account, plus any library entry this import created and you have not touched. Entries with your own data (completions, copies, groups, reviews, favorites, extra artwork) are kept. The account stays linked — re-sync afterwards to start clean.";
+"account.purge.confirm" = "Removes all synced records from this account and untouched auto-created entries. Games with custom logs, reviews, or holdings are preserved.";
 "account.purge.done" = "Deleted %1$d records · removed %2$d imported entries · kept %3$d entries with your own data.";
-"account.syncBusy" = "This account is already syncing. Please wait for it to finish.";
+"account.syncBusy" = "Sync in progress. Please wait.";
 
 /* ---- Linking records ---- */
 
@@ -538,29 +538,29 @@
 "account.link.skipReason" = "Skip reason";
 "account.link.current" = "Currently linked to";
 "account.link.unbind" = "Unlink";
-"account.link.unbindHint" = "Unlinking only removes the link — it is reversible. If a later sync matches this record again, it will be linked automatically once more.";
+"account.link.unbindHint" = "Removes current link only. If matched again in future syncs, it will reconnect automatically.";
 "account.link.merge" = "Merge with another game…";
 "account.link.suggestions" = "Suggestions";
-"account.link.suggestionsHint" = "Fuzzy title matches, offered only as a starting point.";
+"account.link.suggestionsHint" = "Suggestions based on fuzzy title match.";
 "account.link.search" = "Search games";
 "account.link.noMatch" = "No matching game.";
 "account.link.allGames" = "All Games";
 "account.link.autoImport" = "Automatic import";
 "account.link.ignore" = "Stop importing this one";
 "account.link.unignore" = "Import this one again";
-"account.link.ignoreHint" = "Affects only this record: later syncs skip it entirely — no auto-created game, no asking again. It does not unlink a game you already linked; once unlinked, a skipped record stays skipped until you undo this.";
-"account.link.ruleSkippedHint" = "A rule skipped this record (see the skip reason above), so it was not you who ignored it — there is no toggle here. Bind it to a game to bring it back into your library.";
+"account.link.ignoreHint" = "Future syncs will skip this record without creating entries. Existing linked games are not affected.";
+"account.link.ruleSkippedHint" = "This record was skipped by a rule (see reason above). Bind it to an existing game to include it in your library.";
 
 /* ---- Merge ---- */
 
 "account.merge.title" = "Merge Games";
-"account.merge.source" = "Entry to be merged away";
-"account.merge.target" = "Entry to keep";
+"account.merge.source" = "Source Entry (to merge)";
+"account.merge.target" = "Target Entry (to keep)";
 "account.merge.search" = "Search for the entry to keep";
 "account.merge.choose" = "Choose which one to keep";
-"account.merge.explain" = "The kept entry wins: fields it already has are never overwritten, and only blanks are filled from the other. Completions, copies, groups and source records are all merged over.";
+"account.merge.explain" = "Target entry takes precedence: existing fields are preserved, blanks are filled from source. All records, holdings, and groups are merged.";
 "account.merge.confirm" = "Merge";
-"account.merge.confirmHint" = "The \"entry to be merged away\" is deleted afterwards. This cannot be undone.";
+"account.merge.confirmHint" = "The source entry will be deleted after merging. This action cannot be undone.";
 "account.merge.counts" = "%1$d completions · %2$d sources";
 
 /* ---- Detail page "Game Records" disclosure (the container of the external source cards) ---- */
