@@ -309,7 +309,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = "beta 3.1";
+				MARKETING_VERSION = "beta 3.2";
 				PRODUCT_BUNDLE_IDENTIFIER = "com.abcleg.GameLog";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -333,7 +333,7 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				MARKETING_VERSION = "beta 3.1";
+				MARKETING_VERSION = "beta 3.2";
 				PRODUCT_BUNDLE_IDENTIFIER = "com.abcleg.GameLog";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -360,7 +360,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = "beta 3.1";
+				MARKETING_VERSION = "beta 3.2";
 				PRODUCT_BUNDLE_IDENTIFIER = "com.abcleg.GameLog";
 				PRODUCT_NAME = "GameLog";
 				SDKROOT = iphoneos;
@@ -390,7 +390,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = "beta 3.1";
+				MARKETING_VERSION = "beta 3.2";
 				PRODUCT_BUNDLE_IDENTIFIER = "com.abcleg.GameLog";
 				PRODUCT_NAME = "GameLog";
 				SDKROOT = iphoneos;

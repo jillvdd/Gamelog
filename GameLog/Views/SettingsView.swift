@@ -1,5 +1,4 @@
 import SwiftUI
-import SwiftData
 
 #if os(macOS)
 import AppKit
@@ -10,12 +9,16 @@ import UIKit
 import UniformTypeIdentifiers
 #endif
 
-/// 设置：语言（中日英）、个性化（用户名/头像/图标）、SteamGridDB key、数据备份。
+/// 设置：本机偏好 —— 语言（中日英）、个性化（用户名 / 头像 / 图标 / 主页横幅 / 显示开关）、
+/// 存储与缓存。
+///
+/// ⚠️ 跟**外部服务**有关的三节（SteamGridDB API Key / 游戏账号 / 数据备份）2026-09-18 已搬去
+/// `LinkSettingsView`（macOS 走 App 菜单「关联设置…」，iOS 走底部页签「关联」）。
+/// 判断某一行属于哪一页看的是「它是不是本机偏好」，不是「它以前住哪」——
+/// 所以别再往这里加需要网络、需要凭证、或会动整库的行。
 struct SettingsView: View {
-    @Environment(\.modelContext) private var context
     @Environment(\.appLanguageCode) private var language
     @AppStorage("appLanguage") private var languageCode = AppLanguage.chinese.localeCode
-    @AppStorage("steamGridDBKey") private var steamGridDBKey = ""
 
     @AppStorage(UserCustomization.usernameKey) private var username = ""
     @AppStorage(UserCustomization.avatarFileKey) private var avatarFile = ""
@@ -30,7 +33,6 @@ struct SettingsView: View {
     @AppStorage(UserCustomization.keepOriginalImagesKey) private var keepOriginalImages = false
     @AppStorage(UserCustomization.platformIconsKey) private var showPlatformIcons = true
     @AppStorage(UserCustomization.minimalGridKey) private var minimalGrid = false
-    @AppStorage(UserCustomization.autoBackupKey) private var autoBackup = true
     @AppStorage(UserCustomization.bannerBackgroundFileKey) private var bannerBackgroundFile = ""
     @AppStorage(UserCustomization.spotlightBackdropPreferenceKey) private var spotlightBackdropRaw = UserCustomization.spotlightBackdropAuto
     /// iPad 横屏专用底图偏好（仅 iPad 显示；竖屏/iPhone/macOS 走上面通用键）。
@@ -61,31 +63,7 @@ struct SettingsView: View {
         )
     }
 
-    @Query(sort: \Game.createdAt) private var games: [Game]
-    @Query(sort: \GameGroup.name) private var groups: [GameGroup]
-    @Query private var linkedAccounts: [LinkedAccount]
-
-    /// 「游戏账号」一行右侧的计数。
-    private var linkedAccountCount: Int { linkedAccounts.count }
-
-    @State private var statusMessage: String?
-    @State private var showingImportConfirm = false
-    /// macOS 分享备份：待分享的临时文件 URL + 分享面板锚点触发开关。
-    @State private var backupShareURL: URL?
-    @State private var showingBackupShare = false
-    /// 导出禁重入（2026-09-08）：BackupManager.encode 主线程同步编码，800MB 库
-    /// 数秒卡死；连点会叠多个 1GB Data 编码。置位期间禁用导出按钮。
-    @State private var isExporting = false
     @State private var cropSession: CropSession?
-    /// SteamGridDB key 是否明文显示。
-    @State private var showKey = false
-    /// SteamGridDB key 验证状态（改动时自动校验，✓/✗）。
-    @State private var keyStatus: SteamGridDBKeyStatus = .idle
-    /// 最近一次已验证为有效的 key（避免重复请求）。
-    @State private var validatedKey = ""
-    @State private var keyValidationTask: Task<Void, Never>?
-    /// 是否显示「从自动备份恢复」确认。
-    @State private var showingAutoRestoreConfirm = false
     /// 是否显示「清除缓存」确认。
     @State private var showingCacheConfirm = false
     /// 当前缓存占用（字节），onAppear / 清除后刷新。
@@ -103,9 +81,6 @@ struct SettingsView: View {
     @State private var showingBannerPicker = false
     @State private var showingAbout = false
     #endif
-
-    /// 游戏账号（双平台共用：macOS 的「设置」窗口里也要能进）。
-    @State private var showingAccounts = false
 
     var body: some View {
         Form {
@@ -257,121 +232,8 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Section(L10n.tr("settings.steamgriddb", lang: language)) {
-                HStack(spacing: 8) {
-                    Group {
-                        if showKey {
-                            TextField(L10n.tr("settings.steamGridDBKey", lang: language), text: $steamGridDBKey)
-                        } else {
-                            SecureField(L10n.tr("settings.steamGridDBKey", lang: language), text: $steamGridDBKey)
-                        }
-                    }
-                    .textFieldStyle(.roundedBorder)
-
-                    Button {
-                        showKey.toggle()
-                    } label: {
-                        Image(systemName: showKey ? "eye.slash" : "eye")
-                    }
-                    .appStandardButton()
-                    .help(L10n.tr(showKey ? "settings.hideKey" : "settings.showKey", lang: language))
-
-                    Button {
-                        copyKey()
-                    } label: {
-                        Image(systemName: "doc.on.doc")
-                    }
-                    .appStandardButton()
-                    .help(L10n.tr("settings.copyKey", lang: language))
-
-                    keyStatusIcon
-                        .frame(width: 20, height: 20)
-                }
-                LText("settings.steamGridDBHint")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section {
-                Button {
-                    showingAccounts = true
-                } label: {
-                    HStack {
-                        Label(L10n.tr("settings.accounts", lang: language),
-                              systemImage: "person.crop.circle.badge.checkmark")
-                        Spacer()
-                        if linkedAccountCount > 0 {
-                            Text(verbatim: "\(linkedAccountCount)")
-                                .foregroundStyle(.secondary)
-                        }
-                        Image(systemName: "chevron.right")
-                            .font(.caption)
-                            .foregroundStyle(.tertiary)
-                    }
-                }
-                .buttonStyle(.plain)
-                LText("settings.accountsHint")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            } header: {
-                HStack(spacing: 6) {
-                    Text(verbatim: L10n.tr("settings.accounts", lang: language))
-                    TagLabel(text: L10n.tr("account.experimental", lang: language), tint: .orange)
-                }
-            }
-
-            Section(L10n.tr("settings.backup", lang: language)) {
-                Toggle(L10n.tr("settings.autoBackup", lang: language), isOn: $autoBackup)
-                LText("settings.autoBackupHint")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                backupInfoRow
-
-                Button(L10n.tr("backup.backupNow", lang: language)) { backupNow() }
-                    .appStandardButton()
-                Button(L10n.tr("backup.autobackupRestore", lang: language)) { showingAutoRestoreConfirm = true }
-                    .appStandardButton()
-
-                #if os(macOS)
-                HStack {
-                    Button(L10n.tr("backup.export", lang: language)) { export() }
-                        .appStandardButton()
-                        .disabled(isExporting)
-                    Button {
-                        shareBackup()
-                    } label: {
-                        Label(L10n.tr("backup.share", lang: language), systemImage: "square.and.arrow.up")
-                    }
-                    .appStandardButton()
-                    .disabled(isExporting)
-                    // 系统分享面板（含 AirDrop）从本按钮位置弹出；anchor 隐藏在按钮背后。
-                    .background {
-                        if let url = backupShareURL {
-                            MacSharingAnchor(isPresented: $showingBackupShare) { [url] }
-                        }
-                    }
-                }
-                Button(L10n.tr("backup.import", lang: language)) { showingImportConfirm = true }
-                    .appStandardButton()
-                #else
-                // iOS：导出分享单由 prepareBackupShare 直接以 UIKit 呈现（不走 SwiftUI sheet，
-                // 规避 sheet 首次弹出为空白、需先弹其他窗「预热」的问题）。
-                Button(L10n.tr("backup.export", lang: language)) { prepareBackupShare() }
-                    .appStandardButton()
-                    .disabled(isExporting)
-                Button(L10n.tr("backup.import", lang: language)) { importBackup() }
-                    .appStandardButton()
-                #endif
-                if let statusMessage {
-                    Text(verbatim: statusMessage)
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
             Section(L10n.tr("settings.storage", lang: language)) {
-                Text(verbatim: L10n.tr("settings.cacheSize", [formatSize(Int(cacheSizeBytes))], lang: language))
+                Text(verbatim: L10n.tr("settings.cacheSize", [ByteFormat.fileSize(cacheSizeBytes)], lang: language))
                     .font(.callout)
                     .foregroundStyle(.secondary)
                 Button(L10n.tr("settings.cacheClear", lang: language)) { showingCacheConfirm = true }
@@ -395,31 +257,10 @@ struct SettingsView: View {
             #endif
         }
         .formStyle(.grouped)
-        .onAppear { validateKey(); refreshCacheSize() }
-        .onChange(of: steamGridDBKey) { _, _ in validateKey() }
-        .onDisappear { keyValidationTask?.cancel() }
+        .onAppear { refreshCacheSize() }
         #if os(macOS)
         .frame(width: 520, height: 720)
         #endif
-        .confirmationDialog(
-            L10n.tr("common.confirm", lang: language),
-            isPresented: $showingImportConfirm,
-            titleVisibility: .visible
-        ) {
-            Button(L10n.tr("common.confirm", lang: language)) { importBackup() }
-            Button(L10n.tr("common.cancel", lang: language), role: .cancel) {}
-        } message: {
-            LText("backup.importConfirm")
-        }
-        .platformConfirmDialog(
-            L10n.tr("common.confirm", lang: language),
-            isPresented: $showingAutoRestoreConfirm,
-            message: L10n.tr("backup.autobackupRestoreConfirm", lang: language),
-            cancelTitle: L10n.tr("common.cancel", lang: language),
-            actions: [
-                ConfirmAction(title: L10n.tr("common.confirm", lang: language)) { restoreFromAutoBackup() }
-            ]
-        )
         .platformConfirmDialog(
             L10n.tr("common.confirm", lang: language),
             isPresented: $showingCacheConfirm,
@@ -429,9 +270,6 @@ struct SettingsView: View {
                 ConfirmAction(title: L10n.tr("settings.cacheClear", lang: language)) { clearCache() }
             ]
         )
-        .sheet(isPresented: $showingAccounts) {
-            ExternalAccountsView()
-        }
         .sheet(item: $cropSession) { session in
             ImageCropSheet(
                 kind: session.kind,
@@ -542,67 +380,6 @@ struct SettingsView: View {
         .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(.quaternary, lineWidth: 0.5))
     }
 
-    // MARK: - SteamGridDB key 验证
-
-    /// key 验证状态图标：空=无、转圈=验证中、✓=有效、✗=无效。
-    @ViewBuilder
-    private var keyStatusIcon: some View {
-        switch keyStatus {
-        case .idle:
-            EmptyView()
-        case .checking:
-            ProgressView()
-                .controlSize(.small)
-        case .valid:
-            Image(systemName: "checkmark.circle.fill")
-                .foregroundStyle(.green)
-                .help(L10n.tr("settings.keyValid", lang: language))
-        case .invalid:
-            Image(systemName: "xmark.circle.fill")
-                .foregroundStyle(.red)
-                .help(L10n.tr("settings.keyInvalid", lang: language))
-        }
-    }
-
-    /// 复制 key（复制净化后的值，不带网页粘贴进来的多余文字）。
-    private func copyKey() {
-        let key = SteamGridDBClient.sanitizedKey(steamGridDBKey)
-        #if os(macOS)
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(key, forType: .string)
-        #else
-        UIPasteboard.general.string = key
-        #endif
-    }
-
-    /// 校验 key 可用性：取净化后的 key，调 SteamGridDB 搜索接口，200=✓、失败=✗。
-    /// 防抖 400ms + 代际守卫，只在停止输入后发一次请求；打开设置页也会校验一次。
-    private func validateKey() {
-        keyValidationTask?.cancel()
-        let key = SteamGridDBClient.sanitizedKey(steamGridDBKey)
-        guard !key.isEmpty else {
-            keyStatus = .idle
-            validatedKey = ""
-            return
-        }
-        if keyStatus == .valid, validatedKey == key { return }
-        validatedKey = key
-        keyStatus = .checking
-        let task = Task {
-            try? await Task.sleep(nanoseconds: 400_000_000)
-            guard !Task.isCancelled else { return }
-            do {
-                _ = try await SteamGridDBClient(apiKey: key).search(term: "zelda")
-                guard !Task.isCancelled else { return }
-                keyStatus = .valid
-            } catch {
-                guard !Task.isCancelled else { return }
-                keyStatus = .invalid
-            }
-        }
-        keyValidationTask = task
-    }
-
     // MARK: - 选图 + 裁切
 
     private func pickImage(for kind: CropKind) {
@@ -639,178 +416,16 @@ struct SettingsView: View {
         try? UserCustomization.saveBannerBackgroundPNG(data)
     }
 
-    // MARK: - 备份
-
-    /// 备份导出文件名（macOS NSSavePanel 预填名 / 双平台分享临时文件共用；POSIX locale 保证格式稳定）。
-    private func backupFileName() -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.dateFormat = "yyyy-MM-dd-HH-mm"
-        return "GameLog-backup-\(formatter.string(from: Date())).json"
-    }
-
-    private func export() {
-        // 禁重入：同步编码期间按钮已禁用，此处是双保险（2026-09-08）。
-        guard !isExporting else { return }
-        isExporting = true
-        defer { isExporting = false }
-        #if os(macOS)
-        let panel = NSSavePanel()
-        panel.allowedContentTypes = [.json]
-        panel.nameFieldStringValue = backupFileName()
-        panel.canCreateDirectories = true
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        do {
-            let data = try BackupManager.encode(games: games, groups: groups)
-            try data.write(to: url)
-            statusMessage = L10n.tr("backup.exportDone", lang: language)
-        } catch {
-            statusMessage = L10n.tr("backup.exportFailed", lang: language)
-        }
-        #else
-        // iOS：阶段 3 用 ShareLink（系统分享单，含 AirDrop）导出备份。
-        #endif
-    }
-
-    #if os(macOS)
-    /// macOS 分享备份：编码整库 → 写临时文件 → 从「分享备份」按钮位置弹出系统分享面板（含 AirDrop）。
-    /// 同步编码与 export() / iOS prepareBackupShare 口径一致。
-    private func shareBackup() {
-        guard !isExporting else { return }
-        isExporting = true
-        defer { isExporting = false }
-        guard let data = try? BackupManager.encode(games: games, groups: groups) else {
-            statusMessage = L10n.tr("backup.exportFailed", lang: language)
-            return
-        }
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent(backupFileName())
-        guard (try? data.write(to: url)) != nil else {
-            statusMessage = L10n.tr("backup.exportFailed", lang: language)
-            return
-        }
-        backupShareURL = url
-        showingBackupShare = true
-    }
-    #endif
-
-    #if !os(macOS)
-    /// iOS 备份导出：编码成 JSON → 写临时文件 → 直接用 UIKit 呈现系统分享单（含 AirDrop / 存储到文件）。
-    /// 不走 SwiftUI sheet：挂 Form 行按钮上的 sheet 首次弹窗会呈现为空白、静默失败（先弹别的窗可「预热」）。
-    private func prepareBackupShare() {
-        guard !isExporting else { return }
-        isExporting = true
-        defer { isExporting = false }
-        guard let data = try? BackupManager.encode(games: games, groups: groups) else {
-            statusMessage = L10n.tr("backup.exportFailed", lang: language)
-            return
-        }
-        // 文件名带时间，与 macOS 导出（NSSavePanel 预填名）同一格式。
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent(backupFileName())
-        guard (try? data.write(to: url)) != nil else {
-            statusMessage = L10n.tr("backup.exportFailed", lang: language)
-            return
-        }
-        if !presentShareSheet(url: url) {
-            statusMessage = L10n.tr("backup.exportFailed", lang: language)
-        }
-    }
-    #endif
-
-    private func importBackup() {
-        #if os(macOS)
-        let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.json]
-        panel.allowsMultipleSelection = false
-        panel.canChooseDirectories = false
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        importBackupData(from: url, requestAccess: false)
-        #else
-        // iOS：裸 UIDocumentPickerViewController（DocumentPicker），不走 SwiftUI fileImporter。
-        DocumentPicker.present(types: [.json]) { url in
-            self.importBackupData(from: url, requestAccess: true)
-        }
-        #endif
-    }
-
-    /// 解码并整库替换（走统一入口 importBackup：快照→后台重建→定制回写→广播→补备份）。
-    /// iOS 的「文件」App URL 在安全沙盒作用域外，需先取得安全作用域授权才能读取，
-    /// 否则 Data(contentsOf:) 抛权限错误被静默吞掉（与 onOpenURL 路径一致）。
-    /// 安全作用域内只同步读完 Data 就释放——`defer{stop}` 不可跨 await（2026-09-08），
-    /// 后续异步链只传 Data 不传 URL。
-    private func importBackupData(from url: URL, requestAccess: Bool) {
-        let didStart = requestAccess ? url.startAccessingSecurityScopedResource() : false
-        guard let data = try? Data(contentsOf: url) else {
-            if didStart { url.stopAccessingSecurityScopedResource() }
-            statusMessage = L10n.tr("backup.importFailed", lang: language)
-            return
-        }
-        if didStart { url.stopAccessingSecurityScopedResource() }
-        let context = context
-        Task { @MainActor in
-            do {
-                try await AutoBackup.shared.importBackup(data, into: context) { _ in }
-                statusMessage = L10n.tr("backup.importDone", lang: language)
-            } catch {
-                statusMessage = L10n.tr("backup.importFailed", lang: language)
-            }
-        }
-    }
-
-    // MARK: - 自动备份 + 缓存
-
-    @ViewBuilder
-    private var backupInfoRow: some View {
-        if let date = AutoBackup.lastBackupDate {
-            Text(verbatim: L10n.tr(
-                "backup.lastBackup",
-                ["\(date.formatted(date: .abbreviated, time: .shortened))（\(formatSize(AutoBackup.lastBackupSize))）"],
-                lang: language
-            ))
-            .font(.callout)
-            .foregroundStyle(.secondary)
-        } else {
-            LText("backup.noBackupYet")
-                .font(.callout)
-                .foregroundStyle(.secondary)
-        }
-    }
-
-    private func backupNow() {
-        // 据实提示：写盘失败（磁盘满等）时不再误报「已保存备份」。
-        // 编码在后台进行，完成后回填状态消息（主线程不阻塞，按钮期间不转圈——大库下也秒回）。
-        AutoBackup.shared.writeNowAsync { ok in
-            statusMessage = ok
-                ? L10n.tr("backup.nowDone", lang: language)
-                : L10n.tr("backup.nowFailed", lang: language)
-        }
-    }
-
-    private func restoreFromAutoBackup() {
-        // 统一入口是 async：包 Task，后台重建期间主线程不卡，完成后回填状态。
-        // 进度遮罩由根容器按 importProgress 自动呈现。
-        let context = context
-        Task { @MainActor in
-            do {
-                try await AutoBackup.shared.restoreFromAutoBackup(context: context) { _ in }
-                statusMessage = L10n.tr("backup.restoreDone", lang: language)
-            } catch {
-                statusMessage = L10n.tr("backup.restoreFailed", lang: language)
-            }
-        }
-    }
+    // MARK: - 缓存
 
     private func clearCache() {
         let freed = CacheCleaner.clear()
         cacheSizeBytes = CacheCleaner.diskSize()
-        cacheMessage = L10n.tr("settings.cacheCleared", [formatSize(Int(freed))], lang: language)
+        cacheMessage = L10n.tr("settings.cacheCleared", [ByteFormat.fileSize(freed)], lang: language)
     }
 
     private func refreshCacheSize() {
         cacheSizeBytes = CacheCleaner.diskSize()
-    }
-
-    private func formatSize(_ bytes: Int) -> String {
-        ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)
     }
 }
 
@@ -819,9 +434,4 @@ private struct CropSession: Identifiable {
     let id = UUID()
     let kind: CropKind
     let image: AppImage
-}
-
-/// SteamGridDB key 校验状态：无输入=idle，校验中=checking，通过=valid，失败=invalid。
-private enum SteamGridDBKeyStatus {
-    case idle, checking, valid, invalid
 }

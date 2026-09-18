@@ -126,15 +126,18 @@
 "stats.byPlatformValue" = "按机器价值";
 "stats.byGroupValue" = "按分组价值";
 "settings.language" = "界面语言";
-"settings.steamgriddb" = "SteamGridDB";
-"settings.steamGridDBKey" = "API Key";
-"settings.steamGridDBHint" = "在 steamgriddb.com 免费注册后，从个人页面获取";
-"settings.showKey" = "显示";
-"settings.hideKey" = "隐藏";
-"settings.copyKey" = "复制";
-"settings.keyValid" = "API Key 有效";
-"settings.keyInvalid" = "API Key 无效，请检查";
-"settings.backup" = "数据备份";
+// 关联设置（外部服务：SteamGridDB / 游戏账号 / 数据备份）
+"links.title" = "关联设置";
+"links.menu" = "关联设置…";
+"links.steamgriddb" = "SteamGridDB";
+"links.steamGridDBKey" = "API Key";
+"links.steamGridDBHint" = "在 steamgriddb.com 免费注册后，从个人页面获取";
+"links.showKey" = "显示";
+"links.hideKey" = "隐藏";
+"links.copyKey" = "复制";
+"links.keyValid" = "API Key 有效";
+"links.keyInvalid" = "API Key 无效，请检查";
+"links.backup" = "数据备份";
 "settings.customization" = "个性化";
 "settings.username" = "用户名";
 "settings.avatar" = "头像";
@@ -143,7 +146,7 @@
 "settings.removeAvatar" = "移除头像";
 "settings.restoreIcon" = "恢复默认图标";
 "settings.autoMatchCover" = "自动匹配封面";
-"settings.autoMatchCoverHint" = "输入游戏名后，自动搜索 SteamGridDB 并填入第一张封面；已展开开关且未设置的方形封面/横向封面/背景图/Logo 也会一并匹配（需在下方配置 API Key）。";
+"settings.autoMatchCoverHint" = "输入游戏名后，自动搜索 SteamGridDB 并填入第一张封面；已展开开关且未设置的方形封面/横向封面/背景图/Logo 也会一并匹配（需在「关联设置」里配置 API Key）。";
 "settings.spotlightBackdrop" = "随机游戏底图";
 "settings.spotlightBackdropAuto" = "自动（横图优先）";
 "settings.spotlightBackdropPadLandscape" = "随机游戏底图（横屏）";
@@ -337,6 +340,7 @@
 
 // iOS 专属
 "tab.library" = "库";
+"tab.links" = "关联";
 "tab.settings" = "设置";
 "library.filterGroup" = "按分组筛选";
 "library.allGroups" = "全部分组";
@@ -362,8 +366,8 @@
 "status.unclassified" = "未分类";
 
 // 自动备份 + 缓存
-"settings.autoBackup" = "自动备份";
-"settings.autoBackupHint" = "每次数据改动后自动在本地保存完整备份，可在设置中随时恢复。";
+"links.autoBackup" = "自动备份";
+"links.autoBackupHint" = "每次数据改动后自动在本地保存完整备份，可随时恢复。";
 "backup.lastBackup" = "上次备份：%@";
 "backup.backupNow" = "立即备份";
 "backup.autobackupRestore" = "从自动备份恢复…";
@@ -403,8 +407,8 @@
 
 /* ===== 游戏账号（实验性功能） ===== */
 
-"settings.accounts" = "游戏账号";
-"settings.accountsHint" = "从 Nintendo / PlayStation 官方服务读取你的游玩记录，Xbox 则经由第三方网关（OpenXBL，详见添加账号时的 Xbox 分区）。凭证只保存在本机钥匙串，不上传、不进备份。";
+"links.accounts" = "游戏账号";
+"links.accountsHint" = "从 Nintendo / PlayStation 官方服务读取你的游玩记录，Xbox 则经由第三方网关（OpenXBL，详见添加账号时的 Xbox 分区）。凭证只保存在本机钥匙串，不上传、不进备份。";
 "account.experimental" = "实验性";
 "account.empty" = "还没有绑定任何账号。";
 "account.experimentalHint" = "实验性功能：用的是官方客户端调用、但未公开的接口，任一方调整后可能失效。Nintendo 与 PlayStation 的请求由本机直接发往官方服务；Xbox 的请求会经过 OpenXBL 这台第三方网关（本应用控制不了它）。本应用没有自己的服务器。";

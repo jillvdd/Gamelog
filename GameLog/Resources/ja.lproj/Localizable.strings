@@ -126,15 +126,18 @@
 "stats.byPlatformValue" = "機種価値順";
 "stats.byGroupValue" = "グループ価値順";
 "settings.language" = "表示言語";
-"settings.steamgriddb" = "SteamGridDB";
-"settings.steamGridDBKey" = "API Key";
-"settings.steamGridDBHint" = "steamgriddb.com に無料登録し、プロフィールからキーを取得してください";
-"settings.showKey" = "表示";
-"settings.hideKey" = "隠す";
-"settings.copyKey" = "コピー";
-"settings.keyValid" = "API Key は有効です";
-"settings.keyInvalid" = "API Key が無効です。確認してください";
-"settings.backup" = "データバックアップ";
+// 連携設定（外部サービス：SteamGridDB / ゲームアカウント / データバックアップ）
+"links.title" = "連携設定";
+"links.menu" = "連携設定…";
+"links.steamgriddb" = "SteamGridDB";
+"links.steamGridDBKey" = "API Key";
+"links.steamGridDBHint" = "steamgriddb.com に無料登録し、プロフィールからキーを取得してください";
+"links.showKey" = "表示";
+"links.hideKey" = "隠す";
+"links.copyKey" = "コピー";
+"links.keyValid" = "API Key は有効です";
+"links.keyInvalid" = "API Key が無効です。確認してください";
+"links.backup" = "データバックアップ";
 "settings.customization" = "カスタマイズ";
 "settings.username" = "ユーザー名";
 "settings.avatar" = "アバター";
@@ -143,7 +146,7 @@
 "settings.removeAvatar" = "アバターを削除";
 "settings.restoreIcon" = "デフォルトアイコンに戻す";
 "settings.autoMatchCover" = "カバーを自動取得";
-"settings.autoMatchCoverHint" = "ゲーム名を入力すると SteamGridDB を検索し、最初に見つかったカバーを自動設定します。スイッチを開いていて未設定のスクエアカバー／横カバー／背景画像／ロゴも一緒に設定されます（下で API Key の設定が必要です）。";
+"settings.autoMatchCoverHint" = "ゲーム名を入力すると SteamGridDB を検索し、最初に見つかったカバーを自動設定します。スイッチを開いていて未設定のスクエアカバー／横カバー／背景画像／ロゴも一緒に設定されます（「連携設定」で API Key の設定が必要です）。";
 "settings.spotlightBackdrop" = "ランダムゲーム背景";
 "settings.spotlightBackdropAuto" = "自動（横画像優先）";
 "settings.spotlightBackdropPadLandscape" = "ランダムゲーム背景（横画面）";
@@ -337,6 +340,7 @@
 
 // iOS 专属
 "tab.library" = "ライブラリ";
+"tab.links" = "連携";
 "tab.settings" = "設定";
 "library.filterGroup" = "グループで絞り込む";
 "library.allGroups" = "すべてのグループ";
@@ -362,8 +366,8 @@
 "status.unclassified" = "未分類";
 
 // 自動バックアップ + キャッシュ
-"settings.autoBackup" = "自動バックアップ";
-"settings.autoBackupHint" = "データを変更するたびに完全なバックアップを自動でローカルに保存します。設定からいつでも復元できます。";
+"links.autoBackup" = "自動バックアップ";
+"links.autoBackupHint" = "データを変更するたびに完全なバックアップを自動でローカルに保存します。いつでも復元できます。";
 "backup.lastBackup" = "前回のバックアップ：%@";
 "backup.backupNow" = "今すぐバックアップ";
 "backup.autobackupRestore" = "自動バックアップから復元…";
@@ -403,8 +407,8 @@
 
 /* ===== ゲームアカウント（実験的機能） ===== */
 
-"settings.accounts" = "ゲームアカウント";
-"settings.accountsHint" = "Nintendo / PlayStation の公式サービスから、Xbox はサードパーティのゲートウェイ（OpenXBL、アカウント追加時の Xbox セクションを参照）経由でプレイ記録を読み取ります。認証情報は端末のキーチェーンにのみ保存され、送信もバックアップもされません。";
+"links.accounts" = "ゲームアカウント";
+"links.accountsHint" = "Nintendo / PlayStation の公式サービスから、Xbox はサードパーティのゲートウェイ（OpenXBL、アカウント追加時の Xbox セクションを参照）経由でプレイ記録を読み取ります。認証情報は端末のキーチェーンにのみ保存され、送信もバックアップもされません。";
 "account.experimental" = "実験的";
 "account.empty" = "まだアカウントを連携していません。";
 "account.experimentalHint" = "実験的機能：公式クライアントが利用する非公開のエンドポイントを使用しているため、仕様変更で使えなくなる可能性があります。Nintendo と PlayStation の通信は端末から公式サービスへ直接行われますが、Xbox の通信はサードパーティのゲートウェイ OpenXBL を経由します（本アプリが関与できる相手ではありません）。本アプリ独自のサーバーは存在しません。";

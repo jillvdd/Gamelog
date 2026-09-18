@@ -3,11 +3,11 @@ import SwiftUI
 /// 「游戏账号」这一批界面共用的行组件。
 ///
 /// 放在一处是因为它们表达的是同一件事、必须长得一样：
-/// 候选游戏行（绑定面板 / 合并面板）与外部记录行（账号详情）。
+/// 候选游戏行（绑定面板 / 合并面板）、账号行（关联设置页）与外部记录行（账号详情）。
 ///
-/// 两行的标题都 `lineLimit(1)`：一条外部记录 / 游戏名可以很长
-/// （「Ghost of Tsushima Director's Cut」），而同一行还挂着状态标签，
-/// 不截断就会把右侧的标签挤出屏幕。
+/// 三行的标题都 `lineLimit(1)`：一条外部记录 / 游戏名 / 账号名可以很长
+/// （「Ghost of Tsushima Director's Cut」），而同一行还挂着状态标签或按钮，
+/// 不截断就会把右侧的东西挤出屏幕。
 
 // MARK: - 候选游戏行
 
@@ -46,6 +46,73 @@ struct GameChoiceRow: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(Rectangle())
+    }
+}
+
+// MARK: - 账号行
+
+/// 账号行：展示名 + 品牌 + 上次同步状态 + 凭证状态徽章 + 行内同步按钮。
+///
+/// 原先是 `ExternalAccountsView` 里的 `private` 行。「关联设置」页把账号列表**直接铺在页面上**
+/// （不再是一层 sheet 跳转）之后，它就跟上面两行住在同一个列表体系里，于是搬到这里 ——
+/// 三行的字号与截断规矩从此一处可查。
+///
+/// ⚠️ 徽章与同步按钮/转圈**同时在**（2026-09-18）：此前的写法是「同步中转圈 **或** 徽章」，
+/// 于是同步一开始徽章就消失——而那恰恰是用户最需要看它的时刻（凭证失效时更要盯着同步结果）。
+/// 所以转圈改成与徽章并列，占的是同步按钮那一格。
+struct ExternalAccountRow: View {
+    let account: LinkedAccount
+    let syncing: Bool
+    /// 行内同步按钮的动作。由列表页给；结果照旧写回列表页那一行 banner（不做每行独立回执）。
+    var onSync: () -> Void
+
+    @Environment(\.appLanguageCode) private var language
+
+    var body: some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(verbatim: account.displayName)
+                    .lineLimit(1)
+                    // 账号名是用户自己的昵称，长度不可控；缩一点再截（同 `GameChoiceRow` 口径）。
+                    .minimumScaleFactor(0.7)
+                Text(verbatim: subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 8)
+            CredentialBadge(state: account.credentialState)
+            if syncing {
+                ProgressView().controlSize(.small)
+            } else {
+                // `.borderless` 让这次点击被按钮自己吃掉，而不是穿透给外层 `NavigationLink`
+                // 把用户带进详情页 —— 行本身仍是「点进这个账号」的入口（用户拍板）。
+                Button(action: onSync) {
+                    Image(systemName: AccountUI.syncIcon)
+                }
+                .buttonStyle(.borderless)
+                .help(L10n.tr("account.detail.sync", lang: language))
+                .accessibilityLabel(L10n.tr("account.detail.sync", lang: language))
+            }
+        }
+    }
+
+    /// 副标题**一律以平台打头**：一个任天堂账号和一个 PSN 账号的账号名可能长得很像，
+    /// 「上次同步是三天前」不说明问题，「凭证已失效」才说明问题，而平台决定了这条记录归谁。
+    /// 所以三种情况下都带上品牌，只有中间那句话在换。
+    ///
+    /// 成功那一档**只放日期，不放时刻与条数**：iPhone 上「Nintendo Account · 15 Sep 2026
+    /// at 11:12 PM · 12 条记录」一准被截断，而截掉的正是最后那段。行里给到「哪个平台、
+    /// 哪天同步过」就够判断了；精确时刻与条数在详情页有完整的一份。
+    private var subtitle: String {
+        let brand = account.provider.brandName
+        if let error = account.lastSyncError {
+            return "\(brand) · \(L10n.tr(error.labelKey, lang: language))"
+        }
+        guard let last = account.lastSyncAt else {
+            return "\(brand) · \(L10n.tr("account.neverSynced", lang: language))"
+        }
+        return "\(brand) · \(last.formatted(date: .abbreviated, time: .omitted))"
     }
 }
 

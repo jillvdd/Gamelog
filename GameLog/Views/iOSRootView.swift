@@ -3,8 +3,8 @@ import SwiftData
 
 #if os(iOS)
 
-/// iOS 入口：底部 TabBar（库 / 统计 / 设置）。
-/// macOS 保持 NavigationSplitView 侧边栏（RootView）；iOS 用 TabBar 三个页签。
+/// iOS 入口：底部 TabBar（库 / 统计 / 关联 / 设置）。
+/// macOS 保持 NavigationSplitView 侧边栏（RootView）；iOS 用 TabBar 四个页签。
 struct iOSRootView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.appLanguageCode) private var language
@@ -13,7 +13,7 @@ struct iOSRootView: View {
     @State private var incomingBackupURL: URL?
     @State private var showingIncomingImport = false
 
-    private enum Tab: Hashable { case library, stats, settings }
+    private enum Tab: Hashable { case library, stats, links, settings }
 
     var body: some View {
         TabView(selection: $tab) {
@@ -27,6 +27,15 @@ struct iOSRootView: View {
                     Label(L10n.tr("library.stats", lang: language), systemImage: "chart.bar.fill")
                 }
                 .tag(Tab.stats)
+            // 「关联」（关联设置）：外部服务凭证 / 游戏账号 / 数据备份。与 macOS 的
+            // App 菜单「关联设置…」是同一个页面、同一份内容，只是入口按平台各就各位。
+            // 页签栏外观零设置 —— 液态玻璃是系统 TabBar 自己的皮（iPad 走同一个 root，
+            // 系统会把页签栏按 iPadOS 规范摆到它认为对的位置，那是系统行为）。
+            LinkSettingsView()
+                .tabItem {
+                    Label(L10n.tr("tab.links", lang: language), systemImage: "link")
+                }
+                .tag(Tab.links)
             SettingsView()
                 .tabItem {
                     Label(L10n.tr("tab.settings", lang: language), systemImage: "gearshape.fill")

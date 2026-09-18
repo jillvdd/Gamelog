@@ -72,6 +72,17 @@ struct GameLogApp: App {
                     Text(L10n.tr("about.menu", lang: languageCode))
                 }
             }
+            // 「关联设置」紧跟在系统「设置…」(⌘,) 的正下方 —— `CommandGroupPlacement.appSettings`
+            // 正是系统 Settings 项的位置。它开的是独立窗口而不是第二个设置面板：这一页装的是
+            // 外部服务凭证 / 账号绑定 / 整库导入导出，跟「本机偏好」不是一类东西（见 LinkSettingsView）。
+            CommandGroup(after: .appSettings) {
+                Button {
+                    openWindow(id: "linkSettings")
+                } label: {
+                    Text(L10n.tr("links.menu", lang: languageCode))
+                }
+                .keyboardShortcut(",", modifiers: [.command, .shift])
+            }
         }
         #endif
 
@@ -90,6 +101,18 @@ struct GameLogApp: App {
         }
         .windowStyle(.hiddenTitleBar)
         .defaultSize(width: 380, height: 300)
+
+        // 关联设置独立窗口（App 菜单「关联设置…」⌘⇧, 打开）：SteamGridDB key / 游戏账号 /
+        // 数据备份。⚠️ 这一页用 `@Query` 与 `modelContext`，`modelContainer` 必须给上；
+        // ⚠️ 窗口标题由这里给，页面自己也**不**设 `navigationTitle` —— 否则「隐藏上方毛玻璃」
+        // 会把标题置空，独立窗口就变成无名窗口。
+        Window(L10n.tr("links.title", lang: languageCode), id: "linkSettings") {
+            LinkSettingsView()
+                .environment(\.appLanguageCode, languageCode)
+                .environment(\.locale, Locale(identifier: languageCode))
+        }
+        .modelContainer(container)
+        .defaultSize(width: 560, height: 780)
 
         // 评价编辑独立窗口（macOS 专属「写字台」）：详情页点「编辑评价」打开，
         // 保存才写回 reviewTitle/reviewBody。当前编辑目标经 ReviewEditorSession 共享。

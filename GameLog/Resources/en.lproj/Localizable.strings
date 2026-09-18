@@ -126,15 +126,18 @@
 "stats.byPlatformValue" = "By Platform Value";
 "stats.byGroupValue" = "By Group Value";
 "settings.language" = "Language";
-"settings.steamgriddb" = "SteamGridDB";
-"settings.steamGridDBKey" = "API Key";
-"settings.steamGridDBHint" = "Register for free at steamgriddb.com, then get the key from your profile.";
-"settings.showKey" = "Show";
-"settings.hideKey" = "Hide";
-"settings.copyKey" = "Copy";
-"settings.keyValid" = "API Key is valid";
-"settings.keyInvalid" = "Invalid API Key. Please check.";
-"settings.backup" = "Backup";
+// Link Settings (external services: SteamGridDB / game accounts / data backup)
+"links.title" = "Link Settings";
+"links.menu" = "Link Settings…";
+"links.steamgriddb" = "SteamGridDB";
+"links.steamGridDBKey" = "API Key";
+"links.steamGridDBHint" = "Register for free at steamgriddb.com, then get the key from your profile.";
+"links.showKey" = "Show";
+"links.hideKey" = "Hide";
+"links.copyKey" = "Copy";
+"links.keyValid" = "API Key is valid";
+"links.keyInvalid" = "Invalid API Key. Please check.";
+"links.backup" = "Backup";
 "settings.customization" = "Personalization";
 "settings.username" = "Username";
 "settings.avatar" = "Avatar";
@@ -143,7 +146,7 @@
 "settings.removeAvatar" = "Remove Avatar";
 "settings.restoreIcon" = "Restore Default Icon";
 "settings.autoMatchCover" = "Automatically Match Cover";
-"settings.autoMatchCoverHint" = "When you enter a game name, automatically searches SteamGridDB and sets the first cover found; square / landscape covers / hero images / logos whose toggle is on and unset are matched too (requires an API key below).";
+"settings.autoMatchCoverHint" = "When you enter a game name, automatically searches SteamGridDB and sets the first cover found; square / landscape covers / hero images / logos whose toggle is on and unset are matched too (requires an API key — set it in Link Settings).";
 "settings.spotlightBackdrop" = "Spotlight Backdrop";
 "settings.spotlightBackdropAuto" = "Auto (landscape first)";
 "settings.spotlightBackdropPadLandscape" = "Spotlight Backdrop (Landscape)";
@@ -337,6 +340,7 @@
 
 // iOS 专属
 "tab.library" = "Library";
+"tab.links" = "Links";
 "tab.settings" = "Settings";
 "library.filterGroup" = "Filter by Group";
 "library.allGroups" = "All Groups";
@@ -362,8 +366,8 @@
 "status.unclassified" = "Unclassified";
 
 // Auto backup + cache
-"settings.autoBackup" = "Auto Backup";
-"settings.autoBackupHint" = "Automatically saves a full backup locally whenever your data changes. Restore anytime from Settings.";
+"links.autoBackup" = "Auto Backup";
+"links.autoBackupHint" = "Automatically saves a full backup locally whenever your data changes. Restore anytime.";
 "backup.lastBackup" = "Last backup: %@";
 "backup.backupNow" = "Back Up Now";
 "backup.autobackupRestore" = "Restore from Auto Backup…";
@@ -403,8 +407,8 @@
 
 /* ===== Game Accounts (experimental) ===== */
 
-"settings.accounts" = "Game Accounts";
-"settings.accountsHint" = "Reads your play records from the Nintendo / PlayStation official services, and for Xbox through a third-party gateway (OpenXBL — see the Xbox section when you add an account). Credentials stay in this device's Keychain — never uploaded, never in backups.";
+"links.accounts" = "Game Accounts";
+"links.accountsHint" = "Reads your play records from the Nintendo / PlayStation official services, and for Xbox through a third-party gateway (OpenXBL — see the Xbox section when you add an account). Credentials stay in this device's Keychain — never uploaded, never in backups.";
 "account.experimental" = "Experimental";
 "account.empty" = "No account linked yet.";
 "account.experimentalHint" = "Experimental: these are endpoints called by the official clients but not publicly documented, so either side may change them. Nintendo and PlayStation requests go from this device straight to the official service; Xbox requests go through OpenXBL, a third-party gateway this app does not control. This app has no server of its own.";
