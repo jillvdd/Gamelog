@@ -375,28 +375,36 @@ final class AutoBackup: ObservableObject {
         await onProgress(0.02)
         try await writeSnapshot(context: context)
 
-        // 2. 后台 decode（纯函数）+ 重建 + save。DTO 在主线程解出后只传值类型进后台。
-        let dto = try BackupManager.decode(data)
+        // 2. 后台 decode + 重建 + save。
+        // ⚠️ decode 必须在后台执行：1GB+ 备份 JSON 在 @MainActor 解码会撑爆主线程内存限额
+        //    导致 JSONDecoder throw（2026-09-18 真机复现）。挪进 Task.detached 后，decode 完
+        //    data 即可被 ARC 释放，不再与 DTO 对象树同时压在内存里。
+        //    step 3 需要的定制字段（username 等）从 task 里作为 tuple 返回。
         await onProgress(0.05)
         let container = context.container
-        try await Task.detached(priority: .utility) {
+        typealias CustomizationFields = (username: String?, avatarBase64: String?, iconBase64: String?,
+                                         bannerTitle: String?, bannerSubtitle: String?, bannerBackgroundBase64: String?)
+        let customization: CustomizationFields = try await Task.detached(priority: .utility) {
+            let dto = try BackupManager.decode(data)
             let importer = BackupImporter(modelContainer: container)
             try await importer.applyDTO(dto) { done, total in
                 guard total > 0 else { return }
                 let frac = 0.05 + 0.85 * Double(done) / Double(total)
                 Task { @MainActor in onProgress(frac) }
             }
+            return (dto.username, dto.avatarBase64, dto.iconBase64,
+                    dto.bannerTitle, dto.bannerSubtitle, dto.bannerBackgroundBase64)
         }.value
 
         // 3. 主线程定制回写（DB 已落盘成功后才写文件/UserDefaults；写序不变量在内）。
         await onProgress(0.93)
         try UserCustomization.applyCustomization(
-            username: dto.username,
-            avatarBase64: dto.avatarBase64,
-            iconBase64: dto.iconBase64,
-            bannerTitle: dto.bannerTitle,
-            bannerSubtitle: dto.bannerSubtitle,
-            bannerBackgroundBase64: dto.bannerBackgroundBase64
+            username: customization.username,
+            avatarBase64: customization.avatarBase64,
+            iconBase64: customization.iconBase64,
+            bannerTitle: customization.bannerTitle,
+            bannerSubtitle: customization.bannerSubtitle,
+            bannerBackgroundBase64: customization.bannerBackgroundBase64
         )
 
         // 4. 主线程清解码缓存（key 含 persistentModelID，旧 ID 旧图不再命中）。

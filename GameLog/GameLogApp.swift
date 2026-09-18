@@ -19,13 +19,15 @@ struct GameLogApp: App {
         ])
         do {
             let container = try ModelContainer(for: schema)
-            // 启动即迁移平台旧名（Switch → Nintendo Switch），UI 展示前完成，幂等。
-            // save 失败不阻断启动（迁移幂等，下次启动重跑）；此前 try? 吞错会让闸门
-            // 置位而数据未迁移（2026-09-05 审计）。
-            do {
-                try PlatformMigration.migrate(in: ModelContext(container))
-            } catch {
-                NSLog("GameLog: PlatformMigration save failed: \(error)")
+            // 平台旧名迁移：改写有副作用（fetch 全量实体 → save），挪到后台异步执行，
+            // 避免大库冷启动在主线程同步遍历全部实体造成白屏卡顿（2026-09-18 iOS 真机问题）。
+            // 迁移幂等：一次性 UserDefaults 闸门保证只跑一次，多次启动无害。
+            Task.detached(priority: .utility) {
+                do {
+                    try PlatformMigration.migrate(in: ModelContext(container))
+                } catch {
+                    NSLog("GameLog: PlatformMigration save failed: \(error)")
+                }
             }
             return container
         } catch {

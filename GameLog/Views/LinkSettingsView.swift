@@ -471,28 +471,40 @@ struct LinkSettingsView: View {
     }
 
     /// 解码并整库替换（走统一入口 importBackup：快照→后台重建→定制回写→广播→补备份）。
-    /// iOS 的「文件」App URL 在安全沙盒作用域外，需先取得安全作用域授权才能读取，
-    /// 否则 Data(contentsOf:) 抛权限错误被静默吞掉（与 onOpenURL 路径一致）。
-    /// 安全作用域内只同步读完 Data 就释放——`defer{stop}` 不可跨 await（2026-09-08），
+    /// iOS 的「文件」App URL 在安全沙盒作用域外，需先取得安全作用域授权才能读取。
+    /// 安全作用域在后台 Task 内同步读完立即释放——`defer{stop}` 不可跨 await，
     /// 后续异步链只传 Data 不传 URL。
+    /// ⚠️ 超大备份（1GB+）必须在后台读文件，主线程同步 Data(contentsOf:) 会 OOM（2026-09-18）。
     private func importBackupData(from url: URL, requestAccess: Bool) {
-        let didStart = requestAccess ? url.startAccessingSecurityScopedResource() : false
-        guard let data = try? Data(contentsOf: url) else {
-            if didStart { url.stopAccessingSecurityScopedResource() }
-            statusMessage = L10n.tr("backup.importFailed", lang: language)
-            return
-        }
-        if didStart { url.stopAccessingSecurityScopedResource() }
         let context = context
+        let language = language
         Task { @MainActor in
-            do {
-                try await AutoBackup.shared.importBackup(data, into: context) { _ in }
-                statusMessage = L10n.tr("backup.importDone", lang: language)
-            } catch {
+            // 文件读取放后台：1GB 备份在主线程同步读会直接撑爆 iOS 内存限制（jetsam 杀进程）。
+            let dataResult = await Task.detached(priority: .utility) { () -> Result<Data, Error> in
+                let didStart = requestAccess ? url.startAccessingSecurityScopedResource() : false
+                defer { if didStart { url.stopAccessingSecurityScopedResource() } }
+                do {
+                    let data = try Data(contentsOf: url)
+                    return .success(data)
+                } catch {
+                    return .failure(error)
+                }
+            }.value
+
+            switch dataResult {
+            case .failure:
                 statusMessage = L10n.tr("backup.importFailed", lang: language)
+            case .success(let data):
+                do {
+                    try await AutoBackup.shared.importBackup(data, into: context) { _ in }
+                    statusMessage = L10n.tr("backup.importDone", lang: language)
+                } catch {
+                    statusMessage = L10n.tr("backup.importFailed", lang: language)
+                }
             }
         }
     }
+
 
     @ViewBuilder
     private var backupInfoRow: some View {
