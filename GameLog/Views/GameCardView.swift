@@ -10,29 +10,39 @@ extension GameCardView {
     }
 }
 
-extension Game {
-    var coverImage: AppImage? {
-        ImageDecodeCache.image(for: self, field: "cover", data: coverData)
+/// 已销毁模型的占位格：**什么都不读、什么都不画**，只把格子尺寸占住。
+///
+/// 它不是「装饰」，是防止进程崩溃的最后一格。批量删除后 SwiftUI 可能还会用旧数组
+/// 重跑一次卡片 body，而那时模型已经销毁（`!game.isLive`）—— 读它任何一个属性
+/// 都是 `Fatal error: This backing data was detached from a context`，整进程崩
+/// （详见 `GameCardView.body` 里那段说明）。这里刻意不接收 `Game` 参数：
+/// 拿不到模型就无法误读它。
+///
+/// 尺寸按卡型给足（网格卡 2:3、方形网格卡 1:1、列表行 62、宽卡 100），这样下一帧真数据
+/// 刷新时网格/列表不会先塌一下再弹回来。
+struct DeletedModelPlaceholder: View {
+    enum Style {
+        case gridCard
+        /// 方形网格卡（1:1）。**必须单独一档**：两种网格的格子高度不同，
+        /// 删除那一帧若按 `gridCard` 预留 2:3，方形网格的行高会先塌一截再弹回来。
+        case squareGridCard
+        case listRow
+        case wideCard
     }
 
-    /// 详情页横幅背景图。
-    var heroImage: AppImage? {
-        ImageDecodeCache.image(for: self, field: "hero", data: heroData)
-    }
+    let style: Style
 
-    /// 游戏 Logo（透明 PNG）。详情页在「背景图 + Logo 同时设置」时替代 2:3 封面。
-    var logoImage: AppImage? {
-        ImageDecodeCache.image(for: self, field: "logo", data: logoData)
-    }
-
-    /// 1:1 方形封面（SteamGridDB 方形 grid）。iOS 单列卡大图主格式。
-    var squareImage: AppImage? {
-        ImageDecodeCache.image(for: self, field: "square", data: squareData)
-    }
-
-    /// 横向封面（SteamGridDB 920×430 横版 grid）。iOS 详情页横幅与库横向卡共用。
-    var landscapeImage: AppImage? {
-        ImageDecodeCache.image(for: self, field: "landscape", data: landscapeData)
+    var body: some View {
+        switch style {
+        case .gridCard:
+            Color.clear.aspectRatio(2.0 / 3.0, contentMode: .fit)
+        case .squareGridCard:
+            Color.clear.aspectRatio(1.0, contentMode: .fit)
+        case .listRow:
+            Color.clear.frame(height: 62)
+        case .wideCard:
+            Color.clear.frame(minHeight: 100)
+        }
     }
 }
 
@@ -70,6 +80,21 @@ struct GamePlatformIcons: View {
     }
 }
 
+/// 网格卡的格子形状。库里的两种网格只差这一个参数，其余（徽章位置、信息行、极简模式、
+/// 右键菜单）全部共用 —— 所以它是 `GameCardView` 的参数，而不是另写一个卡片视图。
+enum CardShape {
+    /// 竖版封面网格（2:3）。库的默认网格，也是 iOS 网格。
+    case portrait
+    /// 方形封面网格（1:1，macOS 第三视图）。
+    ///
+    /// 语义（用户拍板）：**整格统一 1:1**。填充方式**不看格子形状**，看「这张图放进这个 1:1
+    /// 格会不会被裁」—— 由 `AppImage.letterboxes(inBoxAspect:)` 判定：
+    /// 方图与竖版封面都比 1:1 格窄 → `fill`（方图满铺；竖图居中裁切填满，格子齐平，
+    /// 代价是竖图上下被裁）；**横图比格子宽 → `fit`** 完整显示、上下留空。
+    /// 所以 §55 的结论原样成立（方形网格用方图满铺），只是补上了横图这一档。
+    case square
+}
+
 /// 网格视图中的游戏卡片：封面 + 库显示分徽章 + 名称 + 平台/日期。
 /// 极简模式（2026-09-05 用户要求，设置「个性化」开关默认关）：只显示封面 +
 /// 右上角胶囊 + 爱心角标，封面下方信息全部隐藏。
@@ -78,28 +103,80 @@ struct GameCardView: View {
     /// 网格极简模式开关（UserCustomization.minimalGridKey，默认关闭）。
     @AppStorage(UserCustomization.minimalGridKey) private var minimalGrid = false
     let game: Game
+    /// 格子形状。默认竖版 = 既有全部调用点零改动。
+    var shape: CardShape = .portrait
+
+    /// 封面锚点比例：竖版 2:3、方形 1:1。
+    private var coverAspectRatio: CGFloat {
+        shape == .square ? 1.0 : 2.0 / 3.0
+    }
+
+    /// 封面填充方式：**由「这张图放进这个格子会不会被裁」决定**，不由格子形状决定。
+    ///
+    /// 判据只有一处 —— `AppImage.letterboxes(inBoxAspect:)`（`Models/Artwork.swift`）：
+    /// 源图比格子更宽（宽出 1.15 一档）就 `fit`（完整显示、上下留空），否则 `fill`（填满、裁边）。
+    ///
+    /// - 方形网格 + 方图 → 比 1:1 格窄 → `fill`，方图正好满铺（§55 的决策，没变）；
+    /// - 方形网格 + 竖版封面 → 更窄 → `fill`，居中裁切填满（格子齐平，代价是竖图上下被裁）；
+    /// - 方形网格 + **横图** → 更宽 → `fit`（**新增**：以前方形网格一律 `fill`，
+    ///   而横图被裁掉的是左右两侧，正是用户报的"封面被放大然后裁切"）；
+    /// - 竖版网格 + 方图 → 更宽 → `fit`（上下留空，§54.6）；
+    /// - 竖版网格 + 竖版封面 → 一样宽 → `fill`（照旧）。
+    ///
+    /// 关键是**看实际要画的那张图**（`preferredArtwork`，方形网格读的是 `squareGridImage`）——
+    /// 改造前这里读的是「封面位那一张是不是方形」（旧属性 `Game.coverIsSquare`，已删除），
+    /// 那个问法有两个答不出的：方形网格读的是**另一个槽**（方图），横图也不是「非方」两个字
+    /// 能概括的（320×176 落进"非方"就一律被裁）。
+    ///
+    /// 单拆一个属性是因为三元表达式会读不出来（`.fill` 被推成 `CGSize`）。
+    private var coverContentMode: ContentMode {
+        guard let image = preferredArtwork else { return .fill }
+        return image.letterboxes(inBoxAspect: coverAspectRatio) ? .fit : .fill
+    }
+
+    /// 内容是否需要自己圆角：`fit` 那一半够不到外层框的四个角，要自己圆（否则是四个直角
+    /// 浮在圆角卡片里）。`fill` 那一半由外层 `cover` 的 `clipShape` 裁，这里给 0 = 什么都不做。
+    private var coverInnerRadius: CGFloat {
+        coverContentMode == .fit ? 8 : 0
+    }
 
     private var cover: some View {
-        // 固定 3:4 方格锚点：用 Color.clear 占位确定尺寸，图片 scaledToFill 覆盖裁剪，
+        // 固定比例方格锚点：用 Color.clear 占位确定尺寸，图片覆盖裁剪，
         // 避免 Image 自带比例撑高单元格导致与相邻卡片重叠（参见 §4.22 安全图案）。
+        // ⚠️ 锚点**不随图片比例变**：方图与竖图占同样大的格子，网格才不会错位。
         Color.clear
-            .aspectRatio(2.0 / 3.0, contentMode: .fit)
-            .overlay {
-                if let image = game.coverImage {
-                    Image(appImage: image)
-                        .resizable()
-                        .scaledToFill()
-                } else {
-                    ZStack {
-                        Rectangle()
-                            .fill(Color.semantic(.quaternarySystemFill))
-                        Image(systemName: "gamecontroller")
-                            .font(.system(size: 32))
-                            .foregroundStyle(.tertiary)
-                    }
-                }
-            }
+            .aspectRatio(coverAspectRatio, contentMode: .fit)
+            .overlay { coverContent }
             .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    /// 卡片该读哪张图 —— **两种网格各有一套槽位优先级**，都定义在 `Artwork.swift`：
+    /// - 竖版网格：`Game.coverImage`（2:3 竖版优先，没有才退方图）；
+    /// - 方形网格：`Game.squareGridImage`（**1:1 方图优先**，没有才退竖版封面居中裁切）。
+    ///
+    /// 分两套的原因是 2026-09-17 用户实测反馈「库内原有游戏的方形网格视图没有用方形封面而是
+    /// 竖向封面」：两槽都有的游戏若照 `coverImage` 读，1:1 格子里塞的是竖版封面。
+    private var preferredArtwork: AppImage? {
+        shape == .square ? game.squareGridImage : game.coverImage
+    }
+
+    @ViewBuilder
+    private var coverContent: some View {
+        if let image = preferredArtwork {
+            Image(appImage: image)
+                .resizable()
+                .aspectRatio(contentMode: coverContentMode)
+                // fit 的那一半要自己圆角；fill 的那一半由外层裁，见 `coverInnerRadius`。
+                .clipShape(RoundedRectangle(cornerRadius: coverInnerRadius))
+        } else {
+            ZStack {
+                Rectangle()
+                    .fill(Color.semantic(.quaternarySystemFill))
+                Image(systemName: "gamecontroller")
+                    .font(.system(size: 32))
+                    .foregroundStyle(.tertiary)
+            }
+        }
     }
 
     private var platformText: String {
@@ -151,7 +228,19 @@ struct GameCardView: View {
     }
 
     var body: some View {
-        if minimalGrid {
+        // ⚠️ 删除守卫必须在最外层，且必须在**读任何属性之前**。
+        //
+        // 为什么卡片 body 会拿着一个已销毁的模型再跑一遍：批量删除（「清空导入数据」一次
+        // 删掉几百个条目、备份导入整库替换）之后，`@Query` 会给出新数组，但 SwiftUI 已经
+        // 排队的渲染动作（实测是 `ScrollViewCommitMutation.commit`）仍带着**旧数组**里那个
+        // 子视图重新求值 —— 而那一刻删除早已落盘。2026-09-16 真机崩溃现场就是它。
+        //
+        // 判据用 `Game.isLive`（= `modelContext != nil`），**不是 `isDeleted`** ——
+        // 后者在 `save()` 之后会翻回 false，见 `Game.isLive` 的说明。
+        if !game.isLive {
+            // 方形网格要单独一档占位：1:1 与 2:3 的格子高度不同，用错档会让行高先塌再弹。
+            DeletedModelPlaceholder(style: shape == .square ? .squareGridCard : .gridCard)
+        } else if minimalGrid {
             // 极简模式：仅封面 + 右上角胶囊 + 爱心角标（无名称/平台/日期信息行）。
             ZStack(alignment: .topTrailing) {
                 cover
@@ -240,12 +329,29 @@ struct GameRowView: View {
     }
 
     var body: some View {
+        // 已销毁模型的守卫 —— 同 `GameCardView.body` 的那段说明，必须在读任何属性之前。
+        if !game.isLive {
+            DeletedModelPlaceholder(style: .listRow)
+        } else {
+            rowContent
+        }
+    }
+
+    /// 行内缩略图的框。写成常量是因为**画图的判据与 `frame` 必须用同一个数** ——
+    /// 分头写一个 40/54、一个 0.74，改一处漏一处就会变成「按这个比例判断、放进那个框里」。
+    private static let thumbSize = CGSize(width: 40, height: 54)
+    private static var thumbAspect: CGFloat { thumbSize.width / thumbSize.height }
+
+    private var rowContent: some View {
         HStack(spacing: 12) {
             Group {
                 if let image = game.coverImage {
                     Image(appImage: image)
                         .resizable()
-                        .scaledToFill()
+                        // 比 40×54 这个框宽的图（方形来源的 1:1 图标、导入的横图）完整显示、
+                        // 上下留空；竖版封面同样宽 → 照旧填满裁切。行高不变，列表不会跳。
+                        // 见 `AppImage.letterboxes(inBoxAspect:)`（判据只有那一处）。
+                        .aspectRatio(contentMode: image.letterboxes(inBoxAspect: Self.thumbAspect) ? .fit : .fill)
                 } else {
                     ZStack {
                         Rectangle().fill(Color.semantic(.quaternarySystemFill))
@@ -253,7 +359,7 @@ struct GameRowView: View {
                     }
                 }
             }
-            .frame(width: 40, height: 54)
+            .frame(width: Self.thumbSize.width, height: Self.thumbSize.height)
             .clipShape(RoundedRectangle(cornerRadius: 6))
 
             VStack(alignment: .leading, spacing: 2) {
@@ -314,7 +420,10 @@ struct GameWideCardView: View {
     }
 
     var body: some View {
-        if iPadLayout.isPadLandscapeCard(viewWidth: viewWidth) {
+        // 已销毁模型的守卫 —— 同 `GameCardView.body` 的那段说明，必须在读任何属性之前。
+        if !game.isLive {
+            DeletedModelPlaceholder(style: .wideCard)
+        } else if iPadLayout.isPadLandscapeCard(viewWidth: viewWidth) {
             horizontalCard
         } else if iPadLayout.isPad {
             iPadPortraitCard
@@ -477,17 +586,22 @@ struct GameWideCardView: View {
         }
     }
 
-    /// 封面区（方形满边长、上下左右全贴边）：1:1 图 scaledToFill 零裁切正好填满；
-    /// 无 1:1 图用竖版封面 scaledToFit 等高完整展示（左右透卡底材质，不垫灰底）；
+    /// 封面区（方形满边长、上下左右全贴边）：1:1 图 `fill` 零裁切正好填满；
+    /// 无 1:1 图用竖版封面 `fit` 等高完整展示（左右透卡底材质，不垫灰底）；
     /// 全无图手柄占位。frame 定尺寸在前、clipped 在后，防图铺出图区（§40.1 教训）。
     /// 边长参数化：横版卡 = cardHeight，iPad 竖版卡 = iPadPortraitEdge（列宽）。
+    ///
+    /// 两条分支的取舍**故意不一样**，别"统一"掉：第一支有图就占满整格（§55 的方形满铺），
+    /// 只有「比这个 1:1 格更宽的图」（横图）才改判 `fit` —— 否则它会变成中间一条；
+    /// 第二支本来就是 `fit`（竖版封面在这个正方形图区里左右留白是定稿的观感）。
     @ViewBuilder
     private func imageArea(edge: CGFloat) -> some View {
         Group {
             if let image = game.squareImage {
                 Image(appImage: image)
                     .resizable()
-                    .scaledToFill()
+                    // 判据的框比例就是 1（正方形图区）。见 `AppImage.letterboxes(inBoxAspect:)`。
+                    .aspectRatio(contentMode: image.letterboxes(inBoxAspect: 1) ? .fit : .fill)
                     .frame(width: edge, height: edge)
                     .clipped()
             } else if let image = game.coverImage {

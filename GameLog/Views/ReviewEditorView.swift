@@ -49,10 +49,11 @@ struct ReviewEditorView: View {
 
     private func load() {
         // 分组编辑：单字段 review，无题眼。编辑窗口开着时目标可能在主窗口被删（级联），
-        // isDeleted 的对象不加载，避免读已失效模型。
+        // 已销毁的对象不加载，避免读已失效模型。
+        // ⚠️ 判据是 `isLive`，不是 `isDeleted` —— 后者在 save() 之后会翻回 false（见 Game.isLive）。
         if let gid = session.groupID,
            let resolved = context.model(for: gid) as? GameGroup,
-           !resolved.isDeleted {
+           resolved.isLive {
             group = resolved
             game = nil
             reviewTitle = ""
@@ -62,7 +63,7 @@ struct ReviewEditorView: View {
         // 游戏编辑（默认路径，不破坏既有行为）。
         guard let id = session.gameID,
               let resolved = context.model(for: id) as? Game,
-              !resolved.isDeleted else {
+              resolved.isLive else {
             game = nil
             group = nil
             return
@@ -226,10 +227,10 @@ struct ReviewEditorView: View {
     /// 保存当前编辑目标：游戏写回 reviewTitle/reviewBody，分组写回单字段 review。
     /// 编辑期间目标被删除（主窗口级联删除）则放弃写回，只关窗。
     private func saveCurrent() {
-        if let game, !game.isDeleted {
+        if let game, game.isLive {
             game.reviewTitle = reviewTitle.trimmingCharacters(in: .whitespacesAndNewlines)
             game.reviewBody = controller.markdown
-        } else if let group, !group.isDeleted {
+        } else if let group, group.isLive {
             group.review = controller.markdown
         }
         try? context.save()

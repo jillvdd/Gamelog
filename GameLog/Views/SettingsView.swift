@@ -63,6 +63,10 @@ struct SettingsView: View {
 
     @Query(sort: \Game.createdAt) private var games: [Game]
     @Query(sort: \GameGroup.name) private var groups: [GameGroup]
+    @Query private var linkedAccounts: [LinkedAccount]
+
+    /// 「游戏账号」一行右侧的计数。
+    private var linkedAccountCount: Int { linkedAccounts.count }
 
     @State private var statusMessage: String?
     @State private var showingImportConfirm = false
@@ -99,6 +103,9 @@ struct SettingsView: View {
     @State private var showingBannerPicker = false
     @State private var showingAbout = false
     #endif
+
+    /// 游戏账号（双平台共用：macOS 的「设置」窗口里也要能进）。
+    @State private var showingAccounts = false
 
     var body: some View {
         Form {
@@ -285,6 +292,34 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            Section {
+                Button {
+                    showingAccounts = true
+                } label: {
+                    HStack {
+                        Label(L10n.tr("settings.accounts", lang: language),
+                              systemImage: "person.crop.circle.badge.checkmark")
+                        Spacer()
+                        if linkedAccountCount > 0 {
+                            Text(verbatim: "\(linkedAccountCount)")
+                                .foregroundStyle(.secondary)
+                        }
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                .buttonStyle(.plain)
+                LText("settings.accountsHint")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } header: {
+                HStack(spacing: 6) {
+                    Text(verbatim: L10n.tr("settings.accounts", lang: language))
+                    TagLabel(text: L10n.tr("account.experimental", lang: language), tint: .orange)
+                }
+            }
+
             Section(L10n.tr("settings.backup", lang: language)) {
                 Toggle(L10n.tr("settings.autoBackup", lang: language), isOn: $autoBackup)
                 LText("settings.autoBackupHint")
@@ -394,6 +429,9 @@ struct SettingsView: View {
                 ConfirmAction(title: L10n.tr("settings.cacheClear", lang: language)) { clearCache() }
             ]
         )
+        .sheet(isPresented: $showingAccounts) {
+            ExternalAccountsView()
+        }
         .sheet(item: $cropSession) { session in
             ImageCropSheet(
                 kind: session.kind,
@@ -490,8 +528,7 @@ struct SettingsView: View {
             } else {
                 RoundedRectangle(cornerRadius: 6)
                     .fill(LinearGradient(
-                        colors: [Color(red: 0.13, green: 0.115, blue: 0.09),
-                                 Color(red: 0.075, green: 0.067, blue: 0.055)],
+                        colors: [BrandPalette.gradientTop, BrandPalette.background],
                         startPoint: .topLeading, endPoint: .bottomTrailing))
                     .overlay {
                         Image(systemName: "photo")

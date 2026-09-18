@@ -9,25 +9,35 @@ struct StatsView: View {
     @AppStorage(UserCustomization.collectorModeKey) private var collectorMode = false
     @State private var showingOverall = false
     /// 点击榜单游戏名 → 编程式 push 到详情。
+    ///
+    /// ⚠️ 这里是**有守卫的例外**（项目规矩本是「`@State` 只存 `PersistentIdentifier`」）：
+    /// 整库替换时 `libraryReplacedNotification` 会把它清掉（见 body 末尾），推送时再挡一道
+    /// `isLive`。保留 `Game?` 而非 ID，是因为榜单行传入的就是 `Game`，改 ID 会让
+    /// `RankingBoard.onSelect` 的签名也跟着变 —— 收益不抵改动面（同 `LibraryView` 的取舍）。
     @State private var selectedGame: Game?
 
-    private var totalGames: Int { games.count }
+    private var totalGames: Int { liveGames.count }
+
+    /// 还活着的游戏。本页所有统计、榜单、封面都从**这一个**入口取 ——
+    /// 批量删除后 SwiftUI 会拿旧 `@Query` 数组再渲染一帧，而统计与榜单读的是数组本身
+    /// （没有卡片那层守卫），读一个已销毁模型就是 SwiftData fatal（见 `Game.isLive`）。
+    private var liveGames: [Game] { games.filter(\.isLive) }
 
     // MARK: - 派生统计（唯一归属 = Support/LibraryStats.swift）
 
     private var collectorTotals: LibraryStats.CollectorTotals {
-        LibraryStats.collectorTotals(games.flatMap(\.copies), language: language)
+        LibraryStats.collectorTotals(liveGames.flatMap(\.copies), language: language)
     }
     private var totalCopyCount: Int { collectorTotals.editionCount }
     private var totalCopyQuantity: Int { collectorTotals.totalQuantity }
     private var totalSpent: Double? { collectorTotals.totalSpent }
     private var totalEstimate: Double? { collectorTotals.totalEstimate }
 
-    private var backlogCount: Int { LibraryStats.backlogCount(games) }
-    private var avgScore: Double? { LibraryStats.averageScore(games) }
+    private var backlogCount: Int { LibraryStats.backlogCount(liveGames) }
+    private var avgScore: Double? { LibraryStats.averageScore(liveGames) }
 
     private var platformCounts: [(platform: String, count: Int)] {
-        LibraryStats.platformDistribution(games)
+        LibraryStats.platformDistribution(liveGames)
     }
 
     private var maxPlatformCount: Int {
@@ -39,7 +49,7 @@ struct StatsView: View {
             GeometryReader { geo in
                 ScrollView {
                     VStack(alignment: .leading, spacing: 24) {
-                        if games.isEmpty {
+                        if liveGames.isEmpty {
                             ContentUnavailableView {
                                 Image(systemName: "chart.bar")
                                     .font(.system(size: 48))
@@ -102,10 +112,7 @@ struct StatsView: View {
                                         }
                                     }
                                     .padding(14)
-                                    .background(
-                                        RoundedRectangle(cornerRadius: 10)
-                                            .fill(Color.semantic(.controlBackground))
-                                    )
+                                    .appCardSurface()
                                 }
                             }
 
@@ -128,7 +135,12 @@ struct StatsView: View {
             }
             .navigationTitle(hideToolbarGlass ? "" : L10n.tr("library.stats", lang: language))
             .appToolbar()
-            .navigationDestination(item: $selectedGame) { GameDetailView(game: $0) }
+            // 纵深守卫：整库替换的通知与重置之间有一帧缝隙，那时 selectedGame 已 detached，
+            // 推详情即读死模型。判据是 `isLive` 而非 `isDeleted`（见 `Game.isLive`）。
+            .navigationDestination(item: Binding(
+                get: { selectedGame?.isLive == true ? selectedGame : nil },
+                set: { selectedGame = $0 }
+            )) { GameDetailView(game: $0) }
             .navigationDestination(isPresented: $showingOverall) { OverallRankingView() }
             // 整库替换后栈上旧 Game 已 detached：退出详情防悬空访问（2026-09-08）。
             .onReceive(NotificationCenter.default.publisher(for: UserCustomization.libraryReplacedNotification)) { _ in
@@ -144,10 +156,7 @@ struct StatsView: View {
                 .font(.title3.bold())
             collectorTilesGrid
                 .padding(14)
-                .background(
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(Color.semantic(.controlBackground))
-                )
+                .appCardSurface()
         }
     }
 
@@ -190,17 +199,17 @@ struct StatsView: View {
 
             RankingBoard(
                 title: L10n.tr("group.avgScore", lang: language),
-                entries: Rankings.byAverage(games: games, platform: nil),
+                entries: Rankings.byAverage(games: liveGames, platform: nil),
                 limit: 10,
                 onSelect: { selectedGame = $0 }
             )
 
             LazyVGrid(columns: rankingColumns(for: width), spacing: 12) {
                 // 全库都没人评的维度不显示空榜。
-                ForEach(Dimension.allCases.filter { !Rankings.byDimension($0, games: games, platform: nil).isEmpty }) { dimension in
+                ForEach(Dimension.allCases.filter { !Rankings.byDimension($0, games: liveGames, platform: nil).isEmpty }) { dimension in
                     RankingBoard(
                         title: L10n.tr(dimension.labelKey, lang: language),
-                        entries: Rankings.byDimension(dimension, games: games, platform: nil),
+                        entries: Rankings.byDimension(dimension, games: liveGames, platform: nil),
                         limit: 5,
                         onSelect: { selectedGame = $0 }
                     )
@@ -213,10 +222,7 @@ struct StatsView: View {
                 Label(L10n.tr("stats.overallRanking", lang: language), systemImage: "arrow.up.right")
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(14)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(Color.semantic(.controlBackground))
-                    )
+                    .appCardSurface()
             }
             .buttonStyle(.plain)
         }
@@ -253,9 +259,6 @@ struct StatsView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(20)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color.semantic(.controlBackground))
-        )
+        .appPanelSurface()
     }
 }

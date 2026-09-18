@@ -57,6 +57,8 @@ extension View {
 /// 固定内容高 30pt = 标准液态玻璃按钮高度。
 struct LiquidGlassSegmentPressStyle: ButtonStyle {
     @State private var hovering = false
+    /// 「减弱动态效果」：开启后 hover 亮斑直接切换（不走 spring 缩放浮现），按压不缩放。
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -69,11 +71,11 @@ struct LiquidGlassSegmentPressStyle: ButtonStyle {
                     .overlay(Circle().fill(Color.white.opacity(0.12)))
                     .frame(width: 36, height: 36)
                     .opacity(hovering ? 1 : 0)
-                    .scaleEffect(hovering ? 1.0 : 0.5)
+                    .scaleEffect(hovering || reduceMotion ? 1.0 : 0.5)
                     .animation(.spring(response: 0.25, dampingFraction: 0.8), value: hovering)
             }
             .contentShape(Rectangle())
-            .scaleEffect(configuration.isPressed ? 0.85 : 1.0)
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.85 : 1.0)
             .opacity(configuration.isPressed ? 0.6 : 1.0)
             .animation(.spring(response: 0.3, dampingFraction: 0.65), value: configuration.isPressed)
             #if os(macOS)

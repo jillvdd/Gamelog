@@ -15,21 +15,29 @@ struct GroupGamePickerView: View {
     @State private var platformFilter: String?
 
     /// 整库出现过的平台：唯一归属 LibraryStats。
-    private var platforms: [String] { LibraryStats.platformsInUse(games) }
+    ///
+    /// 先滤掉已销毁的游戏：本页每个格子都读 `game.coverImage`（外置存储，必 fault 回
+    /// store），而整库替换 / 「清空该账号导入数据」之后 `@Query` 会滞后一帧 ——
+    /// 那就是 `Fatal error: This backing data was detached`（判据见 `Game.isLive`）。
+    private var platforms: [String] { LibraryStats.platformsInUse(games.filter(\.isLive)) }
 
     private var visibleGames: [Game] {
         // 过滤+排序统一走 LibraryQuery（按名排序 + 稳定平级裁决——修复并列游戏重渲染换位）。
         let result = LibraryQuery.filter(
-            games: games, group: nil, platform: platformFilter, status: nil, search: searchText
+            games: games.filter(\.isLive), group: nil, platform: platformFilter, status: nil, search: searchText
         )
         return LibraryQuery.sorted(result, by: .name, language: language)
     }
 
     private func isInGroup(_ game: Game) -> Bool {
-        group.games.contains { $0.persistentModelID == game.persistentModelID }
+        guard group.isLive else { return false }
+        return group.games.contains { $0.persistentModelID == game.persistentModelID }
     }
 
     private func toggle(_ game: Game) {
+        // 纵深守卫：分组可能已被整库替换删掉，`group.games` 读一下就是 SwiftData fatal
+        //（本页是 popover，不会随根视图的状态重置一起关掉）。
+        guard group.isLive, game.isLive else { return }
         if let idx = group.games.firstIndex(where: { $0.persistentModelID == game.persistentModelID }) {
             group.games.remove(at: idx)
         } else {
@@ -39,6 +47,16 @@ struct GroupGamePickerView: View {
     }
 
     var body: some View {
+        Group {
+            if group.isLive {
+                content
+            } else {
+                Color.clear
+            }
+        }
+    }
+
+    private var content: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(verbatim: "\(group.name) · \(L10n.tr("group.memberCount", [group.games.count], lang: language))")
                 .font(.headline)
@@ -109,13 +127,20 @@ struct GroupGamePickerView: View {
         .buttonStyle(PressFeedbackButtonStyle(pressedScale: 0.95))
     }
 
+    /// 选择器格子的比例（3:4）。画图的判据与 `aspectRatio` **共用这一个数**，
+    /// 见 `GameRowView.thumbSize` 那条说明。
+    private static let coverAspect: CGFloat = 3.0 / 4.0
+
     @ViewBuilder
     private func cover(for game: Game) -> some View {
         Group {
             if let image = game.coverImage {
                 Image(appImage: image)
                     .resizable()
-                    .scaledToFill()
+                    // 比 3:4 这个框宽的图（1:1 图标、导入的横图）完整显示、上下留空；
+                    // 竖版封面比它窄 → 照旧填满裁切。外层锚点不变，选择器网格不会错位。
+                    // 见 `AppImage.letterboxes(inBoxAspect:)`（判据只有那一处）。
+                    .aspectRatio(contentMode: image.letterboxes(inBoxAspect: Self.coverAspect) ? .fit : .fill)
             } else {
                 ZStack {
                     Rectangle().fill(Color.semantic(.quaternarySystemFill))
@@ -125,7 +150,7 @@ struct GroupGamePickerView: View {
                 }
             }
         }
-        .aspectRatio(3.0 / 4.0, contentMode: .fit)
+        .aspectRatio(Self.coverAspect, contentMode: .fit)
         .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 

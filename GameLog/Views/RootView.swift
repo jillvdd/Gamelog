@@ -21,6 +21,8 @@ private extension GameStatus {
         case .dropped: "xmark.circle"
         case .longRunning: "infinity"
         case .completed: "checkmark.circle"
+        // catch-all 档位（自动建库的条目落在这里，等用户自己去分）→ 与 `StatusStyle.statusIcon` 一致。
+        case .unclassified: "questionmark.circle"
         }
     }
 }
@@ -67,8 +69,14 @@ struct RootView: View {
     @State private var pickingGamesGroup: GameGroup?
 
     /// 平台 → 去重游戏数 / 在用平台：唯一归属 LibraryStats。
-    private var platformCounts: [String: Int] { LibraryStats.platformCounts(games) }
-    private var platformsInUse: [String] { LibraryStats.platformsInUse(games) }
+    ///
+    /// 先滤掉已销毁的游戏：整库替换 / 清空导入数据之后 `@Query` 会滞后一帧，而这两个
+    /// 统计读的是数组本身（不像卡片自带守卫）—— 读死模型就是 SwiftData fatal（见 `Game.isLive`）。
+    private var platformCounts: [String: Int] { LibraryStats.platformCounts(games.filter(\.isLive)) }
+    private var platformsInUse: [String] { LibraryStats.platformsInUse(games.filter(\.isLive)) }
+
+    /// 还活着的分组。侧边栏每行都要读 `group.name`，死分组会直接崩（见 `Game.isLive`）。
+    private var liveGroups: [GameGroup] { groups.filter(\.isLive) }
 
     /// 分组行「选择游戏」的 popover 绑定：只在该行分组被选中时弹出，锚定到该行。
     private func popoverBinding(for group: GameGroup) -> Binding<GameGroup?> {
@@ -129,7 +137,7 @@ struct RootView: View {
                     if groupsExpanded {
                         Label(L10n.tr("game.favorites", lang: language), systemImage: "heart.fill")
                             .tag(SidebarItem.favorites)
-                        ForEach(groups) { group in
+                        ForEach(liveGroups) { group in
                             Label(group.name, systemImage: "folder")
                                 .tag(SidebarItem.group(group))
                                 .contextMenu {
@@ -200,7 +208,7 @@ struct RootView: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(.ultraThinMaterial)
+                .background(.thinMaterial)
                 .overlay(alignment: .top) { Divider() }
             }
         } detail: {
@@ -249,6 +257,8 @@ struct RootView: View {
         .sheet(isPresented: $showingNewGroup) {
             NewGroupSheet()
         }
+        // 守卫判据是 `isLive`（`modelContext != nil`），不是 `isDeleted` —— 后者在 save()
+        // 之后会翻回 false（见 `Game.isLive`）。改名面板自己也在 body 里挡一道，这里是第二道。
         .sheet(item: $renameGroup) { group in
             RenameGroupSheet(group: group)
         }
@@ -258,7 +268,7 @@ struct RootView: View {
             titleVisibility: .visible
         ) {
             Button(L10n.tr("common.delete", lang: language), role: .destructive) {
-                if let group = deleteGroup {
+                if let group = deleteGroup, group.isLive {
                     if case .group(let selected) = selection, selected.persistentModelID == group.persistentModelID {
                         selection = .all
                     }
@@ -273,7 +283,7 @@ struct RootView: View {
                 deleteGroup = nil
             }
         } message: {
-            if let group = deleteGroup {
+            if let group = deleteGroup, group.isLive {
                 Text(verbatim: L10n.tr("group.deleteConfirm", [group.name], lang: language))
             }
         }
@@ -287,21 +297,38 @@ struct RenameGroupSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Query(sort: \GameGroup.name) private var groups: [GameGroup]
     let group: GameGroup
-    @State private var name: String
-
-    init(group: GameGroup) {
-        self.group = group
-        _name = State(initialValue: group.name)
-    }
+    /// 名字**不在 init 里读**（`init` 会无条件执行，而这张面板可能开在整库替换的同一刻，
+    /// 那时 `group` 已是死模型 —— 在 init 里读 `group.name` 就直接崩）。改在 `body` 的
+    /// `isLive` 守卫之后装填。
+    @State private var name = ""
+    @State private var didLoad = false
 
     private var trimmed: String { name.trimmingCharacters(in: .whitespaces) }
+    /// 重名判定要滤掉死分组：整库替换后 `@Query` 会滞后一帧，读死分组的 `name` 即 fatal。
     private var isDuplicate: Bool {
         !trimmed.isEmpty && groups.contains {
-            $0.persistentModelID != group.persistentModelID && $0.name == trimmed
+            $0.isLive && $0.persistentModelID != group.persistentModelID && $0.name == trimmed
         }
     }
 
     var body: some View {
+        Group {
+            if group.isLive {
+                content
+            } else {
+                Color.clear
+            }
+        }
+        .onAppear {
+            // 装填前再挡一道 `isLive`：`onAppear` 挂在 Group 上，死分支也会触发，
+            // 那时 `group.name` 就是读已销毁模型（见 `GameGroup.isLive`）。
+            guard !didLoad, group.isLive else { return }
+            didLoad = true
+            name = group.name
+        }
+    }
+
+    private var content: some View {
         VStack(spacing: 16) {
             LText("group.rename")
                 .font(.headline)

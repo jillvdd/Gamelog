@@ -124,12 +124,10 @@ struct CompletionCardView: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(Color.semantic(.controlBackground))
-        )
+        .appCardSurface()
+        // 描边半径必须跟着 `cardRadius` 走，否则改圆角时边框会错位。
         .overlay(
-            RoundedRectangle(cornerRadius: 10)
+            RoundedRectangle(cornerRadius: SurfaceStyle.cardRadius)
                 .stroke(Color.semantic(.separator))
         )
     }
@@ -268,7 +266,8 @@ private struct LocalizedNamesSubtitle: View {
         default: others = [game.nameZh, game.nameJa].compactMap { $0 }
         }
         let display = game.displayName(for: currentLanguage)
-        return others.filter { $0 != display }
+        // 空值要滤掉：主名可以为空（见 `Game.name`），不滤会渲染出一行空白。
+        return others.filter { !$0.isEmpty && $0 != display }
     }
 
     var body: some View {
@@ -323,14 +322,14 @@ private struct DetailStatusPicker: View {
             ZStack(alignment: .topLeading) {
                 // 选中滑块：内部 sliderIndex 驱动，offset + spring 动画，独立于父视图重算。
                 RoundedRectangle(cornerRadius: 9)
-                    .fill(Color.accentColor.opacity(0.18))
+                    .fill(SurfaceStyle.segmentHighlight)
                     .overlay(
                         RoundedRectangle(cornerRadius: 9)
-                            .strokeBorder(Color.accentColor.opacity(0.45), lineWidth: 1)
+                            .strokeBorder(SurfaceStyle.segmentTrack, lineWidth: 1)
                     )
                     .frame(width: cellWidth, height: geo.size.height)
                     .offset(x: CGFloat(sliderIndex) * cellWidth)
-                    .animation(.spring(response: 0.3, dampingFraction: 0.78), value: status)
+                    .animation(SurfaceStyle.segmentSpring, value: status)
                 // 按钮层：每个状态一列，整格可点；分段本体带按压形变（选中滑块另有 spring 动画）。
                 HStack(spacing: 0) {
                     ForEach(all) { s in
@@ -368,6 +367,10 @@ struct GameDetailView: View {
     @AppStorage(UserCustomization.collectorModeKey) private var collectorMode = false
     /// 隐藏上方毛玻璃（全局开关）：开启 = 无标题 + 无毛玻璃，与 Library / 统计一致。
     @AppStorage(UserCustomization.hideToolbarGlassKey) private var hideToolbarGlass = false
+    /// 「游戏记录」折叠区是否展开（默认 true = 展开，跨会话记忆）。
+    /// 默认展开意味着**加这一节之前长什么样，现在还是什么样**（纯增量）。
+    /// 全局一份而不是每个游戏一份，理由见 `externalRecordsSection`。
+    @AppStorage(UserCustomization.detailRecordsExpandedKey) private var recordsExpanded = true
     let game: Game
 
     @State private var detailTab: DetailTab = .details
@@ -379,6 +382,14 @@ struct GameDetailView: View {
     @State private var pendingDeleteCompletion: Completion?
     @State private var showingDeleteGame = false
     @State private var showingShare = false
+
+    /// 该游戏的**来源记录**（只用来渲染「奖杯」区块）。
+    ///
+    /// 一律**全量取回再内存过滤**，不读 `game.externalRecords` 这个 inverse ——
+    /// 与 `ImportCoordinator` / `ExternalAccountDetailView` 同一条纪律。
+    /// 消费前先滤 `isLive`：同步会删记录（`purge` / 换绑），而 `@Query` 结果数组会滞后一帧，
+    /// 读已销毁记录的 `titleName` / `account` 就是 SwiftData fatal。
+    @Query private var allExternalRecords: [ExternalGameRecord]
     /// 状态机选中值：绑定局部 @State 隔离，避免每次点击时因 game 模型变化导致 Picker 重绘重载。
     /// 初始值在 init 中取自 game.statusValue，确保首帧即正确（不闪一下「已通关」再滑过去）。
     @State private var detailStatus: GameStatus
@@ -398,10 +409,403 @@ struct GameDetailView: View {
         !game.reviewTitle.isEmpty || !game.reviewBody.isEmpty
     }
 
+    // MARK: - 奖杯
+
+    /// 这个游戏该显示的奖杯进度（**空数组 = 整块不渲染**）。
+    ///
+    /// 四条判据，每条都有理由：
+    /// - **只认 PlayStation**：奖杯是 PSN 独有的来源事实，任天堂那边没有这个东西
+    ///   （`ExternalGameRecord.trophies` 对 Nintendo 恒为 nil，这里再挡一道是纵深）。
+    /// - **没有被关联的 PSN 记录、或记录没有奖杯数据 → 那一条不进列表**。留一个空标题
+    ///   「奖杯」下面什么都没有，比不显示更糟 —— 用户会以为数据丢了。
+    /// - **一条记录一张卡**（2026-09-17 用户要求）。每条来源记录是一个**独立的奖杯套**，
+    ///   各有自己的平台与编号。此前这里只取「已获得最多」的那**一条** —— 那会把
+    ///   「哪个版本拿了多少」整件事抹掉：港版人中之龙 0 的 PS3/PS4 套与 PS4 套是两套奖杯，
+    ///   只显示其中一套，用户就无从知道另一套还剩几个。用户的原话是
+    ///   「每个游戏的版本，平台，奖杯一一对应」。
+    /// - **排序：已获得降序 → 最近游玩降序 → 编号升序**。第一条因此与旧版的「取最多」
+    ///   逐字一致（不制造意外），后两条只为了结果稳定 —— 同分时不会每次刷新换个位置。
+    ///
+    /// ⚠️ **游玩三项与奖杯取自同一条记录**，不各自去挑「时长最多的那条」——
+    /// 那会拼出一份任何单一来源都不存在的组合（奖杯是 PS5 版的、时长是 PS4 版的）。
+    /// 宁可每张卡各自同源，也不要一块看起来更丰富、实则拼凑的卡。
+    private var trophySources: [TrophySource] {
+        let gameID = game.persistentModelID
+        let candidates = allExternalRecords.compactMap { record -> TrophySource? in
+            guard record.isLive,
+                  record.provider == .playstation,
+                  record.game?.persistentModelID == gameID,
+                  let progress = record.trophies else { return nil }
+            // 账号也可能已被解绑（记录随账号级联删除，同样滞后一帧）——
+            // 与上面同一条 guard 纪律，读已销毁模型的 `displayName` 同样是 fatal。
+            let account = record.account
+            return TrophySource(id: record.persistentModelID,
+                                progress: progress,
+                                accountName: (account?.isLive == true) ? account?.displayName : nil,
+                                platformText: record.psnPlatformDisplay,
+                                titleCode: record.titleCodeDisplay,
+                                firstPlayedAt: record.firstPlayedAt,
+                                lastPlayedAt: record.lastPlayedAt,
+                                hours: record.displayHours)
+        }
+        return candidates.sorted { lhs, rhs in
+            if lhs.progress.earnedTotal != rhs.progress.earnedTotal {
+                return lhs.progress.earnedTotal > rhs.progress.earnedTotal
+            }
+            let l = lhs.lastPlayedAt ?? .distantPast
+            let r = rhs.lastPlayedAt ?? .distantPast
+            if l != r { return l > r }
+            return lhs.titleCode < rhs.titleCode
+        }
+    }
+
+    /// 奖杯区块的来源数据（版式见 `TrophyProgressView`）。
+    ///
+    /// **值类型，不持有 `@Model`**：记录可能在同步 / 清空时被删掉，而本页还挂在导航栈上，
+    /// 持有引用就会在下一帧读已销毁模型（判据见 `Game.isLive`）。`id` 只用来给 `ForEach` 定序。
+    private struct TrophySource: Identifiable {
+        let id: PersistentIdentifier
+        let progress: TrophyProgress
+        let accountName: String?
+        /// 来源给的**平台列表**（`PS3/PS4`）—— 见 `ExternalGameRecord.psnPlatformDisplay`。
+        /// 是列表而不是单值：同一个奖杯套可以横跨两个平台，那正是用户要看到的「版本」。
+        let platformText: String?
+        /// 来源编号的展示写法（`NPWR-08547`）—— 见 `ExternalGameRecord.titleCodeDisplay`。
+        let titleCode: String
+        let firstPlayedAt: Date?
+        let lastPlayedAt: Date?
+        let hours: Int?
+    }
+
+    // MARK: - 游玩记录（Nintendo）
+
+    /// Nintendo 的游玩记录卡数据（**每条绑定的 Nintendo 记录一张**，版式见 `PlayActivityView`）。
+    ///
+    /// 入场判据整条交给 `ExternalGameRecord.showsPlayActivityCard`（来源是 Nintendo + 三项至少一项），
+    /// 这里只负责取账号名与排序 —— 判定写在视图里的话 DataSmoke 覆盖不到。
+    ///
+    /// 排序：**最近游玩降序 → 编号升序**。前者是这三项里唯一有先后意义的（用户想看最近在玩的），
+    /// 后者只为结果稳定：同一条记录每次刷新都排在同一个位置。奖杯卡那边还多一条「已获得降序」，
+    /// 这里没有奖杯可排。
+    private var playActivitySources: [PlayActivitySource] {
+        let gameID = game.persistentModelID
+        let candidates = allExternalRecords.compactMap { record -> PlayActivitySource? in
+            guard record.isLive,
+                  record.showsPlayActivityCard,
+                  record.game?.persistentModelID == gameID else { return nil }
+            // 账号也可能已被解绑（记录随账号级联删除，同样滞后一帧）——
+            // 与 `trophySources` 同一条 guard 纪律，读已销毁模型的 `displayName` 同样是 fatal。
+            let account = record.account
+            return PlayActivitySource(id: record.persistentModelID,
+                                      accountName: (account?.isLive == true) ? account?.displayName : nil,
+                                      titleId: record.titleId,
+                                      firstPlayedAt: record.firstPlayedAt,
+                                      lastPlayedAt: record.lastPlayedAt,
+                                      hours: record.displayHours)
+        }
+        return candidates.sorted { lhs, rhs in
+            let l = lhs.lastPlayedAt ?? .distantPast
+            let r = rhs.lastPlayedAt ?? .distantPast
+            if l != r { return l > r }
+            return lhs.titleId < rhs.titleId
+        }
+    }
+
+    /// 游玩记录卡的来源数据（版式见 `PlayActivityView`）。值类型、不持有 `@Model`，理由同 `TrophySource`。
+    private struct PlayActivitySource: Identifiable {
+        let id: PersistentIdentifier
+        let accountName: String?
+        /// 来源侧标题 ID。**不上屏**（16 位十六进制，用户认不出来），只用于同分时的稳定排序。
+        let titleId: String
+        let firstPlayedAt: Date?
+        let lastPlayedAt: Date?
+        let hours: Int?
+    }
+
+    // MARK: - 成就（Xbox）
+
+    /// Xbox 成就卡数据（**每条绑定的 Xbox 记录一张**，版式见 `XboxAchievementView`）。
+    ///
+    /// 入场判据整条交给 `ExternalGameRecord.showsXboxAchievementCard`（来源是 Xbox +
+    /// 成就四项或游玩两项至少一项），这里只负责取账号名与排序 —— 判定写在视图里的话
+    /// DataSmoke 覆盖不到。
+    ///
+    /// 排序与 `playActivitySources` 同口径：**最近游玩降序 → titleId 升序**。
+    /// 奖杯卡那边多一条「已获得降序」，这里没有对位物 —— 成就数与 Gamerscore 各有各的总数
+    /// （52 个成就 / 2000 分），跨游戏比大小没有意义。
+    private var xboxSources: [XboxSource] {
+        let gameID = game.persistentModelID
+        let candidates = allExternalRecords.compactMap { record -> XboxSource? in
+            guard record.isLive,
+                  record.showsXboxAchievementCard,
+                  record.game?.persistentModelID == gameID else { return nil }
+            // 账号也可能已被解绑（记录随账号级联删除，同样滞后一帧）——
+            // 与 `trophySources` 同一条 guard 纪律，读已销毁模型的 `displayName` 同样是 fatal。
+            let account = record.account
+            return XboxSource(id: record.persistentModelID,
+                              accountName: (account?.isLive == true) ? account?.displayName : nil,
+                              achievements: record.achievements,
+                              platformText: record.xboxPlatformDisplay,
+                              titleId: record.titleId,
+                              lastPlayedAt: record.lastPlayedAt,
+                              hours: record.displayHours)
+        }
+        return candidates.sorted { lhs, rhs in
+            let l = lhs.lastPlayedAt ?? .distantPast
+            let r = rhs.lastPlayedAt ?? .distantPast
+            if l != r { return l > r }
+            return lhs.titleId < rhs.titleId
+        }
+    }
+
+    /// 成就卡的来源数据（版式见 `XboxAchievementView`）。值类型、不持有 `@Model`，理由同 `TrophySource`。
+    private struct XboxSource: Identifiable {
+        let id: PersistentIdentifier
+        let accountName: String?
+        /// 成就进度。nil = 这条记录没有成就数据（卡片两格显示 `—`）。
+        let achievements: AchievementProgress?
+        /// 来源给的**可用平台列表**（`Xbox One/Xbox Series X|S`）—— 见 `ExternalGameRecord.xboxPlatformDisplay`。
+        let platformText: String?
+        /// 来源侧标题 ID。**不上屏**（十进制串，Xbox 自己的界面也不显示它），
+        /// 只用于同分时的稳定排序。
+        let titleId: String
+        let lastPlayedAt: Date?
+        let hours: Int?
+    }
+
+    /// 「游戏记录」折叠区：一行可点的标题 +（展开时）各来源卡。
+    ///
+    /// 2026-09-18 用户要求：「给游戏详情页的状态滑块和详情持有滑块中间加一个『游戏记录』…
+    /// 点击展开就显示卡片，不展开就收起卡片，另外如果游戏没有绑定游戏记录就不会有这一项」。
+    ///
+    /// - **一条来源记录都没有 → 整块不渲染**（连标题行也不出现）。判据是
+    ///   `externalCardItems.isEmpty`，与卡片本身读的是**同一个数组** —— 两处各判一次的话，
+    ///   早晚会出现「标题行在、里面空着」这种自相矛盾的版面。
+    /// - **默认展开、且是全局一份**（`UserCustomization.detailRecordsExpandedKey`）而不是
+    ///   每个游戏一份：与侧边栏三个分区同一套做法。默认展开 = 纯增量（加这一节之前的版面
+    ///   就是现在展开的样子）。代价是「在 A 游戏收起」会让 B 游戏也是收起 —— 用户收起的动机
+    ///   通常是「这类信息我暂时不看」，而不是「这个游戏我不看」。
+    /// - 展开/收起走 `withAnimation`，与侧边栏同一档 `.easeInOut(duration: 0.2)`。
+    ///
+    /// ⚠️ 展开时**卡与卡之间仍是页面原有的 28pt 行距**：这里再包一层 `VStack(spacing: 28)`
+    /// 正是为了「撑开/收起之外，版面与加这一节之前逐字一致」。`externalActivitySection`
+    /// 的单列分支本来靠的就是页面那个 `VStack(spacing: 28)`，现在中间多了本节这一层，
+    /// 不补上就变成 12pt —— 那是**顺带改了卡片间距**，不是用户要的改动。
+    @ViewBuilder
+    private func externalRecordsSection(width: CGFloat) -> some View {
+        let items = externalCardItems
+        if !items.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                recordsHeader(count: items.count)
+                if recordsExpanded {
+                    VStack(alignment: .leading, spacing: 28) {
+                        externalActivitySection(width: width)
+                    }
+                }
+            }
+        }
+    }
+
+    /// 「游戏记录」那一行：整行可点的折叠开关（chevron + 标题 + 张数）。
+    ///
+    /// 仿侧边栏的 `SidebarSectionHeader`（`RootView.swift`）：整行可点、`.plain` 按钮样式、
+    /// chevron 展开时转 90°。**没有直接复用那个类型** —— 它在 `RootView.swift` 里是 `private`，
+    /// 且那份字号/颜色是给侧边栏用的（11pt 全 secondary），拿到详情页会与
+    /// `game.completions` 那类区块标题差着两级。
+    ///
+    /// 标题档位取 `.headline` 而不是 `completionsSection` 的 `.title3.bold()`：这一行既是标题
+    /// 也是**开关**，视觉上要比一级区块标题轻，否则页面看起来平白多了一个大区块。
+    /// 张数走 `(N)` 的既有写法（同 `game.completions` 旁那个计数），是数字不是句子，不进 L10n。
+    ///
+    /// ⚠️ `count` 是**卡片数**（`externalCardItems.count`），不是「绑定的来源记录数」——
+    /// 两者在真库上并不总相等：**21 条已绑定的 PSN 记录没有奖杯数据**（`trophies == nil`，
+    /// PS3 时代没有奖杯套的那些），它们不出卡，于是这类游戏的张数会比绑定记录数少。
+    /// 选卡片数的理由：**展开后看到几张就是几**，收起时那一眼给的信息与展开结果自洽；
+    /// 写绑定记录数的话，用户展开一数少一张，看起来像丢了一条记录。
+    /// （「绑了记录但一张卡都不出」的条目也因此整块不显示 —— 与「没有记录」同样是「没东西可看」。）
+    ///
+    /// `accessibilityHint` 是这一行专有的：手写的折叠控件不像原生 `DisclosureGroup` 那样
+    /// 会被读屏念出「已展开/已折叠」，不给一句说明，读屏用户就不知道这一行点下去会藏起内容。
+    private func recordsHeader(count: Int) -> some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.2)) { recordsExpanded.toggle() }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .rotationEffect(.degrees(recordsExpanded ? 90 : 0))
+                    .foregroundStyle(.secondary)
+                    // 读屏不该念出「chevron」—— 这一行的语义由标题 + hint 说清。
+                    .accessibilityHidden(true)
+                LText("game.records")
+                    .font(.headline)
+                Text(verbatim: "(\(count))")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                Spacer(minLength: 0)
+            }
+            // 整行可点：`Spacer` 只把内容推到左边，可点区得自己铺满（iPad / iPhone 上尤其要紧）。
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 4)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint(L10n.tr("game.records.a11y", lang: language))
+    }
+
+    /// 外部账号的事实区：**每条绑定的来源记录一张卡** —— PSN 记录出奖杯卡（`TrophyProgressView`），
+    /// Xbox 记录出成就卡（`XboxAchievementView`），Nintendo 记录出游玩记录卡（`PlayActivityView`）。
+    ///
+    /// ⚠️ **本视图在 `body` 里的 5 个挂载点已收进 `externalRecordsSection` 一处**
+    /// （2026-09-18 加「游戏记录」折叠区时改的）：`body` 的 5 个版式分支现在一律调
+    /// `externalRecordsSection(width:)`，折叠标题与卡片在那一处一起摆位、一起判空，
+    /// 本视图只剩它一个调用点。此前叫 `trophySection`，加了 Nintendo 卡之后改名 ——
+    /// 名字得跟着内容走：叫「奖杯」的话，以后往这里加第三个来源时没人会想到来看它。
+    ///
+    /// **顺序：Xbox 卡 → Nintendo 卡 → PSN 卡**（2026-09-18 用户追加要求：「卡片的排序是
+    /// xbox 最优先，其次任天堂，再其次索尼」）。
+    ///
+    /// ⚠️ 这条**推翻了 §63.6 记的 PSN → Xbox → Nintendo**。那一版的理由是「由重到轻」
+    /// （奖杯卡：环 + 四格 + 三项 ＞ 成就卡：环 + 四格 ＞ 游玩卡：三格），推理本身没错，
+    /// 但**「哪家的记录更重要」是用户的偏好，不是能从信息密度推出来的结论** ——
+    /// 这一版按用户点名的次序排，不再替用户排序。
+    ///
+    /// 各 `xxxSources` 数组**内部的**排序一个字没动（奖杯卡那条
+    /// 「已获得降序 → 最近游玩降序 → 编号升序」仍是 §60 定稿的）—— 改的只是三类之间谁在前。
+    /// 空数组天然渲染成空，所以「一条都没有 → 整块不渲染」这条既有语义**靠结构保持**。
+    ///
+    /// **两张以上 + 窗口够宽 → 两两并排**（2026-09-18 用户要求「一个游戏有多张卡片时
+    /// macOS 在窗口尺寸合适的情况下可以有两张卡片并排」）。这只是**摆放方式**变了：
+    /// 每张卡的内容、宽度上限（`ExternalCardStyle.maxWidth`）、内部版式都没动 ——
+    /// 并排时每列约 412–510pt，仍比卡片自己的上限窄，所以卡看起来是同一种卡。
+    /// 并排/堆叠的判据只看宽度、不判平台（理由见 `ExternalCardStyle.twoUpMinWidth`）。
+    @ViewBuilder
+    private func externalActivitySection(width: CGFloat) -> some View {
+        let items = externalCardItems
+        if items.count > 1, width >= ExternalCardStyle.twoUpMinWidth {
+            // 外层这个 `VStack(spacing: 28)` 不会改变间距：页面那个
+            // `VStack(alignment: .leading, spacing: 28)` 里，卡片本来就是这个间距，
+            // 现在换成「一个子视图装着整块」，块内块外的 28 加在一起与原来逐字一致。
+            VStack(alignment: .leading, spacing: 28) {
+                ForEach(Self.cardRows(items)) { row in
+                    HStack(alignment: .top, spacing: ExternalCardStyle.columnSpacing) {
+                        ForEach(row.items) { externalCard($0) }
+                    }
+                    // 行**自己**铺满整宽，余量落到右边、卡片保持左对齐 —— 与堆叠版式一致。
+                    //
+                    // ⚠️ 这里**不能**改用尾巴上的 `Spacer(minLength: 0)`（2026-09-18 修的 bug）：
+                    // `HStack` 的 `spacing` 是按**子视图个数**算的，那个 `Spacer` 也是一个子视图，
+                    // 于是两张卡之间被插了**两段** 16pt，每张卡只剩 (840 − 32) ÷ 2 = **404**，
+                    // 而单列时是 412 —— 用户在并排阈值那个窗口下正好看到「单列卡比并排宽一点点」。
+                    // 用 `frame(maxWidth:)` 铺行的话行里只有卡片子视图，间距只算一次。
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+        } else {
+            // ⚠️ 这里**不能**也包一层 `VStack`：一条记录都没有时，那个空 `VStack` 会成为
+            // 页面的一个子视图，凭空白占 28pt 间距（页面的 spacing 按子视图个数算）。
+            // `ForEach` 直接向外交卡片，与旧版逐字一致。
+            ForEach(items) { externalCard($0) }
+        }
+    }
+
+    /// 详情页内容区的宽度：`geo.size.width` 减去页面自己的左右内边距，
+    /// 再受页面外层 `.frame(maxWidth: 1500)` 的封顶。
+    ///
+    /// 只用在「够不够并排」这一件事上（卡片自己的宽度上限比这些都小）——
+    /// 所以估得略宽一点点（iPad 那条横幅分支没有 1500 封顶，这里一律按有封顶算）
+    /// 不会画错任何东西，最多在极窄的窗口上多试一次并排、再由卡片自身的上限兜住。
+    private func contentWidth(_ total: CGFloat, horizontalInset: CGFloat) -> CGFloat {
+        max(0, min(total, 1500) - horizontalInset * 2)
+    }
+
+    /// 三张卡的来源数据摊平成**一个序列**（顺序：**Xbox → Nintendo → PSN**，见
+    /// `externalActivitySection` 的说明）。
+    ///
+    /// 为什么要有这一步：并排版式是「按第几张两两结对」的，而三张卡出自三个各自排序的
+    /// `ForEach` —— 不摊平就没法说清「哪两张是同一行」。
+    /// 摊平的次序**同时决定了两件事**：页面上谁先谁后，以及并排时**谁跟谁同一行**
+    /// （每行两张）。所以改这个数组的顺序 = 改页面布局，不是纯排序。
+    private var externalCardItems: [ExternalCardItem] {
+        xboxSources.map(ExternalCardItem.xbox)
+            + playActivitySources.map(ExternalCardItem.playActivity)
+            + trophySources.map(ExternalCardItem.trophy)
+    }
+
+    /// 把卡片按「一行最多两张」切开（并排版式用）。
+    ///
+    /// 切法保证每段非空，所以下面 `slice[0]` 的下标一定在界内。
+    private static func cardRows(_ items: [ExternalCardItem]) -> [ExternalCardRow] {
+        var rows: [ExternalCardRow] = []
+        var index = 0
+        while index < items.count {
+            let slice = Array(items[index..<min(index + 2, items.count)])
+            rows.append(ExternalCardRow(id: slice[0].id, items: slice))
+            index += 2
+        }
+        return rows
+    }
+
+    /// 三张卡里的一页（并排版式的一行）。
+    ///
+    /// `id` 取首张卡的 —— 一条来源记录只属于一个 provider，所以三张卡之间不会撞 id。
+    private struct ExternalCardRow: Identifiable {
+        let id: PersistentIdentifier
+        let items: [ExternalCardItem]
+    }
+
+    /// 详情页上的一张来源卡（三种来源的联合）。
+    ///
+    /// 值类型、不持有 `@Model`：与 `TrophySource` 那三个数组同一条纪律
+    /// （记录可能在同步 / 清空时被删掉，而本页还挂在导航栈上）。
+    private enum ExternalCardItem: Identifiable {
+        case trophy(TrophySource)
+        case xbox(XboxSource)
+        case playActivity(PlayActivitySource)
+
+        var id: PersistentIdentifier {
+            switch self {
+            case .trophy(let source): source.id
+            case .xbox(let source): source.id
+            case .playActivity(let source): source.id
+            }
+        }
+    }
+
+    /// 画一张卡。三种卡的入参各自取自上面那三个来源数组 —— 这里**只转发、不做判断**，
+    /// 入场判据与排序都在各自的 `xxxSources` 里。
+    @ViewBuilder
+    private func externalCard(_ item: ExternalCardItem) -> some View {
+        switch item {
+        case .trophy(let source):
+            TrophyProgressView(progress: source.progress,
+                               sourceName: source.accountName,
+                               platformText: source.platformText,
+                               titleCode: source.titleCode,
+                               firstPlayedAt: source.firstPlayedAt,
+                               lastPlayedAt: source.lastPlayedAt,
+                               hours: source.hours)
+        case .xbox(let source):
+            XboxAchievementView(achievements: source.achievements,
+                                sourceName: source.accountName,
+                                platformText: source.platformText,
+                                lastPlayedAt: source.lastPlayedAt,
+                                hours: source.hours)
+        case .playActivity(let source):
+            PlayActivityView(sourceName: source.accountName,
+                             firstPlayedAt: source.firstPlayedAt,
+                             lastPlayedAt: source.lastPlayedAt,
+                             hours: source.hours)
+        }
+    }
+
     /// 仅在离开详情页时把本地选中的状态写回模型；未变更则跳过（避免无谓的 SwiftData 写入）。
     /// 游戏被删除（删除确认 → dismiss → onDisappear）时模型已删，写回会访问失效对象。
+    ///
+    /// ⚠️ 判据是 `isLive`（`modelContext != nil`），**不是 `isDeleted`** —— 后者在
+    /// `save()` 之后会翻回 false，恰好守不住「删除已落盘」这一刻（见 `Game.isLive`）。
     private func persistStatusIfChanged() {
-        guard !game.isDeleted else { return }
+        guard game.isLive else { return }
         guard detailStatus != game.statusValue else { return }
         game.statusValue = detailStatus
         try? context.save()
@@ -416,7 +820,8 @@ struct GameDetailView: View {
     var body: some View {
         // 纵深守卫：整库替换后若此页仍被渲染（如通知时序缝隙），game 已 detached，
         // 直接访问属性即 SwiftData fatal——画空视图等导航重置把它弹走（2026-09-08）。
-        if game.isDeleted {
+        // 判据用 `isLive` 而非 `isDeleted`：删除落盘后 isDeleted 会翻回 false（见 Game.isLive）。
+        if !game.isLive {
             Color.clear
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
@@ -435,6 +840,7 @@ struct GameDetailView: View {
                             .padding(.bottom, 6)
                         VStack(alignment: .leading, spacing: 28) {
                             header(width: geo.size.width - 56, hideCoverBand: true)
+                            externalRecordsSection(width: contentWidth(geo.size.width, horizontalInset: 28))
                             if collectorMode {
                                 detailTabPicker
                             }
@@ -454,6 +860,7 @@ struct GameDetailView: View {
                 } else {
                     VStack(alignment: .leading, spacing: 28) {
                         header(width: geo.size.width)
+                        externalRecordsSection(width: contentWidth(geo.size.width, horizontalInset: 28))
                         if collectorMode {
                             detailTabPicker
                         }
@@ -484,6 +891,7 @@ struct GameDetailView: View {
                             .padding(.bottom, 6)
                         VStack(alignment: .leading, spacing: 28) {
                             header(width: geo.size.width - 56, hideCoverBand: true)
+                            externalRecordsSection(width: contentWidth(geo.size.width, horizontalInset: 28))
                             if collectorMode {
                                 detailTabPicker
                             }
@@ -509,6 +917,7 @@ struct GameDetailView: View {
                         }
                         VStack(alignment: .leading, spacing: 28) {
                             header(width: geo.size.width, hideCover: true)
+                            externalRecordsSection(width: contentWidth(geo.size.width, horizontalInset: 16))
                             if collectorMode {
                                 detailTabPicker
                             }
@@ -526,6 +935,7 @@ struct GameDetailView: View {
                 } else {
                     VStack(alignment: .leading, spacing: 28) {
                         header(width: geo.size.width)
+                        externalRecordsSection(width: contentWidth(geo.size.width, horizontalInset: 16))
                         if collectorMode {
                             detailTabPicker
                         }
@@ -630,11 +1040,17 @@ struct GameDetailView: View {
             #endif
         }
         .sheet(item: $editingCompletion) { completion in
-            #if os(macOS)
-            CompletionEditView(game: game, completion: completion)
-            #else
-            NavigationStack { CompletionEditView(game: game, completion: completion) }
-            #endif
+            // 纵深守卫：本条通关记录可能已被删掉（删除游戏会级联删通关记录，而 sheet 由
+            // 父视图的 item 绑定撑着）—— 编辑页读它的字段就是 SwiftData fatal（见 `Completion.isLive`）。
+            if completion.isLive {
+                #if os(macOS)
+                CompletionEditView(game: game, completion: completion)
+                #else
+                NavigationStack { CompletionEditView(game: game, completion: completion) }
+                #endif
+            } else {
+                Color.clear
+            }
         }
         .sheet(isPresented: $showingShare) { SharePanelView(preselected: [game]) }
         #if os(iOS)
@@ -655,7 +1071,8 @@ struct GameDetailView: View {
                     title: L10n.tr("common.delete", lang: language),
                     isDestructive: true
                 ) {
-                    if let completion = pendingDeleteCompletion {
+                    // 纵深守卫：这条记录可能在确认框弹出后被别处删掉（见 `Completion.isLive`）。
+                    if let completion = pendingDeleteCompletion, completion.isLive {
                         context.delete(completion)
                     }
                 }
@@ -671,6 +1088,10 @@ struct GameDetailView: View {
                     title: L10n.tr("common.delete", lang: language),
                     isDestructive: true
                 ) {
+                    // 先给这条游戏名下的外部记录打上「别再导入」的标记**再删** ——
+                    // 否则下次同步会把它原样建回来，而用户完全不知道发生了什么
+                    // （见 `GameMerger.ignoreRecords`）。
+                    GameMerger.ignoreRecords(linkedTo: game, in: context)
                     context.delete(game)
                     // 缓存 key = persistentModelID+字段，pk 删除后可能被新插入行重用——
                     // 不清缓存旧图会贴到新游戏上（2026-09-05 审计）。
@@ -679,7 +1100,7 @@ struct GameDetailView: View {
                 }
             ]
         )
-        } // else（isDeleted 纵深守卫）：替换后残留渲染走空分支
+        } // else（isLive 纵深守卫）：替换后残留渲染走空分支
     }
 
     // MARK: - 工具栏按钮
@@ -692,7 +1113,7 @@ struct GameDetailView: View {
         } label: {
             Label(L10n.tr("library.share", lang: language), systemImage: "square.and.arrow.up")
                 .labelStyle(.iconOnly)
-                .font(.system(size: 15))
+                .font(.system(size: ToolbarMetrics.iconPt))
         }
     }
 
@@ -702,7 +1123,7 @@ struct GameDetailView: View {
         } label: {
             Label(L10n.tr("completion.add", lang: language), systemImage: "plus")
                 .labelStyle(.iconOnly)
-            .font(.system(size: 15))
+            .font(.system(size: ToolbarMetrics.iconPt))
         }
     }
 
@@ -712,7 +1133,7 @@ struct GameDetailView: View {
         } label: {
             Label(L10n.tr("common.edit", lang: language), systemImage: "pencil")
                 .labelStyle(.iconOnly)
-                .font(.system(size: 15))
+                .font(.system(size: ToolbarMetrics.iconPt))
         }
     }
 
@@ -722,7 +1143,7 @@ struct GameDetailView: View {
         } label: {
             Label(L10n.tr("common.delete", lang: language), systemImage: "trash")
                 .labelStyle(.iconOnly)
-                .font(.system(size: 15))
+                .font(.system(size: ToolbarMetrics.iconPt))
                 .foregroundStyle(.red)
         }
     }
@@ -736,7 +1157,7 @@ struct GameDetailView: View {
             Label(L10n.tr("game.favorites", lang: language),
                   systemImage: game.isFavorite ? "heart.fill" : "heart")
                 .labelStyle(.iconOnly)
-                .font(.system(size: 15))
+                .font(.system(size: ToolbarMetrics.iconPt))
                 .foregroundStyle(game.isFavorite ? Color.pink : Color.primary)
         }
     }
@@ -1232,7 +1653,10 @@ struct GameDetailView: View {
 
     // MARK: - 通关记录
 
-    /// 详情页内容（现有评价 + 通关记录）。收藏家模式关时直接显示；开时在「详情」页签显示。
+    /// 详情页内容（评价 + 通关记录）。收藏家模式关时直接显示；开时在「详情」页签显示。
+    ///
+    /// ⚠️ **奖杯区块不在这里** —— 2026-09-17 起它挂在头部之下、`detailTabPicker` 之上
+    /// （见 `externalActivitySection`），所以不会随页签切换消失，也不该在这里再渲染一遍。
     @ViewBuilder
     private func detailsContent(width: CGFloat) -> some View {
         if width >= 1000 {
@@ -1255,14 +1679,14 @@ struct GameDetailView: View {
             let cellWidth = geo.size.width / CGFloat(all.count)
             ZStack(alignment: .topLeading) {
                 RoundedRectangle(cornerRadius: 9)
-                    .fill(Color.accentColor.opacity(0.18))
+                    .fill(SurfaceStyle.segmentHighlight)
                     .overlay(
                         RoundedRectangle(cornerRadius: 9)
-                            .strokeBorder(Color.accentColor.opacity(0.45), lineWidth: 1)
+                            .strokeBorder(SurfaceStyle.segmentTrack, lineWidth: 1)
                     )
                     .frame(width: cellWidth, height: geo.size.height)
                     .offset(x: CGFloat(tabSliderIndex) * cellWidth)
-                    .animation(.spring(response: 0.3, dampingFraction: 0.78), value: tabSliderIndex)
+                    .animation(SurfaceStyle.segmentSpring, value: tabSliderIndex)
                 HStack(spacing: 0) {
                     ForEach(Array(all.enumerated()), id: \.offset) { _, tab in
                         Button {

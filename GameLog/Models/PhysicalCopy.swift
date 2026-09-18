@@ -253,4 +253,10 @@ extension PhysicalCopy {
         default:         estValueEn = value
         }
     }
+
+    /// 这份持有记录是不是**还挂在某个 context 上**（判据与理由见 `Game.isLive`）。
+    ///
+    /// 「清空账号导入数据」/整库替换会**级联删掉** Game 名下的全部 copies，而持有页的
+    /// 编辑 sheet 与删除确认可能正开着 —— 那时它攥着的就是已销毁对象。
+    var isLive: Bool { modelContext != nil }
 }

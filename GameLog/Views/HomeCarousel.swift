@@ -90,7 +90,7 @@ struct HomeCarousel: View {
         )
         .onAppear {
             if spotlight == nil {
-                spotlightID = Self.randomSpotlightID(games: games, avoiding: nil)
+                spotlightID = Self.randomSpotlightID(games: liveGames, avoiding: nil)
             }
             if featuredFavorite == nil {
                 featuredFavoriteID = Self.randomFavoriteID(games: favorites, avoiding: nil)
@@ -123,15 +123,24 @@ struct HomeCarousel: View {
 
     // MARK: - 随机对象解析（ID → Game，已删自愈）
 
+    /// 还活着的游戏。本视图**所有**统计、榜单、最爱列表、计数都从这一个入口取 ——
+    /// 批量删除（清空导入数据 / 整库替换）之后 SwiftUI 会拿旧 `@Query` 数组再渲染一帧，
+    /// 那时读数组里那个已销毁模型的任何属性都是
+    /// `Fatal error: This backing data was detached from a context`（见 `Game.isLive`）。
+    private var liveGames: [Game] { games.filter(\.isLive) }
+
     /// 随机游戏当前游戏：按 ID 在新鲜 games 里解析；ID 失效（游戏已删）自动重抽一款。
     /// 每次求值都解析（而非缓存 Game 引用）——这是悬空引用崩溃的自愈点。
+    ///
+    /// `liveGames` 那一层过滤与下面 `spotlightID` 的解析同源：两处都读不到死模型。
     private var spotlight: Game? {
-        if let spotlightID, let hit = games.first(where: { $0.persistentModelID == spotlightID }) {
+        let live = liveGames
+        if let spotlightID, let hit = live.first(where: { $0.persistentModelID == spotlightID }) {
             return hit
         }
-        let fresh = Self.randomSpotlightID(games: games, avoiding: nil)
+        let fresh = Self.randomSpotlightID(games: live, avoiding: nil)
         if fresh != spotlightID { spotlightID = fresh }
-        return fresh.flatMap { id in games.first { $0.persistentModelID == id } }
+        return fresh.flatMap { id in live.first { $0.persistentModelID == id } }
     }
 
     /// 最爱置顶当前游戏：同 spotlight 口径（只在 favorites 里解析与重抽）。
@@ -232,7 +241,13 @@ struct HomeCarousel: View {
                         .frame(width: i == page ? 18 : 6, height: 6)
                 }
                 .buttonStyle(.plain)
-                // 触控目标放大但不撑布局太多：视觉仍是细圆点，点击不费劲。
+                // 命中区放大但不撑布局太多：视觉仍是细圆点，点击不费劲。
+                //
+                // ⚠️ 这里**够不到** HIG 的 44×44，不是没想到：圆点行紧贴在轮播卡下方、
+                // 游戏列表上方（VStack spacing 只有 8），向上扩会抢走卡片底部「点开详情」
+                // 的那次点击、向下扩会抢走列表首行；横向 25pt 的圆心间距下扩到 44 会让相邻
+                // 圆点的命中区互相重叠，**点右边那个会跳到左边那个**。真要 44pt 必须把整行
+                // 布局高度改成 44（视觉位移），属于用户拍板的「零观感变化」之外，见 ROADMAP。
                 .frame(width: 20, height: 18)
                 .contentShape(Rectangle())
             }
@@ -263,8 +278,7 @@ struct HomeCarousel: View {
                             .scaledToFill()
                     } else {
                         LinearGradient(
-                            colors: [Color(red: 0.13, green: 0.115, blue: 0.09),
-                                     Color(red: 0.075, green: 0.067, blue: 0.055)],
+                            colors: [BrandPalette.gradientTop, BrandPalette.background],
                             startPoint: .topLeading, endPoint: .bottomTrailing
                         )
                     }
@@ -309,7 +323,7 @@ struct HomeCarousel: View {
     /// 横幅副标题：用户自定义（空则回退「共 N 款游戏」）。
     private var bannerSubtitle: String {
         let t = UserDefaults.standard.string(forKey: UserCustomization.bannerSubtitleKey) ?? ""
-        return t.isEmpty ? L10n.tr("home.bannerSubtitleDefault", [games.count], lang: language) : t
+        return t.isEmpty ? L10n.tr("home.bannerSubtitleDefault", [liveGames.count], lang: language) : t
     }
 
     /// 大头像：用户头像，未设时同理占位（圆框 + 描边）；随卡片缩放（更大更大气）。
@@ -514,7 +528,7 @@ struct HomeCarousel: View {
             HStack(alignment: .firstTextBaseline, spacing: 5 * contentUnit) {
                 Image(systemName: "text.quote")
                     .font(.system(size: 12 * contentUnit))
-                    .foregroundStyle(Color(red: 1.0, green: 0.72, blue: 0.42))
+                    .foregroundStyle(BrandPalette.accent)
                 if game.reviewTitle.isEmpty {
                     Text(verbatim: L10n.tr("home.spotlightNoReview", lang: language))
                         .font(.system(size: 15 * contentUnit))
@@ -541,8 +555,9 @@ struct HomeCarousel: View {
     }
     #endif
 
+    /// 我喜爱列表（源自 `liveGames`，同样自带 `isLive` 那层过滤）。
     private var favorites: [Game] {
-        games.filter(\.isFavorite)
+        liveGames.filter(\.isFavorite)
     }
 
     /// 从我喜爱列表里随机挑一款置顶（每次进入首页换一轮，尽量不重复上一款）。
@@ -560,7 +575,7 @@ struct HomeCarousel: View {
     private var statsPage: some View {
         carouselCard(icon: "chart.bar.fill", titleKey: "home.statsTitle") {
             statTiles([
-                (value: "\(games.count)",
+                (value: "\(liveGames.count)",
                  label: L10n.tr("stats.totalGames", lang: language)),
                 (value: averageScore.map { String(format: "%.1f", $0) } ?? "—",
                  label: L10n.tr("stats.avgScore", lang: language)),
@@ -573,18 +588,18 @@ struct HomeCarousel: View {
         }
     }
 
-    private var averageScore: Double? { LibraryStats.averageScore(games) }
-    private var backlogCount: Int { LibraryStats.backlogCount(games) }
+    private var averageScore: Double? { LibraryStats.averageScore(liveGames) }
+    private var backlogCount: Int { LibraryStats.backlogCount(liveGames) }
     /// 已通关 + 长线游玩（详情页视为同一类）。
     private var completedCount: Int {
-        games.filter(\.isCompletedOrLongRunning).count
+        liveGames.filter(\.isCompletedOrLongRunning).count
     }
 
     /// 六状态计数分布行（想玩…已通关，每状态一个计数胶囊）。
     private var statusDistribution: some View {
         HStack(spacing: 6) {
             ForEach(GameStatus.allCases) { status in
-                let n = games.filter { $0.statusValue == status }.count
+                let n = liveGames.filter { $0.statusValue == status }.count
                 HStack(spacing: 3) {
                     Text(verbatim: L10n.tr(status.labelKey, lang: language))
                         .lineLimit(1)
@@ -608,7 +623,7 @@ struct HomeCarousel: View {
 
     private var holdingsPage: some View {
         carouselCard(icon: "shippingbox.fill", titleKey: "home.holdingsTitle") {
-            let totals = LibraryStats.collectorTotals(games.flatMap(\.copies), language: language)
+            let totals = LibraryStats.collectorTotals(liveGames.flatMap(\.copies), language: language)
             if totals.editionCount == 0 {
                 emptyHint("home.holdingsHint")
             } else {
@@ -693,7 +708,7 @@ struct HomeCarousel: View {
                     HStack(alignment: .firstTextBaseline, spacing: 5 * contentUnit) {
                         Image(systemName: "text.quote")
                             .font(.system(size: 12 * contentUnit))
-                            .foregroundStyle(Color(red: 1.0, green: 0.72, blue: 0.42))
+                            .foregroundStyle(BrandPalette.accent)
                         if game.reviewTitle.isEmpty {
                             Text(verbatim: L10n.tr("home.spotlightNoReview", lang: language))
                                 .font(.system(size: 15 * contentUnit))
@@ -723,7 +738,7 @@ struct HomeCarousel: View {
                     HStack(alignment: .firstTextBaseline, spacing: 5 * contentUnit) {
                         Image(systemName: "text.quote")
                             .font(.system(size: 12 * contentUnit))
-                            .foregroundStyle(Color(red: 1.0, green: 0.72, blue: 0.42))
+                            .foregroundStyle(BrandPalette.accent)
                         if game.reviewTitle.isEmpty {
                             Text(verbatim: L10n.tr("home.spotlightNoReview", lang: language))
                                 .font(.system(size: 15 * contentUnit))
@@ -764,7 +779,7 @@ struct HomeCarousel: View {
                     .foregroundStyle(.white.opacity(0.85))
                 Image(systemName: "star.fill")
                     .font(.system(size: 11 * contentUnit))
-                    .foregroundStyle(Color(red: 1.0, green: 0.72, blue: 0.42))
+                    .foregroundStyle(BrandPalette.accent)
                 Text(verbatim: GameCardView.formatScore(score))
                     .font(.system(size: 13 * contentUnit, weight: .bold))
                     .monospacedDigit()
@@ -774,7 +789,7 @@ struct HomeCarousel: View {
             .padding(.vertical, 4 * contentUnit)
             .background(Capsule().fill(.black.opacity(0.45)))
             .overlay(
-                Capsule().strokeBorder(Color(red: 1.0, green: 0.72, blue: 0.42).opacity(0.55),
+                Capsule().strokeBorder(BrandPalette.accent.opacity(0.55),
                                       lineWidth: 1)
             )
         }
@@ -783,7 +798,7 @@ struct HomeCarousel: View {
     /// shuffle 再随机按钮（iOS 右上角单独用；macOS 与评分胶囊并排）。
     private func spotlightShuffleButton(_ game: Game) -> some View {
         Button {
-            spotlightID = Self.randomSpotlightID(games: games, avoiding: game.persistentModelID)
+            spotlightID = Self.randomSpotlightID(games: liveGames, avoiding: game.persistentModelID)
         } label: {
             Image(systemName: "shuffle")
                 .font(.system(size: 13 * contentUnit, weight: .semibold))
@@ -791,6 +806,12 @@ struct HomeCarousel: View {
                 .padding(8 * contentUnit)
                 .background(Capsule().fill(.black.opacity(0.45)))
                 .overlay(Capsule().strokeBorder(.white.opacity(0.3), lineWidth: 1))
+                // 命中区补足 44pt（HIG）：同上，正 padding 撑命中形状 + 负 padding 收回布局，
+                // 圆钮直径与右上角间距都不变。
+                .contentShape(Rectangle())
+                .padding(7)
+                .contentShape(Rectangle())
+                .padding(-7)
         }
         .buttonStyle(.plain)
     }
@@ -832,7 +853,7 @@ struct HomeCarousel: View {
                     HStack(alignment: .firstTextBaseline, spacing: 5 * contentUnit) {
                         Image(systemName: "text.quote")
                             .font(.system(size: 12 * contentUnit))
-                            .foregroundStyle(Color(red: 1.0, green: 0.72, blue: 0.42))
+                            .foregroundStyle(BrandPalette.accent)
                         if game.reviewTitle.isEmpty {
                             Text(verbatim: L10n.tr("home.spotlightNoReview", lang: language))
                                 .font(.system(size: 15 * contentUnit))
@@ -873,7 +894,7 @@ struct HomeCarousel: View {
                 HStack(spacing: 6 * contentUnit) {
                     Image(systemName: "star.fill")
                         .font(.system(size: 13 * contentUnit))
-                        .foregroundStyle(Color(red: 1.0, green: 0.72, blue: 0.42))
+                        .foregroundStyle(BrandPalette.accent)
                     VStack(alignment: .leading, spacing: 0) {
                         Text(verbatim: L10n.tr("group.avgScore", lang: language))
                             .font(.system(size: 9 * contentUnit, weight: .medium))
@@ -888,7 +909,7 @@ struct HomeCarousel: View {
                 .padding(.vertical, 6 * contentUnit)
                 .background(Capsule().fill(.black.opacity(0.45)))
                 .overlay(
-                    Capsule().strokeBorder(Color(red: 1.0, green: 0.72, blue: 0.42).opacity(0.55),
+                    Capsule().strokeBorder(BrandPalette.accent.opacity(0.55),
                                           lineWidth: 1)
                 )
             }
@@ -911,8 +932,7 @@ struct HomeCarousel: View {
                         .brightness(0.06)
                 } else {
                     LinearGradient(
-                        colors: [Color(red: 0.13, green: 0.115, blue: 0.09),
-                                 Color(red: 0.075, green: 0.067, blue: 0.055)],
+                        colors: [BrandPalette.gradientTop, BrandPalette.background],
                         startPoint: .topLeading, endPoint: .bottomTrailing
                     )
                 }
@@ -920,14 +940,30 @@ struct HomeCarousel: View {
             .clipped()
     }
 
-    /// 网格同款 2:3 封面（完整展示不放大裁剪；无图占位）。宽 110 基准随卡片缩放。
+    /// 竖版海报框的基准尺寸（110×165，实际尺寸乘 `contentUnit`）。
+    /// 画图的判据与 `frame` **共用这一个数**，见 `GameRowView.thumbSize` 那条说明。
+    private static let posterSize = CGSize(width: 110, height: 165)
+    private static var posterAspect: CGFloat { posterSize.width / posterSize.height }
+
+    /// 行内缩略图框的基准尺寸（34×46，实际尺寸乘 `contentUnit`）。同上：判据与 `frame` 共用。
+    private static let rowThumbSize = CGSize(width: 34, height: 46)
+    private static var rowThumbAspect: CGFloat { rowThumbSize.width / rowThumbSize.height }
+
+    /// 网格同款 2:3 封面（竖版填满裁切；比这个框宽的图完整展示、上下留空；无图占位）。
+    /// 宽 110 基准随卡片缩放。
     @ViewBuilder
     private func posterCover(_ game: Game) -> some View {
+        let letterboxed = game.coverImage?.letterboxes(inBoxAspect: Self.posterAspect) ?? false
         Group {
             if let image = game.coverImage {
                 Image(appImage: image)
                     .resizable()
-                    .scaledToFill()
+                    // 判据是「这张图放进 110×165 会不会被裁」——方形来源的 1:1 图标与
+                    // 导入的横图都会留白，竖版封面照旧填满裁切。外框不变，卡片尺寸与
+                    // 相邻卡不错位。见 `AppImage.letterboxes(inBoxAspect:)`（判据只有那一处）。
+                    .aspectRatio(contentMode: letterboxed ? .fit : .fill)
+                    // fit 那一半够不到外框的角，要自己圆角（与网格卡同一处理）。
+                    .clipShape(RoundedRectangle(cornerRadius: letterboxed ? 10 * contentUnit : 0))
             } else {
                 ZStack {
                     Rectangle().fill(Color.semantic(.quaternarySystemFill))
@@ -937,7 +973,7 @@ struct HomeCarousel: View {
                 }
             }
         }
-        .frame(width: 110 * contentUnit, height: 165 * contentUnit)
+        .frame(width: Self.posterSize.width * contentUnit, height: Self.posterSize.height * contentUnit)
         .clipShape(RoundedRectangle(cornerRadius: 10 * contentUnit))
         .overlay(RoundedRectangle(cornerRadius: 10 * contentUnit).strokeBorder(.quaternary, lineWidth: 1))
         .shadow(color: .black.opacity(0.10), radius: 6, y: 2)
@@ -954,13 +990,20 @@ struct HomeCarousel: View {
     }
 
     /// 1:1 方形封面：优先方形图，无则竖版封面正裁填满，再退占位。
+    ///
+    /// 框是 1:1（调用点 `featuredFavoriteCard` 给的比例），判据照样按「这张图放进 1:1 会不会被裁」：
+    /// 方图与竖版封面都比 1:1 窄 → 正裁填满；**横图比 1:1 宽 → 完整显示、上下留空**。
     @ViewBuilder
     private func squareCover(_ game: Game) -> some View {
+        let image = game.squareImage ?? game.coverImage
+        let letterboxed = image?.letterboxes(inBoxAspect: 1) ?? false
         Group {
-            if let image = game.squareImage ?? game.coverImage {
+            if let image {
                 Image(appImage: image)
                     .resizable()
-                    .scaledToFill()
+                    .aspectRatio(contentMode: letterboxed ? .fit : .fill)
+                    // fit 的那一半够不到外框的角，要自己圆角（与 `posterCover` 同一处理）。
+                    .clipShape(RoundedRectangle(cornerRadius: letterboxed ? 12 : 0))
             } else {
                 ZStack {
                     Rectangle()
@@ -1085,6 +1128,7 @@ struct HomeCarousel: View {
     /// 单行：可带名次或缩略图。缩略图用封面（34×46 竖版，与库网格观感一致）；无封面用占位。
     @ViewBuilder
     private func gameRow(rank: Int?, _ game: Game, action: @escaping () -> Void) -> some View {
+        let letterboxed = game.coverImage?.letterboxes(inBoxAspect: Self.rowThumbAspect) ?? false
         Button(action: action) {
             HStack(spacing: 10 * contentUnit) {
                 if let rank {
@@ -1098,13 +1142,19 @@ struct HomeCarousel: View {
                     if let image = game.coverImage {
                         Image(appImage: image)
                             .resizable()
-                            .scaledToFill()
+                            // 比 34×46 这个框宽的图（1:1 图标、导入的横图）完整显示、上下留空；
+                            // 竖版封面同样宽 → 照旧填满裁切。外框不变，行高与相邻行不错位。
+                            // 见 `AppImage.letterboxes(inBoxAspect:)`。
+                            .aspectRatio(contentMode: letterboxed ? .fit : .fill)
+                            // fit 那一半够不到外框的角，要自己圆角（与同文件 `posterCover` 同一处理）。
+                            .clipShape(RoundedRectangle(cornerRadius: letterboxed ? 5 * contentUnit : 0))
                     } else {
                         Rectangle()
                             .fill(Color.semantic(.quaternarySystemFill))
                     }
                 }
-                .frame(width: 34 * contentUnit, height: 46 * contentUnit)
+                .frame(width: Self.rowThumbSize.width * contentUnit,
+                       height: Self.rowThumbSize.height * contentUnit)
                 .clipShape(RoundedRectangle(cornerRadius: 5 * contentUnit))
 
                 VStack(alignment: .leading, spacing: 2 * contentUnit) {

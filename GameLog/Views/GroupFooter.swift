@@ -66,7 +66,11 @@ struct PlatformBarRow: View {
 struct GroupStatsSection: View {
     let group: GameGroup
     var body: some View {
-        GroupStatsSectionContent(games: Array(group.games))
+        // 纵深守卫：分组可能在整库替换里被删（设置页导入 / 从自动备份恢复），而本区块
+        // 会读 `group.games` —— 那是死模型。判据是 `isLive`（见 `Game.isLive`）。
+        if group.isLive {
+            GroupStatsSectionContent(games: Array(group.games))
+        }
     }
 }
 
@@ -76,9 +80,13 @@ struct GroupStatsSectionContent: View {
     @Environment(\.appLanguageCode) private var language
     let games: [Game]
 
+    /// 还活着的游戏。本区块读的是**数组本身**（分数、平台、封面），没有卡片那层守卫 ——
+    /// 批量删除后 SwiftUI 拿旧数组再渲染一帧，读死模型就是 SwiftData fatal（见 `Game.isLive`）。
+    private var liveGames: [Game] { games.filter(\.isLive) }
+
     /// 组内各游戏的库显示分（按游戏聚合，取整到 0.5）；未评分游戏不计入。
     private var gameScores: [Double] {
-        games.compactMap(\.libraryScore)
+        liveGames.compactMap(\.libraryScore)
     }
 
     /// 平均分：已评分游戏的库分均值，再取整到 0.1；无已评分游戏则 nil。
@@ -89,7 +97,7 @@ struct GroupStatsSectionContent: View {
 
     /// 平台分布：按游戏×平台计数（每游戏每平台计 1，含稳定平级裁决）——唯一归属 LibraryStats。
     private var platformCounts: [(platform: String, count: Int)] {
-        LibraryStats.platformDistribution(games)
+        LibraryStats.platformDistribution(liveGames)
     }
 
     private var maxPlatformCount: Int {
@@ -116,10 +124,7 @@ struct GroupStatsSectionContent: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(20)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.semantic(.controlBackground))
-            )
+            .appPanelSurface()
 
             if !platformCounts.isEmpty {
                 LText("stats.byPlatform")
@@ -136,10 +141,7 @@ struct GroupStatsSectionContent: View {
                     }
                 }
                 .padding(14)
-                .background(
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(Color.semantic(.controlBackground))
-                )
+                .appCardSurface()
             }
         }
     }
@@ -158,6 +160,13 @@ struct GroupReviewSection: View {
     @State private var showingEditor = false
 
     var body: some View {
+        // 纵深守卫：分组被整库替换删掉时本区块仍在栈上（判据见 `Game.isLive`）。
+        if group.isLive {
+            content
+        }
+    }
+
+    private var content: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
                 LText("group.review")
@@ -181,19 +190,13 @@ struct GroupReviewSection: View {
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(14)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(Color.semantic(.controlBackground))
-                    )
+                    .appCardSurface()
             } else {
                 MarkdownReviewView(markdown: group.review)
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(14)
-                    .background(
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(Color.semantic(.controlBackground))
-                    )
+                    .appCardSurface()
             }
         }
         .sheet(isPresented: $showingEditor) {

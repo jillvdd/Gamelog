@@ -88,8 +88,13 @@ struct iOSLibraryTab: View {
     @State private var favoritesOnly = false
     @State private var showingGroupManager = false
 
+    /// 还活着的游戏/分组。批量删除（整库替换 / 清空账号导入数据）之后 SwiftUI 会拿旧
+    /// `@Query` 数组再渲染一帧，那时读已销毁模型就是 SwiftData fatal（判据见 `Game.isLive`）。
+    private var liveGames: [Game] { games.filter(\.isLive) }
+    private var liveGroups: [GameGroup] { groups.filter(\.isLive) }
+
     /// 库里出现过的平台：唯一归属 LibraryStats。
-    private var platformsInUse: [String] { LibraryStats.platformsInUse(games) }
+    private var platformsInUse: [String] { LibraryStats.platformsInUse(liveGames) }
 
     var body: some View {
         NavigationStack {
@@ -159,7 +164,7 @@ struct iOSLibraryTab: View {
                         Text(verbatim: L10n.tr("game.favorites", lang: language))
                     }
                 }
-                ForEach(groups) { group in
+                ForEach(liveGroups) { group in
                     Button {
                         groupFilter = group
                         statusFilter = nil
@@ -222,7 +227,7 @@ struct iOSGroupManagerSheet: View {
     var body: some View {
         NavigationStack {
             List {
-                ForEach(groups) { group in
+                ForEach(groups.filter(\.isLive)) { group in
                     HStack(spacing: 16) {
                         Text(verbatim: group.name)
                             .lineLimit(1)
@@ -265,13 +270,22 @@ struct iOSGroupManagerSheet: View {
             }
         }
         .sheet(isPresented: $showingNewGroup) { NewGroupSheet() }
-        .sheet(item: $renaming) { RenameGroupSheet(group: $0) }
-        .sheet(item: $pickingGames) { GroupGamePickerView(group: $0) }
+        // 两个 item 绑定都过一道 `isLive`（判据见 `Game.isLive`，勿用 `isDeleted`）：
+        // 分组可能已被别处删掉（整库替换 / 本页自己的删除），那时 sheet 里读它即 fatal。
+        // `GroupGamePickerView` / `RenameGroupSheet` 自己也在 body 挡一道，这里是第一道。
+        .sheet(item: Binding(
+            get: { renaming?.isLive == true ? renaming : nil },
+            set: { renaming = $0 }
+        )) { RenameGroupSheet(group: $0) }
+        .sheet(item: Binding(
+            get: { pickingGames?.isLive == true ? pickingGames : nil },
+            set: { pickingGames = $0 }
+        )) { GroupGamePickerView(group: $0) }
         .platformConfirmDialog(
             L10n.tr("group.deleteTitle", lang: language),
             isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }),
-            message: deleting.map {
-                L10n.tr("group.deleteConfirm", [$0.name], lang: language)
+            message: deleting.flatMap { group in
+                group.isLive ? L10n.tr("group.deleteConfirm", [group.name], lang: language) : nil
             },
             cancelTitle: L10n.tr("common.cancel", lang: language),
             actions: [
@@ -279,7 +293,7 @@ struct iOSGroupManagerSheet: View {
                     title: L10n.tr("common.delete", lang: language),
                     isDestructive: true
                 ) {
-                    if let group = deleting {
+                    if let group = deleting, group.isLive {
                         context.delete(group)
                         try? context.save()
                     }

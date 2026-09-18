@@ -10,7 +10,13 @@ struct GameLogApp: App {
 
     /// 各场景共享同一个容器实例。
     private let container: ModelContainer = {
-        let schema = Schema([Game.self, Completion.self, GameGroup.self])
+        // 外部账号同步（beta 3.1）新增 LinkedAccount / ExternalGameRecord 两个实体，
+        // 并在 Game 上加了一条 .nullify 反向关系。纯增量 + 全部声明处带默认值 →
+        // SwiftData 轻量迁移可覆盖，无需 VersionedSchema / MigrationStage，不删字段不重建库。
+        let schema = Schema([
+            Game.self, Completion.self, GameGroup.self,
+            LinkedAccount.self, ExternalGameRecord.self
+        ])
         do {
             let container = try ModelContainer(for: schema)
             // 启动即迁移平台旧名（Switch → Nintendo Switch），UI 展示前完成，幂等。
@@ -53,6 +59,11 @@ struct GameLogApp: App {
         }
         .modelContainer(container)
         #if os(macOS)
+        // 尺寸契约与内容对齐：`RootView` 自己声明了 `minWidth: 980, minHeight: 600`，
+        // 但 scene 侧此前什么也没说 —— 首启窗口按系统默认尺寸开出，比内容下限还小，
+        // 而且能被拖到下限以下（内容被压扁）。`windowResizability` 让窗口下限就是内容下限。
+        .defaultSize(width: 1180, height: 760)
+        .windowResizability(.contentMinSize)
         .commands {
             CommandGroup(replacing: .appInfo) {
                 Button {
@@ -88,9 +99,9 @@ struct GameLogApp: App {
                 .environment(\.locale, Locale(identifier: languageCode))
         }
         .modelContainer(container)
-        #if os(macOS)
+        // 这一整块已经在 `#if os(macOS)` 里（见上），不必再套一层 —— 此前多包的那层
+        // 让「哪些 scene 是 macOS 专属」读起来比实际更绕。
         .defaultSize(width: 760, height: 520)
-        #endif
         #endif
     }
 }

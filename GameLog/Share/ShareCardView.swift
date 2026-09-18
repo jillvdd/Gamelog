@@ -264,11 +264,11 @@ struct ShareTheme {
 
     /// 固定深色品牌主题：暖调近黑底 + 琥珀橙强调（沿用原深色主题 accent）。
     static let brand = ShareTheme(
-        background: Color(red: 0.075, green: 0.067, blue: 0.055),
-        surface: Color(red: 0.13, green: 0.118, blue: 0.10),
+        background: BrandPalette.background,
+        surface: BrandPalette.surface,
         text: Color(white: 0.95),
         secondary: Color(white: 0.60),
-        accent: Color(red: 1.0, green: 0.72, blue: 0.42),
+        accent: BrandPalette.accent,
         separator: Color(white: 0.22)
     )
 }
@@ -297,6 +297,8 @@ private extension GameStatus {
         case .dropped: .red
         case .longRunning: .purple
         case .completed: .teal
+        // 自动建库的条目（用户还没分类）在分享卡上也保持中性色，不伪装成任何一种进度。
+        case .unclassified: .gray
         }
     }
 }

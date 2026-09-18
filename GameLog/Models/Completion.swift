@@ -72,4 +72,10 @@ extension Completion {
         case .performance: scorePerformance
         }
     }
+
+    /// 这条通关记录是不是**还挂在某个 context 上**（判据与理由见 `Game.isLive`）。
+    ///
+    /// 删除游戏会级联删掉它的通关记录，而详情页可能还攥着 `editingCompletion` /
+    /// `pendingDeleteCompletion` 两个引用 —— 读已销毁记录的属性就是 SwiftData fatal。
+    var isLive: Bool { modelContext != nil }
 }

@@ -49,6 +49,22 @@ final class AutoBackup: ObservableObject {
     /// 整库替换进行中（备份导入/自动备份恢复/AirDrop 导入）：抑制自动备份写盘，
     /// 防后台 save 触发 didSave 监听（object:nil）去编码半替换库（2026-09-08）。
     private var isImporting = false
+    /// 「此刻有别的上下文正在批量写库」的计数 —— 自动备份据此让路（见 `performWrite` 的守卫）。
+    ///
+    /// ⚠️ 与 `isImporting` 是**两件事**，别合并：那个是「整库替换」的重入锁兼 UI 上锁依据，
+    /// 这个是纯写盘闸门。外部账号同步不改整库、不上锁，但它**批量改写封面**，同样必须挡住备份。
+    ///
+    /// 为什么非挡不可（2026-09-18 两份崩溃报告，已离线复现）：`@Attribute(.externalStorage)`
+    /// 的图**不在 store 里**，在 `_EXTERNAL_DATA/<uuid>` 文件里，store 行里只存一个引用。
+    /// 另一个上下文改写封面时 CoreData 会删掉旧文件，而**正在跑的备份**手里攥着 fetch 时
+    /// 缓存的旧引用 → 读的时候文件已经没了 → CoreData 抛
+    /// `NSInternalInconsistencyException: External data reference can't find underlying file.`。
+    /// **Swift 捕获不到 NSException**（`do/catch` 只接 Swift error），后台线程上没人接 → abort，
+    /// 整个 app 死掉、备份从此不再推进。所以唯一的修法是**不让两边同时发生**。
+    ///
+    /// ⚠️ 必须计数而不是布尔：整库替换与外部账号同步是两条独立路径，任一条结束就清零的话，
+    /// 另一条还在跑的时候备份就恢复写盘了。
+    private var backupSuppression = 0
     /// 导入进度 0~1（非 nil = 锁定期，根容器据此上锁+显示进度；nil = 无锁）。
     /// @Published 供 AutoBackupContainer 观察；只在主线程读写（本类 @MainActor）。
     @Published var importProgress: Double? = nil
@@ -166,6 +182,23 @@ final class AutoBackup: ObservableObject {
         Self.setPendingFlag(true)
     }
 
+    // MARK: - 让路（别的上下文正在批量写库）
+
+    /// 声明「从现在起别的上下文会批量写库」，期间自动备份不写盘。
+    /// 必须与 `endBackupSuppression()` 配对（调用方用 `defer`），否则自动备份被永久关掉。
+    ///
+    /// 调用点：`ExternalSyncDriver.sync`（外部账号同步会批量回填封面）。
+    /// 整库替换那条路径不用它 —— 它有自己的 `isImporting` 守卫。
+    func beginBackupSuppression() { backupSuppression += 1 }
+
+    /// 结束让路。归零时**补写一次**：被压掉的那几轮不能丢，否则同步完的库要等到
+    /// 下一次改动才进备份（与整库替换路径「先解锁再补一次」同一条纪律）。
+    func endBackupSuppression() {
+        backupSuppression = max(0, backupSuppression - 1)
+        guard backupSuppression == 0 else { return }
+        scheduleWrite()
+    }
+
     // MARK: - 写入（后台）
 
     /// 空库保护判定：主上下文快速数游戏/分组（轻量，无 BLOB 物化风险——
@@ -187,6 +220,9 @@ final class AutoBackup: ObservableObject {
         // 整库替换期间抑制：didSave 监听（object:nil）会被后台导入 save 触发，
         // 此时写盘会编码半替换库；解锁后统一入口会补写一次（2026-09-08）。
         guard !isImporting else { completion?(false); return }
+        // 别的上下文正在批量改封面（外部账号同步）→ 让路。理由见 `backupSuppression` 的注释：
+        // 并发读外置存储的图会抛 Swift 接不住的 NSException，直接把 app 干掉。
+        guard backupSuppression == 0 else { completion?(false); return }
         guard let writer else { completion?(false); return }
         guard !isWriting else { completion?(false); return }
         guard libraryIsNonEmpty() else { needsWrite = false; completion?(false); return }

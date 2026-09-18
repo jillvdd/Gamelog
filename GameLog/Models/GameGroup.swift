@@ -19,3 +19,10 @@ final class GameGroup {
         self.games = []
     }
 }
+
+extension GameGroup {
+    /// 这个分组是不是**还挂在某个 context 上**（判据与理由见 `Game.isLive`）。
+    /// 单独写一份而不是共用泛型：`@Model` 的 `modelContext` 由宏生成，且这里只给
+    /// 「编辑窗口开着时目标被删」这一处守卫用 —— 多一层抽象不值当。
+    var isLive: Bool { modelContext != nil }
+}

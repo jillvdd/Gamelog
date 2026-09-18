@@ -386,20 +386,26 @@ final class ReviewRichTextController: NSObject, ObservableObject, NSTextViewDele
     weak var textView: NSTextView?
     @Published var isEmpty = true
 
-    var isRegistered: Bool = false
-
     /// 防止 normalizeFonts 触发 didChange 后递归。
     private var isNormalizing = false
 
     /// 归属判定：是否允许「编辑已打开的另一游戏」时重建，交给外部处理。
 
     func register(_ textView: NSTextView) {
+        // 换新 textView（窗口重开 / 视图形变后 representable 重建）时先摘旧的注册，
+        // 否则每次重建都会多挂一份，`textChanged` 被调 N 次、`normalizeFonts` 跟着重跑 N 遍。
+        //
+        // 用 `removeObserver(_:name:object:)` 而不是记住 token：`addObserver(_:selector:...)`
+        // 返回 Void（无 token 可存），而**它本来就不需要 deinit 手动摘** —— 自 macOS 10.11
+        // 起通知中心对 selector 版观察者持零弱引用，观察者销毁即自动注销。
+        // （与 `WheelColumn.Coordinator` 那处不同：那边用的是 block 版，中心会强持有 block，
+        // 必须自己存 token + deinit 摘。）
+        NotificationCenter.default.removeObserver(self, name: NSText.didChangeNotification, object: nil)
         self.textView = textView
         textView.delegate = self
         NotificationCenter.default.addObserver(
             self, selector: #selector(textChanged),
             name: NSText.didChangeNotification, object: textView)
-        isRegistered = true
         updateIsEmpty()
     }
 

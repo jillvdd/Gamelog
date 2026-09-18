@@ -23,4 +23,16 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         case .english: "English"
         }
     }
+
+    /// 从 `localeCode` 反查。
+    /// UI 层通过 `\.appLanguageCode` 拿到的是 localeCode 而不是 case，而网络层要的是 case
+    /// （`Gentry-Locale` / `Accept-Language` 都由 case 决定），所以需要一个反查入口。
+    /// 认不出来一律按中文 —— 与 `AppLanguage.chinese` 是全局默认值保持一致。
+    init(localeCode: String) {
+        switch localeCode {
+        case AppLanguage.japanese.localeCode: self = .japanese
+        case AppLanguage.english.localeCode: self = .english
+        default: self = .chinese
+        }
+    }
 }

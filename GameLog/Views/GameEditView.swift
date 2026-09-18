@@ -277,6 +277,10 @@ struct GameEditView: View {
     @State private var didFinishLoading = false
     /// 加载时的游戏名：自动匹配只在名字被用户改动后才触发（避免编辑打开时误匹配）。
     @State private var nameAtLoad = ""
+    /// 加载时的「搜索用名」（见 `searchName`）。**不能拿 `nameAtLoad` 顶替**：
+    /// 导入进来的游戏主名可能是空的（中日文标题只落语言槽），那时 `searchName` 是中/日文名，
+    /// 拿空的 `nameAtLoad` 一比就永远「不相等」→ 一打开编辑页就白搜一次。
+    @State private var searchNameAtLoad = ""
 
     private var isCreating: Bool { game == nil }
 
@@ -313,7 +317,8 @@ struct GameEditView: View {
                 LabeledContent(L10n.tr("game.nameEn", lang: language)) {
                     BorderedTextField(text: $name, placeholder: L10n.tr("game.nameEn", lang: language))
                         // 用 `.task(id:)` 而非 `.onChange`：输入框重渲染会丢尾随空格，NSTextField 封装已规避。
-                        .task(id: name) { await debouncedAutoMatch(name) }
+                        // id 用 `searchName`（不是 `name`）：只填了中文名的游戏也要能自动匹配配图。
+                        .task(id: searchName) { await debouncedAutoMatch(searchName) }
                 }
                 LabeledContent(L10n.tr("game.nameZh", lang: language)) {
                     BorderedTextField(text: $nameZh, placeholder: L10n.tr("game.nameZh", lang: language))
@@ -321,6 +326,12 @@ struct GameEditView: View {
                 LabeledContent(L10n.tr("game.nameJa", lang: language)) {
                     BorderedTextField(text: $nameJa, placeholder: L10n.tr("game.nameJa", lang: language))
                 }
+                // 名称的硬要求只有「至少填一种语言」。同步下来的游戏常常只有中文名或日文名
+                // （英文名那一栏本就该是空的），这句话是给用户看的说明书 —— 否则他会以为自己
+                // 漏填了什么东西。（文案与 `validation.nameRequired` 同一口径。）
+                LText("game.nameHint")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
 
                 // 别名
                 VStack(alignment: .leading, spacing: 6) {
@@ -617,11 +628,13 @@ struct GameEditView: View {
         guard let game else {
             // 新建：字段全部保持默认，直接标记已加载完成，之后输入名字即可触发自动匹配。
             nameAtLoad = ""
+            searchNameAtLoad = ""
             didFinishLoading = true
             return
         }
         name = game.name
         nameAtLoad = game.name
+        searchNameAtLoad = game.primaryName
         status = game.statusValue
         // 游戏主平台：旧数据可能为空（已通关游戏），回退到首条记录的平台。
         platform = game.platform.isEmpty
@@ -670,7 +683,7 @@ struct GameEditView: View {
     /// 输入游戏名 → 防抖后自动匹配封面与已开开关且未设置的附加图（仅当开关开、已配 key）。
     /// 由 `.task(id: name)` 驱动：名字每次变化时取消重开、600ms 后匹配；名字未变（如编辑打开）不匹配。
     private func debouncedAutoMatch(_ newValue: String) async {
-        guard newValue != nameAtLoad,
+        guard newValue != searchNameAtLoad,
               autoMatchCover, !steamGridDBKey.isEmpty, didFinishLoading else { return }
         let term = newValue.trimmingCharacters(in: .whitespaces)
         // 名字过短（不足 2 字）不搜，避免输字过程中频繁命中。
@@ -722,11 +735,24 @@ struct GameEditView: View {
         return Double(t)
     }
 
+    /// 搜索配图用的名字：主名优先，**主名为空时退回任一语言槽**。
+    ///
+    /// 导入进来的游戏主名可以是空的（来源标题是中日文时只落语言槽，见 `Game.name` 的注释），
+    /// 那种游戏直接拿 `name` 去搜会得到一个空词条、静默搜不到图。
+    private var searchName: String {
+        [name, nameZh, nameJa]
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .first { !$0.isEmpty } ?? ""
+    }
+
     private func save() {
         let trimmedName = name.trimmingCharacters(in: .whitespaces)
         let nameZhTrimmed = nameZh.trimmingCharacters(in: .whitespaces)
         let nameJaTrimmed = nameJa.trimmingCharacters(in: .whitespaces)
-        guard !trimmedName.isEmpty else {
+        // 名称的硬要求是「**三种语言至少填一个**」（2026-09-16 起，不再是「必须有英文名」）：
+        // 同步下来只有中文名的游戏，用户打开编辑页看到的就该是「中文名已填好、英文名空着」，
+        // 而不是被逼着把中文复制一份进英文名。三个都空则库里没有任何东西能认出它，仍然拒绝。
+        guard [trimmedName, nameZhTrimmed, nameJaTrimmed].contains(where: { !$0.isEmpty }) else {
             validationError = L10n.tr("validation.nameRequired", lang: language)
             return
         }
@@ -889,9 +915,13 @@ struct ArtworkRow: View {
             Group {
                 if let data, let image = AppImage(data: data) {
                     if let aspect {
+                        // 预览**所见即库内所得**：判据与库里各处共用一处
+                        // `AppImage.letterboxes(inBoxAspect:)` —— 比这个槽位宽的图（导入的横图）
+                        // 完整显示、上下留空，与网格卡 / 详情页一致；比槽位窄的（竖版封面、
+                        // 1:1 图标）照旧填满裁切。
                         Image(appImage: image)
                             .resizable()
-                            .scaledToFill()
+                            .aspectRatio(contentMode: image.letterboxes(inBoxAspect: CGFloat(aspect)) ? .fit : .fill)
                             .aspectRatio(aspect, contentMode: .fit)
                     } else {
                         // Logo 等透明 PNG：contain 显示 + 固定浅灰衬底（白 logo 在纯白衬底上会隐形，

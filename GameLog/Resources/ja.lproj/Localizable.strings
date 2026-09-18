@@ -13,6 +13,7 @@
 "library.sortByValueDesc" = "価値が高い順";
 "library.sort" = "並び替え";
 "library.gridView" = "グリッド表示";
+"library.squareGridView" = "正方形グリッド";
 "library.listView" = "リスト表示";
 "library.wideCardView" = "1列カード";
 "library.viewMode" = "表示";
@@ -27,6 +28,7 @@
 "game.nameEn" = "英語タイトル";
 "game.nameZh" = "中国語タイトル";
 "game.nameJa" = "日本語タイトル";
+"game.nameHint" = "少なくとも 1 つの言語のタイトルを入力してください。連携したアカウントから取り込んだゲームは中国語題・日本語題だけのことが多く、英語タイトルが空でも問題ありません。";
 "game.aliases" = "別名（検索用）";
 "game.aliasPlaceholder" = "別名を入力";
 "game.aliasAdd" = "追加";
@@ -184,7 +186,7 @@
 "backup.importFailed" = "読み込みに失敗しました。有効なバックアップファイルか確認してください";
 "backup.importConfirm" = "読み込むと現在のデータがすべて置き換えられます。続けますか？";
 "backup.share" = "バックアップを共有…";
-"validation.nameRequired" = "ゲーム名を入力してください";
+"validation.nameRequired" = "少なくとも 1 つの言語のタイトルを入力してください";
 "validation.reviewTitleRequired" = "レビュータイトルは必須です";
 "validation.scoreRequired" = "少なくとも1つの軸を評価してください";
 "validation.scoresRequired" = "初回記録には4項目のスコアが必要です";
@@ -357,6 +359,7 @@
 "status.completed" = "クリア済み";
 "stats.backlogCount" = "プレイ予定";
 "status.longRunning" = "長期プレイ";
+"status.unclassified" = "未分類";
 
 // 自動バックアップ + キャッシュ
 "settings.autoBackup" = "自動バックアップ";
@@ -397,3 +400,183 @@
 "settings.bannerHint" = "「すべてのゲーム」ページ上部のカルーセル 1 ページ目に表示されます";
 "crop.titleBanner" = "バナー背景を切り抜き";
 "crop.titleBannerHint" = "使いたい部分をウィンドウ内に収めてください";
+
+/* ===== ゲームアカウント（実験的機能） ===== */
+
+"settings.accounts" = "ゲームアカウント";
+"settings.accountsHint" = "Nintendo / PlayStation の公式サービスから、Xbox はサードパーティのゲートウェイ（OpenXBL、アカウント追加時の Xbox セクションを参照）経由でプレイ記録を読み取ります。認証情報は端末のキーチェーンにのみ保存され、送信もバックアップもされません。";
+"account.experimental" = "実験的";
+"account.empty" = "まだアカウントを連携していません。";
+"account.experimentalHint" = "実験的機能：公式クライアントが利用する非公開のエンドポイントを使用しているため、仕様変更で使えなくなる可能性があります。Nintendo と PlayStation の通信は端末から公式サービスへ直接行われますが、Xbox の通信はサードパーティのゲートウェイ OpenXBL を経由します（本アプリが関与できる相手ではありません）。本アプリ独自のサーバーは存在しません。";
+"account.add" = "アカウントを追加";
+"account.syncAll" = "すべて同期";
+"account.syncing" = "同期中…";
+"account.neverSynced" = "未同期";
+"account.lastSyncAt" = "%1$@ · %2$d 件";
+"account.syncDone" = "%1$@ の同期が完了 · 今回 %2$d 件";
+"account.syncFailed" = "%1$@ の同期に失敗";
+"account.syncAllDone" = "%1$d/%2$d 件のアカウントで成功";
+
+"account.credState.active" = "利用可";
+"account.credState.expired" = "再ログインが必要";
+"account.credState.missing" = "認証情報が見つかりません";
+"account.credState.none" = "未連携";
+
+"account.syncError.network" = "ネットワークに接続できません";
+"account.syncError.authExpired" = "ログインが無効です";
+"account.syncError.rateLimited" = "リクエストが多すぎます";
+"account.syncError.apiChanged" = "API が変更されました";
+"account.syncError.server" = "サーバーエラー";
+"account.syncError.unknown" = "不明なエラー";
+
+"account.version.full" = "製品版";
+"account.version.demo" = "体験版";
+"account.version.trial" = "トライアル版";
+"account.version.unknown" = "バージョン不明";
+
+"account.linkError.invalidInput" = "有効な認証情報ではないようです。もう一度コピーしてください。";
+"account.linkError.staleCallback" = "このリンクは今回のログインのものではありません（前回のものと思われます）。もう一度ログインしてください。";
+
+/* ---- アカウント追加 ---- */
+
+"account.add.title" = "アカウントを追加";
+"account.add.platform" = "プラットフォーム";
+"account.add.connecting" = "確認中…";
+"account.add.titleLocaleHint" = "取得するタイトル名とアートワークの言語です。あとからアカウント詳細ページで変更できます（変更後は再同期が必要です）。";
+"account.add.nintendoSignIn" = "Nintendo ログインページを開く";
+"account.add.nintendoSignInHint" = "任天堂のログインページが開き、ログイン後に本アプリへ自動で戻ります。任天堂のパスワードを本アプリに入力する必要は一切ありません。";
+"account.add.nintendoPasteLabel" = "手動貼り付け（予備手段）";
+"account.add.nintendoPastePlaceholder" = "ログイン後に遷移した URL を貼り付け";
+"account.add.nintendoPasteConfirm" = "この URL で連携する";
+"account.add.nintendoPasteHint" = "ログイン後に「リンクを開けません」と表示されたら、アドレスバーの URL をここに貼り付けてください。自動で戻るのと同じ結果になります。この予備手段が必要な理由：システムのログインセッションはコールバックスキームに依存するため、システムが遷移を本アプリに渡せない場合、貼り付けが唯一の経路になります。";
+"account.add.npssoPlaceholder" = "64 文字";
+"account.add.npssoConfirm" = "このアカウントを連携";
+"account.add.npssoHint" = "取得方法：まず上の「PlayStation のログインページを開く」でログインし、次に「NPSSO 取得ページを開く」を押して、ページ内の npsso の値をここに貼り付けてください。Sony のログインコールバックは同社の PS App にしか送られないため、この貼り付けが必要です。本アプリは Sony のパスワードを取得できませんし、要求しません。";
+"account.add.psnSignIn" = "PlayStation のログインページを開く";
+"account.add.psnNpssoPage" = "NPSSO 取得ページを開く";
+"account.add.psnBrowserHint" = "2 つのボタンは同じブラウザで開いてください。先にログインし、その後 NPSSO を取得します。NPSSO はブラウザのセッションから作られるため、別のブラウザやアプリ内ページでは未ログインのままになります。";
+"account.add.xboxDashboard" = "OpenXBL ダッシュボードを開く";
+"account.add.xboxBrowserHint" = "取得方法：OpenXBL のダッシュボードで Personal API Key を作成し、下に貼り付けてください。その前に一つだけ：個人の Microsoft アカウントでは Xbox のプレイデータを直接取得できないため、このアカウントだけはサードパーティの OpenXBL を経由して読み取ります。API キーとリクエストの内容はそのサーバーを通過します。アプリに表示されるのは Microsoft 自身のデータ（Gamertag、Gamerscore、実績）です。";
+"account.add.xboxKeyHeader" = "OpenXBL API キー";
+"account.add.xboxKeyPlaceholder" = "OpenXBL Personal API Key";
+"account.add.xboxKeyConfirm" = "このアカウントを連携";
+"account.add.xboxKeyHint" = "キーは端末のキーチェーンにのみ保存され、それ以外のどこにも残りません。本アプリが送信することも、バックアップに含めることもありません。OpenXBL のダッシュボードからいつでも無効化できます。";
+"account.detail.trophyUnavailable" = "今回のトロフィーデータは全部取得できませんでした（トロフィーと PS3 / PS Vita のゲームは同じエンドポイントから取得しています）。プレイ記録は正常に更新されています。しばらくしてからもう一度同期してください。";
+"account.detail.playtimeUnavailable" = "今回、プレイ時間を取得できませんでした（別のエンドポイントから取得しています）。プレイ記録は正常に更新されています。しばらくしてからもう一度同期してください。";
+
+/* ---- アカウント詳細 ---- */
+
+"account.detail.status" = "アカウントの状態";
+"account.detail.platform" = "プラットフォーム";
+"account.detail.credential" = "ログイン状態";
+"account.detail.lastSync" = "前回の同期";
+"account.detail.sync" = "今すぐ同期";
+"account.detail.relink" = "再ログイン";
+"account.detail.relinkHint" = "再ログインすると端末に保存された認証情報が更新されます。同期済みの記録はそのまま残ります。";
+"account.detail.filter" = "絞り込み";
+"account.detail.filter.unmatched" = "未関連 %1$d";
+"account.detail.filter.ignored" = "取り込み対象外 %1$d";
+"account.detail.filter.all" = "すべて %1$d";
+"account.detail.noRecords" = "まだ記録がありません。上の「今すぐ同期」を押してください。";
+"account.detail.records" = "プレイ記録";
+"account.detail.recordsHint" = "任意の行をタップすると、ライブラリの項目に関連付けたり、統合したり、取り込みを止めたりできます。記録が多いときは上の検索欄が使えます。";
+"account.detail.search" = "プレイ記録を検索";
+"account.detail.noSearchMatch" = "一致する記録がありません。";
+"account.detail.pruned" = "ライブラリ全体の残留 %1$d 件も整理しました";
+"account.detail.superseded" = "プレイ記録で既にカバーされているトロフィー記録 %1$d 件を整理しました";
+"account.detail.syncSummary" = "新規 %1$d · 更新 %2$d · 自動一致 %3$d · 自動作成 %4$d";
+"account.detail.artworkRefreshed" = "アートワークを更新：%1$d";
+"account.detail.absent" = "提供元に存在しません";
+"account.detail.ignored" = "取り込み対象外";
+"account.detail.hours" = "%1$d 時間";
+"account.detail.firstPlayed" = "初回 %1$@";
+"account.detail.lastPlayed" = "最近 %1$@";
+"account.detail.linkedTo" = "「%1$@」に関連付け済み";
+"account.detail.unmatchedHint" = "未関連 · タップして選択";
+"account.detail.unbind" = "連携を解除";
+"account.detail.unbindTitle" = "連携を解除";
+"account.detail.unbindConfirm" = "端末に保存された認証情報と、このアカウントから同期したすべての記録を削除します。ゲームライブラリの項目は削除されません（提供元の記録がなくなるだけです）。";
+"account.detail.unbindFooter" = "解除後にもう一度同期するには、再ログインが必要です。";
+
+/* ---- タイトルと言語 ---- */
+
+"account.titleLocale.title" = "言語";
+"account.titleLocale.header" = "タイトルとアートワークの言語";
+"account.titleLocale.hint" = "提供元は要求した言語でタイトルとアートワークを返そうとします。「アプリの言語に合わせる」は設定の表示言語に追従します。";
+"account.titleLocale.refresh" = "再同期してタイトルとアートワークを更新";
+"account.titleLocale.fallback" = "Nintendo は「%1$@」を受け付けませんでした。今回の同期は「%2$@」にフォールバックしました。";
+"account.titleLocale.coverage" = "ソース側の %2$d 件のタイトルのうち %1$d 件が %3$@ です。残りはソースにその言語の名称が無いものです（原文のまま。編集画面で手動入力できます）。";
+"account.titleLocale.followApp" = "アプリの言語に合わせる";
+"account.titleLocale.zhHant" = "繁體中文";
+"account.titleLocale.zhHans" = "简体中文";
+"account.titleLocale.ja" = "日本語";
+"account.titleLocale.en" = "English (US)";
+
+/* ---- 取り込みデータの削除 ---- */
+
+"account.purge.action" = "取り込んだデータをすべて削除…";
+"account.purge.confirmTitle" = "取り込みデータを削除";
+"account.purge.confirm" = "このアカウントから同期したすべてのプレイ記録と、この取り込みが作成し、あなたがまだ手を加えていないライブラリ項目を削除します。自分で書いたデータ（クリア記録・所持・グループ・レビュー・お気に入り・追加の画像）がある項目は残します。連携は維持されるので、このあと再同期するときれいな状態から始められます。";
+"account.purge.done" = "記録を %1$d 件削除 · 取り込み項目を %2$d 件削除 · 自分のデータがある項目 %3$d 件は保持しました。";
+"account.syncBusy" = "このアカウントはすでに同期中です。完了までお待ちください。";
+
+/* ---- 記録の関連付け ---- */
+
+"account.link.title" = "ゲームに関連付け";
+"account.link.record" = "提供元の記録";
+"account.link.platform" = "プラットフォーム";
+"account.link.firstPlayed" = "初回プレイ";
+"account.link.lastPlayed" = "最近のプレイ";
+"account.link.hours" = "プレイ時間";
+"account.link.version" = "バージョン";
+"account.link.current" = "現在の関連付け";
+"account.link.unbind" = "関連付けを解除";
+"account.link.unbindHint" = "解除は関連を外すだけで、やり直せます。次回の同期で再び一致すれば、自動的に関連付けられます。";
+"account.link.merge" = "別のゲームと統合…";
+"account.link.suggestions" = "候補";
+"account.link.suggestionsHint" = "タイトル名のあいまい一致による候補です。参考程度にお使いください。";
+"account.link.search" = "ゲームを検索";
+"account.link.noMatch" = "一致するゲームがありません。";
+"account.link.allGames" = "すべてのゲーム";
+"account.link.autoImport" = "自動での取り込み";
+"account.link.ignore" = "この記録を取り込まない";
+"account.link.unignore" = "この記録を取り込む";
+"account.link.ignoreHint" = "この記録だけに適用されます。以後の同期ではスキップされ、自動作成も確認も行われません。すでに関連付けたゲームが外れることはありませんが、解除したあとは、この設定を戻すまで取り込まれません。";
+
+/* ---- 統合 ---- */
+
+"account.merge.title" = "ゲームを統合";
+"account.merge.source" = "統合して消える項目";
+"account.merge.target" = "残す項目";
+"account.merge.search" = "残す項目を検索";
+"account.merge.choose" = "どちらを残すか選択";
+"account.merge.explain" = "残す項目が優先されます。既に入っている項目は上書きされず、空欄だけがもう一方で埋められます。クリア記録・所持・グループ・提供元の記録はすべて統合されます。";
+"account.merge.confirm" = "統合";
+"account.merge.confirmHint" = "統合すると「統合して消える項目」は削除されます。元に戻せません。";
+"account.merge.counts" = "クリア %1$d · 提供元 %2$d";
+
+/* ---- 詳細ページの「ゲーム記録」開閉区画（外部ソースカードの入れ物） ---- */
+
+"game.records" = "ゲーム記録";
+"game.records.a11y" = "連携アカウントの記録を表示または非表示にします";
+
+/* ---- 外部ソースカード：2 種類のカード（トロフィー / プレイ記録）共通 ---- */
+
+"game.activity.source" = "提供元：%1$@";
+"game.activity.firstPlayed" = "初回プレイ";
+"game.activity.lastPlayed" = "最近プレイ";
+"game.activity.playtime" = "プレイ時間";
+
+/* ---- トロフィー（PlayStation 専用） ---- */
+
+"game.trophies.a11y" = "トロフィー %1$d 個中 %2$d 個獲得";
+"game.trophies.summary" = "プラチナ %1$d · 金 %2$d · 銀 %3$d · 銅 %4$d";
+"game.trophy.platinum" = "プラチナ";
+"game.trophy.gold" = "金";
+"game.trophy.silver" = "銀";
+"game.trophy.bronze" = "銅";
+
+/* ---- 成就（Xbox 独有） ---- */
+
+"game.xbox.achievements" = "実績";
+"game.xbox.gamerscore" = "ゲーマースコア";

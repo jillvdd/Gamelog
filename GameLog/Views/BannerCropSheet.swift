@@ -57,8 +57,12 @@ struct BannerCropSheet: View {
                     scale = 1.0
                 } label: {
                     Image(systemName: "arrow.counterclockwise")
-                        .frame(width: 32, height: 28)
+                        #if os(iOS)
+                        // 触控目标补足 44×44（HIG）；macOS 悬停有 help 提示，保持紧凑。
+                        // 与同族 `ImageCropView` 的重置按钮同一口径。
+                        .frame(width: 44, height: 44)
                         .contentShape(Rectangle())
+                        #endif
                 }
                 .buttonStyle(.borderless)
                 .help(L10n.tr("crop.reset", lang: language))

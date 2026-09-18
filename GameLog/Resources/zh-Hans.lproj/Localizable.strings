@@ -13,6 +13,7 @@
 "library.sortByValueDesc" = "价值最高";
 "library.sort" = "排序";
 "library.gridView" = "网格视图";
+"library.squareGridView" = "方形网格";
 "library.listView" = "列表视图";
 "library.wideCardView" = "单列卡片";
 "library.viewMode" = "视图";
@@ -27,6 +28,7 @@
 "game.nameEn" = "英文名";
 "game.nameZh" = "中文名";
 "game.nameJa" = "日文名";
+"game.nameHint" = "至少填写一种语言的名称；从账号同步来的游戏常常只有中文名或日文名，英文名留空是正常的。";
 "game.aliases" = "别名（用于搜索）";
 "game.aliasPlaceholder" = "输入别名";
 "game.aliasAdd" = "添加";
@@ -184,7 +186,7 @@
 "backup.importFailed" = "导入失败，请检查文件是否为有效备份";
 "backup.importConfirm" = "导入将替换当前全部数据，确定继续吗？";
 "backup.share" = "分享备份…";
-"validation.nameRequired" = "请输入游戏名称";
+"validation.nameRequired" = "请至少填写一种语言的名称";
 "validation.reviewTitleRequired" = "评价标题必填";
 "validation.scoreRequired" = "至少需要评分一个维度";
 "validation.scoresRequired" = "首条记录需要完成四项评分";
@@ -357,6 +359,7 @@
 "status.completed" = "已通关";
 "stats.backlogCount" = "想玩";
 "status.longRunning" = "长线游玩";
+"status.unclassified" = "未分类";
 
 // 自动备份 + 缓存
 "settings.autoBackup" = "自动备份";
@@ -397,3 +400,183 @@
 "settings.bannerHint" = "显示在「全部游戏」页顶端的轮播第 1 页";
 "crop.titleBanner" = "裁切横幅背景";
 "crop.titleBannerHint" = "把想要的背景部分放进窗口";
+
+/* ===== 游戏账号（实验性功能） ===== */
+
+"settings.accounts" = "游戏账号";
+"settings.accountsHint" = "从 Nintendo / PlayStation 官方服务读取你的游玩记录，Xbox 则经由第三方网关（OpenXBL，详见添加账号时的 Xbox 分区）。凭证只保存在本机钥匙串，不上传、不进备份。";
+"account.experimental" = "实验性";
+"account.empty" = "还没有绑定任何账号。";
+"account.experimentalHint" = "实验性功能：用的是官方客户端调用、但未公开的接口，任一方调整后可能失效。Nintendo 与 PlayStation 的请求由本机直接发往官方服务；Xbox 的请求会经过 OpenXBL 这台第三方网关（本应用控制不了它）。本应用没有自己的服务器。";
+"account.add" = "添加账号";
+"account.syncAll" = "同步全部";
+"account.syncing" = "正在同步…";
+"account.neverSynced" = "尚未同步";
+"account.lastSyncAt" = "%1$@ · %2$d 条记录";
+"account.syncDone" = "%1$@ 同步完成 · 本轮 %2$d 条";
+"account.syncFailed" = "%1$@ 同步失败";
+"account.syncAllDone" = "%1$d/%2$d 个账号同步成功";
+
+"account.credState.active" = "可用";
+"account.credState.expired" = "需要重新登录";
+"account.credState.missing" = "凭证已丢失";
+"account.credState.none" = "未绑定";
+
+"account.syncError.network" = "网络不可用";
+"account.syncError.authExpired" = "登录已失效";
+"account.syncError.rateLimited" = "请求过于频繁";
+"account.syncError.apiChanged" = "接口已变更";
+"account.syncError.server" = "服务端错误";
+"account.syncError.unknown" = "未知错误";
+
+"account.version.full" = "完整版";
+"account.version.demo" = "体验版";
+"account.version.trial" = "试玩版";
+"account.version.unknown" = "版本未知";
+
+"account.linkError.invalidInput" = "这段内容看起来不是有效的登录凭证，请重新复制一次。";
+"account.linkError.staleCallback" = "这个链接不属于本次登录（多半是上一次的），请重新登录一次。";
+
+/* ---- 添加账号 ---- */
+
+"account.add.title" = "添加账号";
+"account.add.platform" = "平台";
+"account.add.connecting" = "正在验证…";
+"account.add.titleLocaleHint" = "决定抓取的标题与封面用什么语言。绑定之后在账号详情页还能改；改完要重新同步一次才会生效。";
+"account.add.nintendoSignIn" = "打开 Nintendo 登录页";
+"account.add.nintendoSignInHint" = "会打开任天堂自己的登录页面，登录后自动跳回本应用。全程不会要求你把任天堂密码交给本应用。";
+"account.add.nintendoPasteLabel" = "手工粘贴兜底";
+"account.add.nintendoPastePlaceholder" = "粘贴登录后跳转到的完整链接";
+"account.add.nintendoPasteConfirm" = "用这段链接完成绑定";
+"account.add.nintendoPasteHint" = "如果登录完成后页面停在「无法打开链接」，把地址栏里的完整链接复制到这里即可，效果与自动跳回完全相同。之所以需要这条兜底：系统登录会话依赖回调 scheme，若系统未能把跳转交回本应用，粘贴是唯一不依赖它的通路。";
+"account.add.npssoPlaceholder" = "64 位字符";
+"account.add.npssoConfirm" = "绑定这个账号";
+"account.add.npssoHint" = "获取方式：先点上面的「打开 PlayStation 登录页」登录，再点「打开 NPSSO 获取页」，把页面里的 npsso 值复制到这里。Sony 的登录回调只发给自家的 PS App，本应用收不到，所以只能手工粘贴这一步。本应用不会、也无法拿到你的 Sony 密码。";
+"account.add.psnSignIn" = "打开 PlayStation 登录页";
+"account.add.psnNpssoPage" = "打开 NPSSO 获取页";
+"account.add.psnBrowserHint" = "两个按钮请用同一个浏览器打开：先登录，再取 NPSSO。NPSSO 是浏览器会话的产物，换个浏览器或改用应用内页面都会是未登录状态。";
+"account.add.xboxDashboard" = "打开 OpenXBL 面板";
+"account.add.xboxBrowserHint" = "获取方式：在 OpenXBL 面板上建一把 Personal API Key，复制到下面。动手前请先看这一句：个人微软账号拿不到 Xbox 的游玩数据，所以这一家只能经由 OpenXBL 这台第三方服务读取 —— 你的 API key 与请求内容会经过那台服务器。你在应用里看到的仍然是微软自己的数据（Gamertag、Gamerscore、成就）。";
+"account.add.xboxKeyHeader" = "OpenXBL API Key";
+"account.add.xboxKeyPlaceholder" = "OpenXBL Personal API Key";
+"account.add.xboxKeyConfirm" = "绑定这个账号";
+"account.add.xboxKeyHint" = "这把 key 只存进本机钥匙串，别处都没有：本应用不上传它，也不会把它写进备份。你随时可以在 OpenXBL 面板上吊销它。";
+"account.detail.trophyUnavailable" = "本次的奖杯数据没取全（奖杯与 PS3 / PS Vita 游戏来自同一个接口）。游玩记录已正常更新，可以稍后再同步一次。";
+"account.detail.playtimeUnavailable" = "本次的游玩时长没取到（它来自另一个接口）。游玩记录已正常更新，可以稍后再同步一次。";
+
+/* ---- 账号详情 ---- */
+
+"account.detail.status" = "账号状态";
+"account.detail.platform" = "平台";
+"account.detail.credential" = "登录状态";
+"account.detail.lastSync" = "上次同步";
+"account.detail.sync" = "立即同步";
+"account.detail.relink" = "重新登录";
+"account.detail.relinkHint" = "重新登录会刷新本机保存的凭证，不会动已经同步下来的记录。";
+"account.detail.filter" = "筛选";
+"account.detail.filter.unmatched" = "待关联 %1$d";
+"account.detail.filter.ignored" = "已忽略 %1$d";
+"account.detail.filter.all" = "全部 %1$d";
+"account.detail.noRecords" = "这里还没有记录。先点上面的「立即同步」。";
+"account.detail.records" = "游玩记录";
+"account.detail.recordsHint" = "点任意一条可以把它关联到游戏库里的条目、合并到另一个游戏，或者设为不再导入；记录多时用上面的搜索框。";
+"account.detail.search" = "搜索游玩记录";
+"account.detail.noSearchMatch" = "没有匹配的记录。";
+"account.detail.pruned" = "顺带清理全库残留 %1$d 个条目";
+"account.detail.superseded" = "清理已被游玩记录覆盖的奖杯记录 %1$d 条";
+"account.detail.syncSummary" = "新建 %1$d · 刷新 %2$d · 自动匹配 %3$d · 自动建库 %4$d";
+"account.detail.artworkRefreshed" = "封面刷新 %1$d 张";
+"account.detail.absent" = "来源已无此记录";
+"account.detail.ignored" = "已忽略";
+"account.detail.hours" = "%1$d 小时";
+"account.detail.firstPlayed" = "首次 %1$@";
+"account.detail.lastPlayed" = "最近 %1$@";
+"account.detail.linkedTo" = "已关联到「%1$@」";
+"account.detail.unmatchedHint" = "未关联 · 点一下选择游戏";
+"account.detail.unbind" = "解除绑定";
+"account.detail.unbindTitle" = "解除绑定";
+"account.detail.unbindConfirm" = "会删除本机保存的凭证，以及该账号同步下来的全部记录。已经绑定到游戏条目的游戏不会删除，只是不再有来源记录。";
+"account.detail.unbindFooter" = "解除绑定后需要重新登录才能再次同步。";
+
+/* ---- 标题与封面语言 ---- */
+
+"account.titleLocale.title" = "语言";
+"account.titleLocale.header" = "标题与封面语言";
+"account.titleLocale.hint" = "来源平台会尽量按你要求的语言返回标题与封面。「跟随 App 语言」跟着设置里的界面语言走。";
+"account.titleLocale.refresh" = "重新同步并刷新标题与封面";
+"account.titleLocale.fallback" = "任天堂不接受「%1$@」，本次已回退到「%2$@」。";
+"account.titleLocale.coverage" = "来源侧 %2$d 条标题里 %1$d 条是 %3$@。其余是来源本身没有该语言的名称（保留原文，可在编辑页手动补）。";
+"account.titleLocale.followApp" = "跟随 App 语言";
+"account.titleLocale.zhHant" = "繁體中文";
+"account.titleLocale.zhHans" = "简体中文";
+"account.titleLocale.ja" = "日本語";
+"account.titleLocale.en" = "英语（美版）";
+
+/* ---- 清空导入数据 ---- */
+
+"account.purge.action" = "清空该账号导入数据…";
+"account.purge.confirmTitle" = "清空导入数据";
+"account.purge.confirm" = "会删除该账号同步下来的全部游玩记录，以及由导入创建、你还没动过的库条目。写过自己数据（通关记录 / 持有 / 分组 / 评价 / 最爱 / 封面以外的图）的条目一律保留。账号本身绑定不变，清空之后再同步一次即可得到干净的一份。";
+"account.purge.done" = "已清空 %1$d 条记录 · 删掉 %2$d 个导入条目 · 保留 %3$d 个含你自己数据的条目。";
+"account.syncBusy" = "这个账号正在同步，请等它跑完。";
+
+/* ---- 记录绑定 ---- */
+
+"account.link.title" = "关联到游戏";
+"account.link.record" = "来源记录";
+"account.link.platform" = "平台";
+"account.link.firstPlayed" = "首次游玩";
+"account.link.lastPlayed" = "最近游玩";
+"account.link.hours" = "游玩时长";
+"account.link.version" = "版本";
+"account.link.current" = "当前关联";
+"account.link.unbind" = "解除关联";
+"account.link.unbindHint" = "解除关联只是把关联摘掉，可以反悔：下次同步若又匹配上，会自动重新关联。";
+"account.link.merge" = "合并到另一个游戏…";
+"account.link.suggestions" = "建议";
+"account.link.suggestionsHint" = "按标题名模糊匹配出来的候选，仅供参考。";
+"account.link.search" = "搜索游戏";
+"account.link.noMatch" = "没有匹配的游戏。";
+"account.link.allGames" = "全部游戏";
+"account.link.autoImport" = "自动导入";
+"account.link.ignore" = "忽略此条（不再导入）";
+"account.link.unignore" = "恢复导入此条";
+"account.link.ignoreHint" = "只影响这一条：以后同步会跳过它，既不自动建库也不会再问你。它不会把已经关联的游戏摘掉；但解除关联之后，只要还勾着这个，就不会再自动接回来。";
+
+/* ---- 合并 ---- */
+
+"account.merge.title" = "合并游戏";
+"account.merge.source" = "要并入的条目";
+"account.merge.target" = "保留的条目";
+"account.merge.search" = "搜索要保留的条目";
+"account.merge.choose" = "选择保留哪一个";
+"account.merge.explain" = "保留的那个条目优先：它已有的字段不会被覆盖，只有空着的才用另一条补齐。通关记录、持有、分组、来源记录全部合并过来。";
+"account.merge.confirm" = "合并";
+"account.merge.confirmHint" = "合并后「要并入的条目」会被删除，此操作不可撤销。";
+"account.merge.counts" = "通关 %1$d · 来源 %2$d";
+
+/* ---- 详情页「游戏记录」折叠区（外部来源卡片的容器） ---- */
+
+"game.records" = "游戏记录";
+"game.records.a11y" = "展开或收起已绑定账号的记录";
+
+/* ---- 外部来源卡片：两类卡（奖杯 / 游玩记录）共用 ---- */
+
+"game.activity.source" = "来源：%1$@";
+"game.activity.firstPlayed" = "首次游玩";
+"game.activity.lastPlayed" = "最近游玩";
+"game.activity.playtime" = "游玩时长";
+
+/* ---- 奖杯（PlayStation 独有） ---- */
+
+"game.trophies.a11y" = "共 %1$d 个奖杯，已获得 %2$d 个";
+"game.trophies.summary" = "白金 %1$d · 金 %2$d · 银 %3$d · 铜 %4$d";
+"game.trophy.platinum" = "白金";
+"game.trophy.gold" = "金";
+"game.trophy.silver" = "银";
+"game.trophy.bronze" = "铜";
+
+/* ---- 成就（Xbox 独有） ---- */
+
+"game.xbox.achievements" = "成就";
+"game.xbox.gamerscore" = "游戏分数";

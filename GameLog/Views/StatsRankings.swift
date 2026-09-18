@@ -40,7 +40,8 @@ enum Rankings {
     /// 降序；同原始值按游戏名升序。
     private static func rankLess(_ a: RankingEntry, _ b: RankingEntry) -> Bool {
         if a.sortScore != b.sortScore { return a.sortScore > b.sortScore }
-        return a.game.name.localizedCaseInsensitiveCompare(b.game.name) == .orderedAscending
+        // 主名可能为空（导入的中日文标题只落语言槽），用解析后的名字做并列裁决。
+        return a.game.primaryName.localizedCaseInsensitiveCompare(b.game.primaryName) == .orderedAscending
     }
 }
 
@@ -90,11 +91,8 @@ struct RankingBoard: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(Color.semantic(.controlBackground))
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .appCardSurface()
+        .clipShape(RoundedRectangle(cornerRadius: SurfaceStyle.cardRadius))
     }
 
     private func row(rank: Int, entry: RankingEntry) -> some View {
@@ -226,11 +224,8 @@ struct ValueRankingBoard: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(Color.semantic(.controlBackground))
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .appCardSurface()
+        .clipShape(RoundedRectangle(cornerRadius: SurfaceStyle.cardRadius))
     }
 
     private func row(rank: Int, entry: ValueRankingEntry) -> some View {
@@ -275,14 +270,14 @@ struct SegmentSlider: View {
             let cellWidth = geo.size.width / CGFloat(titles.count)
             ZStack(alignment: .topLeading) {
                 RoundedRectangle(cornerRadius: 9)
-                    .fill(Color.accentColor.opacity(0.18))
+                    .fill(SurfaceStyle.segmentHighlight)
                     .overlay(
                         RoundedRectangle(cornerRadius: 9)
-                            .strokeBorder(Color.accentColor.opacity(0.45), lineWidth: 1)
+                            .strokeBorder(SurfaceStyle.segmentTrack, lineWidth: 1)
                     )
                     .frame(width: cellWidth, height: geo.size.height)
                     .offset(x: CGFloat(selection) * cellWidth)
-                    .animation(.spring(response: 0.3, dampingFraction: 0.78), value: selection)
+                    .animation(SurfaceStyle.segmentSpring, value: selection)
                 HStack(spacing: 0) {
                     ForEach(Array(titles.enumerated()), id: \.offset) { idx, title in
                         Button {
@@ -323,13 +318,21 @@ struct OverallRankingView: View {
     /// 价值榜内页：0 游戏 / 1 机器（平台）/ 2 分组。
     @State private var valuePage = 0
     /// 点击榜单游戏名 → 编程式 push 到详情（避免推入视图内 NavigationLink 找不到目标）。
+    ///
+    /// ⚠️ 有守卫的例外（项目规矩本是「`@State` 只存 `PersistentIdentifier`」）：推送处挡了
+    /// `isLive`，整库替换通知也会清空，见 body 与 `selectedGameDestination`。
     @State private var selectedGame: Game?
 
     private static let pageSize = 100
 
+    /// 还活着的游戏。本页所有榜单（分数 / 价值）读的都是数组本身，没有卡片那层守卫 ——
+    /// 批量删除后 SwiftUI 拿旧 `@Query` 数组再渲染一帧就是 SwiftData fatal（见 `Game.isLive`）。
+    private var liveGames: [Game] { games.filter(\.isLive) }
+    private var liveGroups: [GameGroup] { groups.filter(\.isLive) }
+
     /// 库里出现过的平台（按平台预设世代倒序 + 自定义字母排后，与全 app 排序唯一源一致）。
     private var platforms: [String] {
-        Presets.ordered(games.flatMap { $0.completions.map(\.platform) })
+        Presets.ordered(liveGames.flatMap { $0.completions.map(\.platform) })
     }
 
     /// 榜单标题（平均分 + 六维，顺序即切换顺序）。
@@ -339,9 +342,9 @@ struct OverallRankingView: View {
 
     private func entries(for board: Int) -> [RankingEntry] {
         if board == 0 {
-            return Rankings.byAverage(games: games, platform: selectedPlatform)
+            return Rankings.byAverage(games: liveGames, platform: selectedPlatform)
         }
-        return Rankings.byDimension(Dimension.allCases[board - 1], games: games, platform: selectedPlatform)
+        return Rankings.byDimension(Dimension.allCases[board - 1], games: liveGames, platform: selectedPlatform)
     }
 
     private var pageCount: Int {
@@ -367,9 +370,9 @@ struct OverallRankingView: View {
 
     private var valueEntries: [ValueRankingEntry] {
         switch valuePage {
-        case 0: return ValueRankings.byGame(games: games, language: language)
-        case 1: return ValueRankings.byPlatform(games: games, language: language)
-        default: return ValueRankings.byGroup(groups: groups, language: language)
+        case 0: return ValueRankings.byGame(games: liveGames, language: language)
+        case 1: return ValueRankings.byPlatform(games: liveGames, language: language)
+        default: return ValueRankings.byGroup(groups: liveGroups, language: language)
         }
     }
 
@@ -461,7 +464,11 @@ struct OverallRankingView: View {
         .appToolbar()
         // 点击榜单游戏名 → 编程式 push 详情（本页由 navigationDestination(isPresented:) 推入，
         // 用 item: 在本地注册，避免父级根视图的 Game 目标对本页不可见）。
-        .navigationDestination(item: $selectedGame) { GameDetailView(game: $0) }
+        // `isLive` 守卫：整库替换的通知与状态清空之间有一帧缝隙（判据见 `Game.isLive`）。
+        .navigationDestination(item: Binding(
+            get: { selectedGame?.isLive == true ? selectedGame : nil },
+            set: { selectedGame = $0 }
+        )) { GameDetailView(game: $0) }
         // 整库替换后栈上旧 Game 已 detached：退出详情防悬空访问（2026-09-08）。
         .onReceive(NotificationCenter.default.publisher(for: UserCustomization.libraryReplacedNotification)) { _ in
             selectedGame = nil

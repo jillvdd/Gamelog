@@ -55,12 +55,13 @@ struct HoldingsView: View {
 
     /// 网格 / 列表双视图（跨会话记忆，同 Library）。
     @AppStorage(UserCustomization.useHoldingsGridViewKey) private var useGridView = true
-    /// 网格/列表滑块当前列（内部状态驱动，点击即时动画，不依赖父视图重算）。
-    @State private var gridSliderIndex: Int = 0
 
     @State private var showingAddVersion = false
-    @State private var editingCopy: PhysicalCopy?
-    @State private var pendingDeleteCopy: PhysicalCopy?
+    /// 正在编辑 / 待删除的那份持有，**存 ID 不存引用**（项目硬规矩：`@State` 永不持有
+    /// `@Model`；判据与理由见 `Game.isLive`）。本页所在详情页背后的整库替换 / 「清空该
+    /// 账号导入数据」会**级联删掉** `game.copies`，而这两个 sheet 与确认弹窗可能正开着。
+    @State private var editingCopyID: PersistentIdentifier?
+    @State private var pendingDeleteCopyID: PersistentIdentifier?
     #if os(macOS)
     /// 持有 Quick Look 协调器强引用（防止面板使用期间被释放），换图/视图消失时自动释放并清理临时文件。
     @State private var quickLook: QuickLookCoordinator?
@@ -70,8 +71,18 @@ struct HoldingsView: View {
     #endif
 
     /// 按添加先后排序。
+    ///
+    /// 先滤掉已销毁的：整库替换 / 清空导入数据会级联删掉 `game.copies`，而 SwiftUI 可能
+    /// 拿旧数组再渲染一帧 —— 本页的每个格子都会读 `copy.version` / `copy.images`，
+    /// 那是 `Fatal error: This backing data was detached`（判据见 `Game.isLive`）。
     private var sortedCopies: [PhysicalCopy] {
-        game.copies.sorted { $0.createdAt < $1.createdAt }
+        game.copies.filter(\.isLive).sorted { $0.createdAt < $1.createdAt }
+    }
+
+    /// 待删除的那份（按 ID 反查，找不到 = 已经不在了）。
+    private var pendingDeleteCopy: PhysicalCopy? {
+        guard let id = pendingDeleteCopyID else { return nil }
+        return sortedCopies.first { $0.persistentModelID == id }
     }
 
     /// 四格汇总：唯一归属 LibraryStats（全库/按游戏同一份口径）。
@@ -121,23 +132,26 @@ struct HoldingsView: View {
                     .foregroundStyle(.secondary)
                 Spacer()
                 // 网格/列表液态玻璃滑块（与详情|持有滑块同视觉：.thinMaterial 底 + accent 滑块 + spring 动画）。
+                //
+                // 选中列**派生自 `useGridView`**，不另存独立状态 —— 照 `DetailStatusPicker`
+                // 那条口径（GameDetailView 里写明了「不另存独立状态」）。旧版另存了一份
+                // `gridSliderIndex` 且只在 onAppear 同步一次：任何绕过这两个按钮的写入
+                // （同步恢复、其他端改同一键、@AppStorage 外部变更）都会让高亮停在错误一侧。
                 GeometryReader { geo in
-                    let isGrid = useGridView
+                    let sliderIndex = useGridView ? 0 : 1
                     let cellWidth = geo.size.width / 2
                     ZStack(alignment: .topLeading) {
                         RoundedRectangle(cornerRadius: 9)
-                            .fill(Color.accentColor.opacity(0.18))
+                            .fill(SurfaceStyle.segmentHighlight)
                             .overlay(
                                 RoundedRectangle(cornerRadius: 9)
-                                    .strokeBorder(Color.accentColor.opacity(0.45), lineWidth: 1)
+                                    .strokeBorder(SurfaceStyle.segmentTrack, lineWidth: 1)
                             )
                             .frame(width: cellWidth, height: geo.size.height)
-                            .offset(x: CGFloat(gridSliderIndex) * cellWidth)
-                            .animation(.spring(response: 0.3, dampingFraction: 0.78), value: gridSliderIndex)
+                            .offset(x: CGFloat(sliderIndex) * cellWidth)
+                            .animation(SurfaceStyle.segmentSpring, value: sliderIndex)
                         HStack(spacing: 0) {
                             Button {
-                                guard !useGridView else { return }
-                                gridSliderIndex = 0
                                 useGridView = true
                             } label: {
                                 Image(systemName: "square.grid.2x2")
@@ -148,8 +162,6 @@ struct HoldingsView: View {
                             }
                             .buttonStyle(PressFeedbackButtonStyle(pressedScale: 0.9, pressedOpacity: 0.55))
                             Button {
-                                guard useGridView else { return }
-                                gridSliderIndex = 1
                                 useGridView = false
                             } label: {
                                 Image(systemName: "list.bullet")
@@ -185,12 +197,16 @@ struct HoldingsView: View {
                 listModeContent
             }
         }
-        .onAppear { gridSliderIndex = useGridView ? 0 : 1 }
         .sheet(isPresented: $showingAddVersion) {
             CopyEditSheet(game: game, copy: nil)
         }
-        .sheet(item: $editingCopy) { copy in
-            CopyEditSheet(game: game, copy: copy)
+        .sheet(item: $editingCopyID) { id in
+            // 每帧反查（判据同 `editingCopyID`）：找不到就画空，不碰已销毁对象。
+            if let copy = sortedCopies.first(where: { $0.persistentModelID == id }) {
+                CopyEditSheet(game: game, copy: copy)
+            } else {
+                Color.clear
+            }
         }
         #if !os(macOS)
         .sheet(item: $previewItem) { item in
@@ -201,11 +217,18 @@ struct HoldingsView: View {
                 }
         }
         #endif
+        // 整库替换（备份导入 / 自动备份恢复 / 「清空该账号导入数据」）后，`game.copies`
+        // 会被级联删掉，而本页可能还开着编辑/删除确认。清掉这两个持有旧对象的 state，
+        // 与同族消费页（LibraryView / StatsView / RootView）同一条纪律。
+        .onReceive(NotificationCenter.default.publisher(for: UserCustomization.libraryReplacedNotification)) { _ in
+            editingCopyID = nil
+            pendingDeleteCopyID = nil
+        }
         .platformConfirmDialog(
             L10n.tr("common.confirmDelete", lang: language),
             isPresented: Binding(
-                get: { pendingDeleteCopy != nil },
-                set: { if !$0 { pendingDeleteCopy = nil } }
+                get: { pendingDeleteCopyID != nil },
+                set: { if !$0 { pendingDeleteCopyID = nil } }
             ),
             message: pendingDeleteCopy.map {
                 L10n.tr("copy.deleteConfirm", [$0.version], lang: language)
@@ -216,11 +239,14 @@ struct HoldingsView: View {
                     title: L10n.tr("common.delete", lang: language),
                     isDestructive: true
                 ) {
-                    if let copy = pendingDeleteCopy {
+                    // 用 ID 反查而不是直接删 `pendingDeleteCopy`：确认弹窗可能在整库替换
+                    // 之后才被点掉，那一刻旧对象已经是死模型（见 `pendingDeleteCopyID`）。
+                    if let id = pendingDeleteCopyID,
+                       let copy = sortedCopies.first(where: { $0.persistentModelID == id }) {
                         context.delete(copy)
                         try? context.save()
                     }
-                    pendingDeleteCopy = nil
+                    pendingDeleteCopyID = nil
                 }
             ]
         )
@@ -236,7 +262,7 @@ struct HoldingsView: View {
             overviewCell(value: PriceFormat.string(totalEstimate, language: language) ?? "—", label: L10n.tr("copy.overviewEstimate", lang: language))
         }
         .padding(14)
-        .background(RoundedRectangle(cornerRadius: 10).fill(Color.semantic(.controlBackground)))
+        .appCardSurface()
     }
 
     private func overviewCell(value: String, label: String) -> some View {
@@ -257,8 +283,8 @@ struct HoldingsView: View {
             ForEach(sortedCopies) { copy in
                 CopyGridCellView(
                     copy: copy,
-                    onEdit: { editingCopy = copy },
-                    onDelete: { pendingDeleteCopy = copy },
+                    onEdit: { editingCopyID = copy.persistentModelID },
+                    onDelete: { pendingDeleteCopyID = copy.persistentModelID },
                     onEnlarge: showQuickLook
                 )
             }
@@ -271,8 +297,8 @@ struct HoldingsView: View {
             ForEach(sortedCopies) { copy in
                 CopyCardView(
                     copy: copy,
-                    onEdit: { editingCopy = copy },
-                    onDelete: { pendingDeleteCopy = copy },
+                    onEdit: { editingCopyID = copy.persistentModelID },
+                    onDelete: { pendingDeleteCopyID = copy.persistentModelID },
                     onEnlarge: showQuickLook
                 )
             }
@@ -375,8 +401,8 @@ private struct CopyGridCellView: View {
             }
         }
         .padding(12)
-        .background(RoundedRectangle(cornerRadius: 10).fill(Color.semantic(.controlBackground)))
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.semantic(.separator)))
+        .appCardSurface()
+        .overlay(RoundedRectangle(cornerRadius: SurfaceStyle.cardRadius).stroke(Color.semantic(.separator)))
         .platformConfirmDialog(
             L10n.tr("common.confirmDelete", lang: language),
             isPresented: Binding(
@@ -539,10 +565,13 @@ private struct CopyCardView: View {
 
             // 照片网格（含删除 / 放大 / 添加）。
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 96), spacing: 8)], spacing: 8) {
-                ForEach(Array(copy.images.enumerated()), id: \.offset) { index, data in
+                // 身份用**数据本身**（`Data` 本来就 Hashable），不用下标 —— 用下标时删掉
+                // 第一张，后面所有格子的身份都会平移，`ThumbnailView` 的 `@State hovering`
+                // 于是落到错误的格子上（悬停高亮显示在隔壁照片上）。
+                ForEach(copy.images, id: \.self) { data in
                     ThumbnailView(
                         data: data,
-                        onDelete: { pendingDeleteImage = index },
+                        onDelete: { pendingDeleteImage = copy.images.firstIndex(of: data) },
                         onEnlarge: { onEnlarge(data) }
                     )
                 }
@@ -553,8 +582,8 @@ private struct CopyCardView: View {
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 10).fill(Color.semantic(.controlBackground)))
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color.semantic(.separator)))
+        .appCardSurface()
+        .overlay(RoundedRectangle(cornerRadius: SurfaceStyle.cardRadius).stroke(Color.semantic(.separator)))
         .platformConfirmDialog(
             L10n.tr("common.confirmDelete", lang: language),
             isPresented: Binding(

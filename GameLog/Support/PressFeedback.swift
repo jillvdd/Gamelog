@@ -19,10 +19,13 @@ struct PressFeedbackButtonStyle: ButtonStyle {
     var hoverOpacity: Double = 0.85
 
     @State private var hovering = false
+    /// 「减弱动态效果」：开启后按压只变淡、不做缩放。缩放是系统辅助功能开关明确要求抑制的
+    /// 运动形式，而这里每次点按都会触发，正是该开关的适用场景。
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .scaleEffect(configuration.isPressed ? pressedScale : 1)
+            .scaleEffect(configuration.isPressed && !reduceMotion ? pressedScale : 1)
             .opacity(configuration.isPressed ? pressedOpacity : (hovering ? hoverOpacity : 1))
             .animation(.spring(response: 0.25, dampingFraction: 0.8), value: configuration.isPressed)
             .animation(.easeOut(duration: 0.15), value: hovering)

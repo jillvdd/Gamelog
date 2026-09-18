@@ -44,9 +44,22 @@ enum UserCustomization {
     static let sidebarPlatformsExpandedKey = "customization.sidebar.platformsExpanded"
     /// 侧边栏「分组」区展开（默认 true=展开，跨会话记忆）。
     static let sidebarGroupsExpandedKey = "customization.sidebar.groupsExpanded"
-    /// iOS 库视图三态（grid/wideCard/list，原始值字符串）。仅 iOS 读写；macOS 仍用旧 useGridView Bool 键。
-    /// 旧键迁移在 LibraryView 首次读取时做：无此键时按 useGridView 折算 grid/list。
+    /// 详情页「游戏记录」折叠区展开（默认 true=展开，跨会话记忆）。
+    /// **全局一份而不是每个游戏一份** —— 与侧边栏三个分区同一套做法，理由见
+    /// `GameDetailView.externalRecordsSection`。
+    static let detailRecordsExpandedKey = "customization.detail.recordsExpanded"
+    /// 库视图模式（`LibraryViewMode` 原始值字符串，**双平台共用**）。
+    /// 取代了此前 macOS 的 `useGridView` Bool 与 iOS 的 `customization.iosLibraryViewMode` 两个键 ——
+    /// 两个 Bool 表达不了三个状态（macOS 加方形网格后是 grid/squareGrid/list）。
+    static let libraryViewModeKey = "customization.libraryViewMode"
+    /// **旧键，仅供迁移读取**：iOS 库视图三态。新写入一律走 `libraryViewModeKey`。
+    /// LibraryView 首次读取时若新键为空，则由它（或 macOS 的 `useGridView`）折算一次并写上。
+    /// 迁移后不再删除：删了也读不到值，且留着可让用户回退旧版本时不丢偏好。
     static let iosLibraryViewModeKey = "customization.iosLibraryViewMode"
+    /// **旧键，仅供迁移读取**：macOS 网格/列表 Bool（`true` = 网格）。
+    /// 全文仅此一处定义 —— 调用点此前写作字面量 `"useGridView"`，是本项目**唯一**
+    /// 没有命名空间前缀的键（新键一律 `customization.` / `share.` 开头）。
+    static let legacyMacGridViewKey = "useGridView"
     /// 主页横幅标题 / 副标题 / 背景图文件引用（设置页「主页横幅」块读写；轮播第 1 页展示）。
     static let bannerTitleKey = "customization.bannerTitle"
     static let bannerSubtitleKey = "customization.bannerSubtitle"

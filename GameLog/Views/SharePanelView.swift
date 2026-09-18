@@ -55,16 +55,23 @@ struct SharePanelView: View {
     @AppStorage(UserCustomization.usernameKey) private var username = ""
 
     private var selectedGames: [Game] {
-        games.filter { selectedIDs.contains($0.persistentModelID) }
+        liveGames.filter { selectedIDs.contains($0.persistentModelID) }
     }
 
     private var selectedGroup: GameGroup? {
         guard let selectedGroupID else { return nil }
-        return groups.first { $0.persistentModelID == selectedGroupID }
+        return liveGroups.first { $0.persistentModelID == selectedGroupID }
     }
 
+    /// 还活着的游戏 / 分组。本面板从 `GameDetailView` 直接弹出，**没有** `libraryReplacing`
+    /// 门 —— 整库替换或「清空该账号导入数据」之后，`@Query` 会滞后一帧，而分享卡渲染读的是
+    /// 封面的外置存储（必 fault），那就是 2026-09-16 那条 `backing data detached` fatal。
+    /// 判据见 `Game.isLive`。
+    private var liveGames: [Game] { games.filter(\.isLive) }
+    private var liveGroups: [GameGroup] { groups.filter(\.isLive) }
+
     private var visibleGames: [Game] {
-        searchText.isEmpty ? games : games.filter { $0.matches(search: searchText) }
+        searchText.isEmpty ? liveGames : liveGames.filter { $0.matches(search: searchText) }
     }
 
     private var isMulti: Bool { selectedGames.count > 1 }
@@ -282,7 +289,7 @@ struct SharePanelView: View {
                     .buttonStyle(PressFeedbackButtonStyle(pressedOpacity: 0.55))
                 }
             } else {
-                ForEach(groups) { group in
+                ForEach(liveGroups) { group in
                     Button {
                         toggleGroup(group)
                     } label: {
@@ -321,10 +328,19 @@ struct SharePanelView: View {
         }
     }
 
+    /// 分享面板列表里的小缩略图框（26×34）。画图的判据与 `frame` **共用这一个数**，
+    /// 见 `GameRowView.thumbSize` 那条说明。
+    private static let coverThumbSize = CGSize(width: 26, height: 34)
+    private static var coverThumbAspect: CGFloat { coverThumbSize.width / coverThumbSize.height }
+
     private func coverThumb(_ game: Game) -> some View {
         Group {
             if let image = game.coverImage {
-                Image(appImage: image).resizable().scaledToFill()
+                // 比 26×34 这个框宽的图（1:1 图标、导入的横图）完整显示、上下留空；
+                // 竖版封面比它窄 → 照旧填满裁切。缩略图尺寸不变，列表不跳。
+                // 见 `AppImage.letterboxes(inBoxAspect:)`。
+                Image(appImage: image).resizable()
+                    .aspectRatio(contentMode: image.letterboxes(inBoxAspect: Self.coverThumbAspect) ? .fit : .fill)
             } else {
                 ZStack {
                     Rectangle().fill(Color.semantic(.quaternarySystemFill))
@@ -332,7 +348,7 @@ struct SharePanelView: View {
                 }
             }
         }
-        .frame(width: 26, height: 34)
+        .frame(width: Self.coverThumbSize.width, height: Self.coverThumbSize.height)
         .clipShape(RoundedRectangle(cornerRadius: 3))
     }
 
@@ -364,7 +380,7 @@ struct SharePanelView: View {
                     .scaledToFit()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .padding(16)
-                    .background(Color(red: 0.075, green: 0.067, blue: 0.055))
+                    .background(BrandPalette.background)
                     // iOS 点预览全屏看大图：按钮化带按压反馈（原 onTapGesture 无视觉响应）。
                     #if os(iOS)
                     .contentShape(Rectangle())

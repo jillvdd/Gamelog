@@ -58,7 +58,7 @@ struct LaunchGate<Content: View>: View {
     private var splashView: some View {
         ZStack {
             // 双平台同一品牌底色（与分享卡品牌深色一致）
-            Color(red: 0.075, green: 0.067, blue: 0.055)
+            BrandPalette.background
                 .ignoresSafeArea()
 
             VStack(spacing: 18) {
@@ -66,7 +66,7 @@ struct LaunchGate<Content: View>: View {
                     .frame(width: 96, height: 96)
                 Text(L10n.tr("app.menu", lang: language))
                     .font(.title2.weight(.semibold))
-                    .foregroundStyle(Color(red: 1.0, green: 0.72, blue: 0.42))
+                    .foregroundStyle(BrandPalette.accent)
                 SplashProgress()
                     .frame(width: 120, height: 3)
             }
@@ -85,7 +85,7 @@ struct AppIconBadge: View {
                     .scaledToFill()
             } else {
                 RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .fill(Color(red: 1.0, green: 0.72, blue: 0.42))
+                    .fill(BrandPalette.accent)
                     .overlay {
                         Image(systemName: "books.vertical.fill")
                             .font(.system(size: 40))
@@ -124,7 +124,7 @@ private struct SplashProgress: View {
             .fill(Color.white.opacity(0.12))
             .overlay(alignment: .leading) {
                 Capsule()
-                    .fill(Color(red: 1.0, green: 0.72, blue: 0.42))
+                    .fill(BrandPalette.accent)
                     .frame(width: 44)
                     .offset(x: phase ? 76 : 0)
                     .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: phase)

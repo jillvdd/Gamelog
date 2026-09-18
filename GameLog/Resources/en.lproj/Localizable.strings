@@ -13,6 +13,7 @@
 "library.sortByValueDesc" = "Highest Value";
 "library.sort" = "Sort";
 "library.gridView" = "Grid View";
+"library.squareGridView" = "Square Grid";
 "library.listView" = "List View";
 "library.wideCardView" = "Single Column";
 "library.viewMode" = "View";
@@ -27,6 +28,7 @@
 "game.nameEn" = "English Title";
 "game.nameZh" = "Chinese Title";
 "game.nameJa" = "Japanese Title";
+"game.nameHint" = "Fill in at least one language. Games imported from a linked account often have only a Chinese or Japanese title — leaving the English title empty is fine.";
 "game.aliases" = "Aliases (for search)";
 "game.aliasPlaceholder" = "Enter an alias";
 "game.aliasAdd" = "Add";
@@ -184,7 +186,7 @@
 "backup.importFailed" = "Import failed. Check that the file is a valid backup.";
 "backup.importConfirm" = "Importing will replace all current data. Continue?";
 "backup.share" = "Share Backup…";
-"validation.nameRequired" = "Enter a game name";
+"validation.nameRequired" = "Enter a title in at least one language";
 "validation.reviewTitleRequired" = "Review title is required";
 "validation.scoreRequired" = "Score at least one dimension";
 "validation.scoresRequired" = "The first completion requires all four scores";
@@ -357,6 +359,7 @@
 "status.completed" = "Completed";
 "stats.backlogCount" = "Backlog";
 "status.longRunning" = "Long-Running";
+"status.unclassified" = "Unclassified";
 
 // Auto backup + cache
 "settings.autoBackup" = "Auto Backup";
@@ -397,3 +400,183 @@
 "settings.bannerHint" = "Shown on the first carousel page at the top of \"All Games\"";
 "crop.titleBanner" = "Crop Banner Background";
 "crop.titleBannerHint" = "Position the part you want inside the window";
+
+/* ===== Game Accounts (experimental) ===== */
+
+"settings.accounts" = "Game Accounts";
+"settings.accountsHint" = "Reads your play records from the Nintendo / PlayStation official services, and for Xbox through a third-party gateway (OpenXBL — see the Xbox section when you add an account). Credentials stay in this device's Keychain — never uploaded, never in backups.";
+"account.experimental" = "Experimental";
+"account.empty" = "No account linked yet.";
+"account.experimentalHint" = "Experimental: these are endpoints called by the official clients but not publicly documented, so either side may change them. Nintendo and PlayStation requests go from this device straight to the official service; Xbox requests go through OpenXBL, a third-party gateway this app does not control. This app has no server of its own.";
+"account.add" = "Add Account";
+"account.syncAll" = "Sync All";
+"account.syncing" = "Syncing…";
+"account.neverSynced" = "Never synced";
+"account.lastSyncAt" = "%1$@ · %2$d records";
+"account.syncDone" = "%1$@ synced · %2$d records this round";
+"account.syncFailed" = "%1$@ failed to sync";
+"account.syncAllDone" = "%1$d of %2$d accounts synced";
+
+"account.credState.active" = "Ready";
+"account.credState.expired" = "Sign-in required";
+"account.credState.missing" = "Credential missing";
+"account.credState.none" = "Not linked";
+
+"account.syncError.network" = "No network";
+"account.syncError.authExpired" = "Sign-in expired";
+"account.syncError.rateLimited" = "Too many requests";
+"account.syncError.apiChanged" = "API changed";
+"account.syncError.server" = "Server error";
+"account.syncError.unknown" = "Unknown error";
+
+"account.version.full" = "Full version";
+"account.version.demo" = "Demo";
+"account.version.trial" = "Trial";
+"account.version.unknown" = "Version unknown";
+
+"account.linkError.invalidInput" = "That does not look like a valid credential. Please copy it again.";
+"account.linkError.staleCallback" = "This link belongs to an earlier sign-in. Please sign in again.";
+
+/* ---- Add account ---- */
+
+"account.add.title" = "Add Account";
+"account.add.platform" = "Platform";
+"account.add.connecting" = "Verifying…";
+"account.add.titleLocaleHint" = "Sets the language for titles and artwork fetched from the source. Changeable later on the account page; changing it afterwards needs a re-sync to take effect.";
+"account.add.nintendoSignIn" = "Open Nintendo Sign-In";
+"account.add.nintendoSignInHint" = "Opens Nintendo's own sign-in page and returns to this app afterwards. You are never asked to give your Nintendo password to this app.";
+"account.add.nintendoPasteLabel" = "Paste manually (fallback)";
+"account.add.nintendoPastePlaceholder" = "Paste the full URL you were redirected to";
+"account.add.nintendoPasteConfirm" = "Link with this URL";
+"account.add.nintendoPasteHint" = "If the page stops at \"cannot open link\" after signing in, copy the full URL from the address bar into here — the result is identical to the automatic return. Why this fallback exists: the system sign-in session depends on a callback scheme, so if the system cannot hand the redirect back to this app, pasting is the only path that does not depend on it.";
+"account.add.npssoPlaceholder" = "64 characters";
+"account.add.npssoConfirm" = "Link this account";
+"account.add.npssoHint" = "How to get it: press \"Open PlayStation sign-in page\" above and sign in, then press \"Open NPSSO page\" and copy the npsso value into here. Sony only sends its sign-in callback to its own PS App, so this manual step is unavoidable. This app cannot and will not obtain your Sony password.";
+"account.add.psnSignIn" = "Open PlayStation sign-in page";
+"account.add.psnNpssoPage" = "Open NPSSO page";
+"account.add.psnBrowserHint" = "Open both buttons in the same browser: sign in first, then get the NPSSO. The NPSSO comes from a browser session, so a different browser or an in-app page will still look signed out.";
+"account.add.xboxDashboard" = "Open OpenXBL dashboard";
+"account.add.xboxBrowserHint" = "How to get it: on the OpenXBL dashboard, create a Personal API Key and paste it below. Please read this first: Xbox play data cannot be fetched with a personal Microsoft account directly, so this one account type is read through OpenXBL, a third-party service — your API key and your requests pass through that server. What you see in the app is still Microsoft's own data (Gamertag, Gamerscore, achievements).";
+"account.add.xboxKeyHeader" = "OpenXBL API Key";
+"account.add.xboxKeyPlaceholder" = "OpenXBL Personal API Key";
+"account.add.xboxKeyConfirm" = "Link this account";
+"account.add.xboxKeyHint" = "The key is stored in this device's Keychain and nowhere else: this app never uploads it and never puts it in backups. You can revoke it at any time from the OpenXBL dashboard.";
+"account.detail.trophyUnavailable" = "Trophy data was incomplete this time (trophies and PS3 / PS Vita games come from the same endpoint). Your play records updated normally — try syncing again later.";
+"account.detail.playtimeUnavailable" = "Play time was not fetched this time (it comes from a separate endpoint). Your play records updated normally — try syncing again later.";
+
+/* ---- Account detail ---- */
+
+"account.detail.status" = "Account Status";
+"account.detail.platform" = "Platform";
+"account.detail.credential" = "Sign-in";
+"account.detail.lastSync" = "Last sync";
+"account.detail.sync" = "Sync Now";
+"account.detail.relink" = "Sign In Again";
+"account.detail.relinkHint" = "Signing in again refreshes the credential stored on this device. Already-synced records are untouched.";
+"account.detail.filter" = "Filter";
+"account.detail.filter.unmatched" = "Unlinked %1$d";
+"account.detail.filter.ignored" = "Not imported %1$d";
+"account.detail.filter.all" = "All %1$d";
+"account.detail.noRecords" = "No records yet. Tap \"Sync Now\" above.";
+"account.detail.records" = "Play Records";
+"account.detail.recordsHint" = "Tap any row to link it to an entry in your library, merge it, or stop importing it. With many records, use the search field above.";
+"account.detail.search" = "Search play records";
+"account.detail.noSearchMatch" = "No matching records.";
+"account.detail.pruned" = "Also cleaned up %1$d leftover entries library-wide";
+"account.detail.superseded" = "Removed %1$d trophy records already covered by a play record";
+"account.detail.syncSummary" = "%1$d new · %2$d updated · %3$d auto-matched · %4$d games created";
+"account.detail.artworkRefreshed" = "Artwork refreshed: %1$d";
+"account.detail.absent" = "No longer at source";
+"account.detail.ignored" = "Not imported";
+"account.detail.hours" = "%1$d h";
+"account.detail.firstPlayed" = "First %1$@";
+"account.detail.lastPlayed" = "Last %1$@";
+"account.detail.linkedTo" = "Linked to \"%1$@\"";
+"account.detail.unmatchedHint" = "Unlinked · tap to choose a game";
+"account.detail.unbind" = "Unlink Account";
+"account.detail.unbindTitle" = "Unlink Account";
+"account.detail.unbindConfirm" = "This deletes the credential stored on this device and every record synced from this account. Games in your library are not deleted — they just lose their source records.";
+"account.detail.unbindFooter" = "You will need to sign in again before syncing.";
+
+/* ---- Title & artwork language ---- */
+
+"account.titleLocale.title" = "Language";
+"account.titleLocale.header" = "Title & Artwork Language";
+"account.titleLocale.hint" = "The source returns titles and artwork in the language you ask for where it can. \"Follow App Language\" tracks the interface language set in Settings.";
+"account.titleLocale.refresh" = "Re-sync and refresh titles & artwork";
+"account.titleLocale.fallback" = "Nintendo does not accept \"%1$@\" — this sync fell back to \"%2$@\".";
+"account.titleLocale.coverage" = "%1$d of %2$d source titles are in %3$@. The rest have no name in that language on the source side (kept as-is; you can fill them in on the edit page).";
+"account.titleLocale.followApp" = "Follow App Language";
+"account.titleLocale.zhHant" = "繁體中文";
+"account.titleLocale.zhHans" = "简体中文";
+"account.titleLocale.ja" = "日本語";
+"account.titleLocale.en" = "English (US)";
+
+/* ---- Purging imported data ---- */
+
+"account.purge.action" = "Delete All Imported Data…";
+"account.purge.confirmTitle" = "Delete Imported Data";
+"account.purge.confirm" = "Deletes every play record synced from this account, plus any library entry this import created and you have not touched. Entries with your own data (completions, copies, groups, reviews, favorites, extra artwork) are kept. The account stays linked — re-sync afterwards to start clean.";
+"account.purge.done" = "Deleted %1$d records · removed %2$d imported entries · kept %3$d entries with your own data.";
+"account.syncBusy" = "This account is already syncing. Please wait for it to finish.";
+
+/* ---- Linking records ---- */
+
+"account.link.title" = "Link to Game";
+"account.link.record" = "Source record";
+"account.link.platform" = "Platform";
+"account.link.firstPlayed" = "First played";
+"account.link.lastPlayed" = "Last played";
+"account.link.hours" = "Play time";
+"account.link.version" = "Version";
+"account.link.current" = "Currently linked to";
+"account.link.unbind" = "Unlink";
+"account.link.unbindHint" = "Unlinking only removes the link — it is reversible. If a later sync matches this record again, it will be linked automatically once more.";
+"account.link.merge" = "Merge with another game…";
+"account.link.suggestions" = "Suggestions";
+"account.link.suggestionsHint" = "Fuzzy title matches, offered only as a starting point.";
+"account.link.search" = "Search games";
+"account.link.noMatch" = "No matching game.";
+"account.link.allGames" = "All Games";
+"account.link.autoImport" = "Automatic import";
+"account.link.ignore" = "Stop importing this one";
+"account.link.unignore" = "Import this one again";
+"account.link.ignoreHint" = "Affects only this record: later syncs skip it entirely — no auto-created game, no asking again. It does not unlink a game you already linked; once unlinked, a skipped record stays skipped until you undo this.";
+
+/* ---- Merge ---- */
+
+"account.merge.title" = "Merge Games";
+"account.merge.source" = "Entry to be merged away";
+"account.merge.target" = "Entry to keep";
+"account.merge.search" = "Search for the entry to keep";
+"account.merge.choose" = "Choose which one to keep";
+"account.merge.explain" = "The kept entry wins: fields it already has are never overwritten, and only blanks are filled from the other. Completions, copies, groups and source records are all merged over.";
+"account.merge.confirm" = "Merge";
+"account.merge.confirmHint" = "The \"entry to be merged away\" is deleted afterwards. This cannot be undone.";
+"account.merge.counts" = "%1$d completions · %2$d sources";
+
+/* ---- Detail page "Game Records" disclosure (the container of the external source cards) ---- */
+
+"game.records" = "Game Records";
+"game.records.a11y" = "Shows or hides records from the accounts you linked";
+
+/* ---- External source cards: shared by both card kinds (trophies / play activity) ---- */
+
+"game.activity.source" = "Source: %1$@";
+"game.activity.firstPlayed" = "First played";
+"game.activity.lastPlayed" = "Last played";
+"game.activity.playtime" = "Play time";
+
+/* ---- Trophies (PlayStation only) ---- */
+
+"game.trophies.a11y" = "%2$d of %1$d trophies earned";
+"game.trophies.summary" = "%1$d platinum · %2$d gold · %3$d silver · %4$d bronze";
+"game.trophy.platinum" = "Platinum";
+"game.trophy.gold" = "Gold";
+"game.trophy.silver" = "Silver";
+"game.trophy.bronze" = "Bronze";
+
+/* ---- 成就（Xbox 独有） ---- */
+
+"game.xbox.achievements" = "Achievements";
+"game.xbox.gamerscore" = "Gamerscore";

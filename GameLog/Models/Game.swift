@@ -17,10 +17,13 @@ enum Dimension: String, CaseIterable, Identifiable {
     var labelKey: String { "dimension.\(rawValue)" }
 }
 
-/// 游戏状态机：想玩 / 在玩 / 搁置 / 弃坑 / 长线游玩 / 已通关。
+/// 游戏状态机：想玩 / 在玩 / 搁置 / 弃坑 / 长线游玩 / 已通关 / 未分类。
 /// 想玩/在玩/搁置/弃坑是轻量状态：不挂通关记录（详情页隐藏记录区）；流转到 `completed` 或 `longRunning` 才挂记录。
 /// 长线游玩对应已通关：挂通关记录、卡片显示评分（而非状态标签），用于长期运营游戏。
 /// 存储 rawValue，展示走 L10n（status.backlog 等）。
+///
+/// ⚠️ `unclassified` **必须留在最后**：它是「还没有人来分过类」的 catch-all，不是状态机的一站。
+/// 排在中间会让详情页状态滑块把「已通关」和「未分类」画成相邻两格，看起来像可以来回降级。
 enum GameStatus: String, CaseIterable, Identifiable {
     case backlog
     case playing
@@ -28,6 +31,9 @@ enum GameStatus: String, CaseIterable, Identifiable {
     case dropped
     case longRunning
     case completed
+    /// 外部账号导入自动建库时的初始状态（`ImportCoordinator.makeGame`）。
+    /// 语义 = 「这条是同步替我建的，我还没表过态」。用户一旦在详情页动过状态，它就和别的档位一样了。
+    case unclassified
 
     var id: String { rawValue }
     var labelKey: String { "status.\(rawValue)" }
@@ -72,10 +78,19 @@ enum LogoBannerHorizontal: String, CaseIterable, Identifiable, LabelKeyed {
 
 /// 一个游戏（库条目）。创建时带首条通关记录，之后可追加。
 /// 多语言名字：`name` 为英文名（必须、canonical），`nameZh`/`nameJa` 可选；
-/// 展示时按当前语言用 `displayName(for:)` 回退（中文→nameZh??name，日文→nameJa??name，英文→name）。
+/// 展示时按当前语言用 `displayName(for:)` 回退（中文→nameZh，日文→nameJa，其余→name；
+/// 槽为空时一律退到 `primaryName`）。
 @Model
 final class Game {
-    /// 英文名（必须，存储 canonical；展示按语言回退）。
+    /// 主名（canonical，存储用；展示按语言回退）。
+    ///
+    /// ⚠️ **可以是空串**（2026-09-16 起）：这条不变量从「必须有英文名」改成了
+    /// 「**必须有一种语言的名称**」。导入进来的游戏，来源标题若是中日文就只进对应的语言槽
+    /// （见 `ImportCoordinator.applyTitleLanguage`），`name` 留空 —— 用户要的是「选了繁體中文
+    /// 就只填中文」，而不是把中文也复制进英文名那一栏。编辑页的校验随之改成「三种语言至少填一个」。
+    ///
+    /// 因此**不要**假定它非空：要拿「一个名字」用 `primaryName`，要按语言拿用 `displayName(for:)`。
+    /// Schema 不变（`String` 换成空值不需要迁移）。
     var name: String
     /// 中文名（可选）。
     var nameZh: String?
@@ -117,6 +132,14 @@ final class Game {
     /// 我的最爱（用户标记；虚拟分组「我的最爱」的成员依据）。
     var isFavorite: Bool = false
 
+    /// 是否是**外部账号导入**自动建出来的库条目（`ImportCoordinator.makeGame` 置 true）。
+    ///
+    /// 只为一件事存在：「清空该账号的导入数据」要能区分「同步替我建的、我还没碰过」与
+    /// 「我自己建/改过的」。没有这个标记时两者在库里长得一模一样，清理就只能靠猜。
+    /// **用户一旦编辑过这个游戏，标记不撤销** —— 撤销与否由清理动作自己判断（见
+    /// `ExternalAccountBinder.purgeImportedData`：有用户数据的一律保留）。
+    var isAutoCreated: Bool = false
+
     @Relationship(deleteRule: .cascade, inverse: \Completion.game)
     var completions: [Completion]
 
@@ -128,6 +151,16 @@ final class Game {
     @Relationship(deleteRule: .nullify, inverse: \GameGroup.games)
     var groups: [GameGroup]
 
+    /// 外部账号（Nintendo / PSN）同步来的游玩记录。
+    ///
+    /// `.nullify` 而非 `.cascade`：删掉这个游戏**不删**来源记录。两个理由——
+    /// ① 来源记录是「账号上发生过的事实」，独立于用户的库条目；② 删游戏与记录的联系被
+    /// 记在记录侧的 `isIgnored` 上（删除路径置位），下次同步不会把用户刚删掉的游戏又建回来。
+    ///
+    /// 声明处给 `= []` 是为了 SwiftData 轻量迁移：新增 to-many 关系不需要自定义迁移阶段。
+    @Relationship(deleteRule: .nullify, inverse: \ExternalGameRecord.game)
+    var externalRecords: [ExternalGameRecord] = []
+
     init(name: String, nameZh: String? = nil, nameJa: String? = nil,
          aliases: [String] = [], platform: String = "", releaseDate: Date? = nil,
          developer: String? = nil, publisher: String? = nil, genre: String? = nil,
@@ -136,7 +169,7 @@ final class Game {
          logoVertical: LogoBannerVertical = .bottom, logoHorizontal: LogoBannerHorizontal = .leading,
          reviewTitle: String = "", reviewBody: String = "",
          createdAt: Date = .now, status: GameStatus = .completed,
-         isFavorite: Bool = false) {
+         isFavorite: Bool = false, isAutoCreated: Bool = false) {
         self.name = name
         self.nameZh = nameZh
         self.nameJa = nameJa
@@ -160,15 +193,33 @@ final class Game {
         self.updatedAt = createdAt
         self.status = status.rawValue
         self.isFavorite = isFavorite
+        self.isAutoCreated = isAutoCreated
         self.completions = []
         self.copies = []
         self.groups = []
+        self.externalRecords = []
     }
 }
 
 // MARK: - 派生计算
 
 extension Game {
+
+    /// 这个实例是不是**还挂在某个 context 上**（即还活着、属性还能读）。
+    ///
+    /// 为什么需要这个判据：批量删除（「清空导入数据」一次删几百个条目、备份导入整库替换）
+    /// 落盘之后，界面里那些「从 `@Query` 数组拿到的」Game 引用当场变成**已销毁模型**，
+    /// 而 SwiftUI 可能还会拿旧数组再渲染一帧。读已销毁模型的属性会直接
+    /// `Fatal error: This backing data was detached from a context without resolving
+    /// attribute faults` —— 不是抛错，是整进程崩（2026-09-16 真机崩溃现场：卡片读
+    /// `coverData`；外置存储的封面必须 fault 回 store，所以它必崩，而小的内联字段
+    /// 恰好能从内存快照里读出来，这也是为什么崩溃点看起来只有封面）。
+    ///
+    /// ⚠️ **判据只能是 `modelContext == nil`，不能用 `isDeleted`**。真机探针实测：
+    /// `context.delete(x)` 之后 `isDeleted == true`，但 `try context.save()` 之后
+    /// **`isDeleted` 又翻回 `false`**，而 `modelContext` 保持 nil。用 `isDeleted`
+    /// 写这道守卫，恰好守不住唯一需要它的那一刻（删除已落盘）。
+    var isLive: Bool { modelContext != nil }
 
     /// 状态机状态（解析存储值，未知值兜底已通关）。
     var statusValue: GameStatus {
@@ -207,13 +258,44 @@ extension Game {
         statusValue == .completed || statusValue == .longRunning
     }
 
-    /// 按当前语言的显示名：中文→中文名（未设回退英文），日文→日文名（未设回退英文），英文→英文名。
-    func displayName(for language: String) -> String {
-        switch language {
-        case "zh-Hans": return nameZh ?? name
-        case "ja": return nameJa ?? name
-        default: return name
+    /// 名字的兜底链：主名 → 中文名 → 日文名，全都为空才返回空串。
+    ///
+    /// **`name` 允许为空**（2026-09-16 起，见 `displayName(for:)` 的注释），所以凡是要拿
+    /// 「一个名字」而不是「某个语言的名字」的地方（排序裁决、合并预览、搜索建议、封面搜索的
+    /// 词条）都走这里，别再直接读 `name` 或自己拼 `?? name`。
+    var primaryName: String {
+        for candidate in [name, nameZh ?? "", nameJa ?? ""] where !candidate.isEmpty {
+            return candidate
         }
+        return ""
+    }
+
+    /// 参与同名匹配的全部名字（主名 / 中文名 / 日文名 / 别名），**去掉空的**。
+    ///
+    /// 空串在归一化后也是空串，`normalizedTitle` 的调用方本来就靠 `!isEmpty` 跳过它 ——
+    /// 但那是每个调用方各写一遍的纪律；在这里滤掉，调用方就不必记得这件事。
+    var allNames: [String] {
+        ([name] + [nameZh, nameJa].compactMap { $0 } + aliases).filter { !$0.isEmpty }
+    }
+
+    /// 按当前语言的显示名：中文→中文名，日文→日文名，其余→主名；
+    /// **当前语言的槽为空时退到 `primaryName`（而不是直接退到主名）**。
+    ///
+    /// 后半条是 2026-09-16 改的，配合「主名可以留空」这条新规矩：导入进来的游戏，
+    /// 来源标题若是中日文就**只进它自己的语言槽**（不再往 `name` 里也塞一份，见
+    /// `ImportCoordinator.applyTitleLanguage`）。于是会出现「`name` 为空、只有 `nameZh`
+    /// 有值」的游戏 —— 英文界面必须退回那个中文名显示，否则卡片上是一片空白。
+    ///
+    /// 对旧数据（主名有值）行为完全不变：`nameZh` 为空时退到的 `primaryName` 就是 `name`。
+    func displayName(for language: String) -> String {
+        let preferred: String?
+        switch language {
+        case "zh-Hans": preferred = nameZh
+        case "ja": preferred = nameJa
+        default: preferred = nil
+        }
+        if let preferred, !preferred.isEmpty { return preferred }
+        return primaryName
     }
 
     /// 通关记录按时间正序。
@@ -226,10 +308,24 @@ extension Game {
         completions.compactMap(\.date).max()
     }
 
-    /// 该游戏出现过的所有平台，去重（通关记录平台 + 游戏主平台）；按平台预设的世代倒序排列，预设外的自定义值按字典序排在最后。
+    /// 该游戏出现过的所有平台，去重（通关记录平台 + 游戏主平台 + **来源记录的平台**）；
+    /// 按平台预设的世代倒序排列，预设外的自定义值按字典序排在最后。
+    ///
+    /// 最后那一路是 2026-09-18 加的（用户原话：*「一个本身没有 PS 的游戏在绑定了 PS 记录后
+    /// 应当也将 PS 视为一个平台」*）：他把三个地区的「人中之龙 0」PS 奖杯记录绑到自己的
+    /// 「Yakuza 0」（平台只填了 Xbox One）上，可按 PS4 / PS3 筛选时那个条目是隐形的 ——
+    /// 明明它下面挂着三条 PS 记录。
+    ///
+    /// 为什么是**派生**而不是把 `"PS4"` 写进 `platform`：写进去就不可逆 —— 解绑之后平台
+    /// 还留着，用户只会觉得「它怎么还说自己是 PS4 游戏」。派生值跟着绑定关系走，解绑即消失，
+    /// 而且**不动用户的声明**（他自己填的那个主平台永远是第一事实，编辑页读的也是它）。
+    ///
+    /// 这一处改了三条路径全部跟着走（库页的平台筛选 `LibraryQuery.filter`、统计页的
+    /// 平台分布 `LibraryStats`、卡片上的平台图标）—— 与「判定只有一处」同一条纪律。
     var platformList: [String] {
         var list = completions.map(\.platform)
         if !platform.isEmpty { list.append(platform) }
+        list.append(contentsOf: externalRecords.map(\.platform))
         return Presets.ordered(list)
     }
 
@@ -271,11 +367,9 @@ extension Game {
         return values.reduce(0, +) / Double(values.count)
     }
 
-    /// 搜索文本：英文名 + 中文/日文名 + 全部别名，小写化。
+    /// 搜索文本：主名 + 中文/日文名 + 全部别名，小写化（空值已由 `allNames` 滤掉）。
     var searchableText: String {
-        ([name] + [nameZh, nameJa].compactMap { $0 } + aliases)
-            .map { $0.lowercased() }
-            .joined(separator: " ")
+        allNames.map { $0.lowercased() }.joined(separator: " ")
     }
 
     /// 按名称或别名模糊匹配。

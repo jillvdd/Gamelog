@@ -1,28 +1,44 @@
 // GameLog 分享卡渲染管线冒烟测试：真实调用 ImageRenderer 出图，校验尺寸与编码路径。
 // 覆盖：单卡竖版/横版、总览图（自适应列数）、无封面占位、无评分路径、分组卡（含拉高）、JPEG 导出。
 //
-// 编译运行（Xcode 工具链 + 宏插件路径，勿用 CLT swiftc）：
-//   xcrun swiftc -o /tmp/gamelog_sharetest \
+// 编译运行（Xcode 工具链 + 宏插件路径，勿用 CLT swiftc；`-sdk` 必需，否则标准库加载失败）：
+//   xcrun swiftc -sdk <Xcode-beta MacOSX.sdk> -o /tmp/gamelog_sharetest \
 //     Scripts/ShareRenderTest/main.swift \
 //     GameLog/Models/Game.swift GameLog/Models/Completion.swift GameLog/Models/GameGroup.swift \
 //     GameLog/Models/PhysicalCopy.swift GameLog/Models/Presets.swift \
+//     GameLog/Models/LinkedAccount.swift GameLog/Models/ExternalGameRecord.swift \
+//     GameLog/Support/ExternalImport/ExternalGameRecordDTO.swift \
+//     GameLog/Support/ExternalImport/ExternalAPIError.swift \
+//     GameLog/Support/ExternalImport/ExternalHTTPClient.swift \
+//     GameLog/Support/ExternalImport/TitleScript.swift \
+//     GameLog/Support/ExternalImport/PlayStation/PSNAPI.swift \
+//     GameLog/Support/ExternalImport/Xbox/XboxAPI.swift \
+//     GameLog/Support/ExternalImport/ExternalTimestamp.swift \
+//     GameLog/Support/PlayActivity.swift \
+//     GameLog/Support/Achievement.swift \
 //     GameLog/Support/ScoreMath.swift GameLog/Support/AppLanguage.swift GameLog/Support/L10n.swift \
 //     GameLog/Support/UserCustomization.swift GameLog/Support/PlatformImage.swift \
 //     GameLog/Support/EnumPickerRow.swift GameLog/Support/PriceFormat.swift \
 //     GameLog/Support/MarkdownReview.swift GameLog/Support/LiquidGlassToolbar.swift GameLog/Support/StatusStyle.swift \
-//     GameLog/Models/Artwork.swift \
+//     GameLog/Support/BrandPalette.swift GameLog/Support/SurfaceStyle.swift \
+//     GameLog/Support/TrophyStyle.swift \
+//     GameLog/Models/Artwork.swift GameLog/Support/ImageDecodeCache.swift \
 //     GameLog/Share/ShareCardView.swift GameLog/Share/ShareCardRenderer.swift \
 //     -plugin-path <Xcode-beta 插件路径>
 //   /tmp/gamelog_sharetest
+//
+// ⚠️ 命令随源码增长而失效过四次（`Game.swift` 引用 `ExternalGameRecord`、`ShareCardView` 引用
+// `BrandPalette`、`ExternalGameRecord.psnPlatformDisplay` 引用 `PSNAPI`、
+// `ExternalGameRecord.xboxPlatformDisplay` 引用 `XboxAPI`），所以**每次跑之前先
+// 确认这行命令仍然编译得过**，别复用旧二进制 —— 旧二进制跑出来的 PASS 与当前源码无关。
+// 最后一次失败（2026-09-17）的表现正是「编译报 3 个 error，而旧二进制照样打印 PASS」。
 import Foundation
 import AppKit
 import SwiftData
 
-// Game.coverImage 扩展在 GameCardView.swift（含 NewGroupSheet，依赖 SwiftData 环境），
-// 此处为纯渲染测试独立声明，避免拖入无关视图。
-extension Game {
-    var coverImage: NSImage? { coverData.flatMap(NSImage.init(data:)) }
-}
+// `Game.coverImage` 等五个图片访问器自 2026-09-16 起归属 `Models/Artwork.swift`
+//（解码走 `Support/ImageDecodeCache`），两者都编进本测试即可 —— 不再需要本地重复声明。
+// 此前这里有一份手写的 `coverImage` 扩展，与 Artwork.swift 的同名属性冲突（重复声明）。
 
 var failures = 0
 func check(_ name: String, _ cond: Bool) {

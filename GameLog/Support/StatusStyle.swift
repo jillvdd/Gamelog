@@ -16,6 +16,9 @@ extension GameStatus {
         case .dropped: .gray
         case .longRunning: .purple
         case .completed: .primary
+        // 未分类 = 中性灰：它不该和任何一个真状态抢注意力（`.dropped` 的灰是「弃坑」的语义色，
+        // 这里是「还没表过态」，所以用自适应的 `.secondary` 而不是固定灰）。
+        case .unclassified: .secondary
         }
     }
 
@@ -28,6 +31,7 @@ extension GameStatus {
         case .dropped: "xmark.circle"
         case .longRunning: "infinity"
         case .completed: "checkmark.circle"
+        case .unclassified: "questionmark.circle"
         }
     }
 }

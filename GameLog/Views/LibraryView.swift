@@ -5,25 +5,6 @@ import SwiftData
 import AppKit
 #endif
 
-#if os(iOS)
-/// iOS 库视图三态：网格 / 单列横向卡 / 列表（macOS 不受影响，仍用 useGridView Bool）。
-enum IOSLibraryViewMode: String, CaseIterable, Identifiable {
-    case grid
-    case wideCard
-    case list
-
-    var id: String { rawValue }
-
-    var labelKey: String {
-        switch self {
-        case .grid: "library.gridView"
-        case .wideCard: "library.wideCardView"
-        case .list: "library.listView"
-        }
-    }
-}
-#endif
-
 /// 主界面：网格/列表切换、搜索、平台筛选、排序、分享、新建入口。
 struct LibraryView: View {
     @Environment(\.modelContext) private var context
@@ -41,12 +22,15 @@ struct LibraryView: View {
     var favoritesOnly: Bool = false
 
     @State private var searchText = ""
-    @AppStorage("useGridView") private var useGridView = true
-    #if os(iOS)
-    // iOS 库视图三态（网格/单列横向卡/列表），与 macOS 的 Bool 键互不干扰。
-    // 旧值迁移：首次读取时无新键 → 按 useGridView 折算（onAppear 里 migratelibraryViewModeIfNeeded）。
-    @AppStorage(UserCustomization.iosLibraryViewModeKey) private var iosViewModeRaw = ""
+    /// 库视图模式（`LibraryViewMode` 原始值，**双平台共用**）。可选项按平台不同，见 `LibraryViewMode.available`。
+    /// 此前是两套互不相干的键（macOS 一个 `useGridView` Bool、iOS 一个三态字符串）；
+    /// macOS 加方形网格后是三态，两个 Bool 表达不了，所以合并成这一个。
+    /// 读到的原始值一律经 `resolved(_:)` 收敛 —— 它会把「本平台不支持的档位」也折回网格
+    ///（比如从 iOS 备份恢复到 macOS 时留下的 `wideCard`）。
+    @AppStorage(UserCustomization.libraryViewModeKey) private var viewModeRaw = ""
+    /// 旧键一次性迁移守卫（`onAppear` 里跑，各平台读各自的历史键）。跨平台，故不在 `#if os(iOS)` 内。
     @State private var didMigrateLibraryViewMode = false
+    #if os(iOS)
     /// 宽卡双列网格的实测内容列宽（背景 GeometryReader 测量，HomeCarousel pageWidth 同款
     /// 模式）——供 GameWideCardView 做 iPad 横竖屏分档与竖版卡封面边长。首帧 0 时卡片走
     /// 349 回退边长，onAppear 即校正（与轮播 pageWidth 起步 0 同口径）。
@@ -64,36 +48,51 @@ struct LibraryView: View {
     @State private var pendingDeleteGame: Game?
     @State private var editingGame: Game?
     @State private var groupPickerGame: Game?
+    /// 右键菜单「合并到另一个游戏…」的源条目（并进用户随后选中的那个）。
+    @State private var mergeSourceGame: Game?
     @State private var showingNewGame = false
     @State private var showingShare = false
 
     private var sortOption: LibrarySort { LibrarySort(rawValue: sortRaw) ?? .completionDate }
 
-    #if os(iOS)
-    /// 当前 iOS 视图模式（迁移未跑或值为空时兜底网格——onAppear 迁移会立即写上真实值）。
-    private var iosViewMode: IOSLibraryViewMode {
-        IOSLibraryViewMode(rawValue: iosViewModeRaw) ?? .grid
+    /// 当前视图模式：原始值经平台收敛（未知值 / 本平台不支持的档位一律回退网格）。
+    /// 迁移未跑或键为空时也走这里 —— `resolved("")` 给的是网格，而 `onAppear` 的迁移会立刻写上真实值。
+    private var viewMode: LibraryViewMode {
+        LibraryViewMode.resolved(viewModeRaw)
     }
-    /// iOS 渲染分支判定：true = 网格；false = 横向卡或列表（由 iOS 渲染分支细化）。
-    #endif
+
+    /// 还活着的游戏。批量删除（清空导入数据 / 整库替换）后 SwiftUI 可能拿**旧数组**
+    /// 再渲染一帧，读一个已销毁模型就是 `Fatal error: This backing data was detached`。
+    /// 卡片自带 `isLive` 守卫，但给到下层的**数组**（轮播、分组统计）没有 —— 在源头拦。
+    /// 本视图所有下游（轮播、`visibleGames`、`allFavorites`）都从这一个入口取。
+    private var liveGames: [Game] { games.filter(\.isLive) }
 
     /// 分组模式下工具栏平台菜单的候选：本组内出现的平台（预设世代倒序 + 自定义排最后）。
     private var groupPlatforms: [String] {
-        guard let group = groupFilter else { return [] }
+        guard let group = groupFilter, group.isLive else { return [] }
         return Presets.ordered(group.games.flatMap { $0.completions.map(\.platform) })
     }
 
     private var visibleGames: [Game] {
         // 平台过滤在分组/非分组两种模式下都生效（iOS 由分组/平台两个菜单驱动；macOS 分组模式叠加 groupPlatformFilter）。
+        //
+        // 先滤掉已销毁的模型：数组级消费者（分组统计、轮播、搜索结果）没有卡片那层
+        // `isLive` 守卫，得在源头拦。
+        //
+        // 分组本身也要活在：`LibraryQuery.filter` 在 group 非 nil 时直接读 `group.games`，
+        // 而侧边栏选中态与这里有两帧缝隙（选中被删分组时读一次就是 SwiftData fatal）。
+        if let groupFilter, !groupFilter.isLive { return [] }
         var result = LibraryQuery.filter(
-            games: games, group: groupFilter,
+            games: liveGames, group: groupFilter,
             platform: platform, status: statusFilter, search: searchText
         )
         if favoritesOnly {
             result = result.filter(\.isFavorite)
         }
         #if os(macOS)
-        if let groupFilter, !groupPlatformFilter.isEmpty {
+        // 只在分组视图内生效（工具栏的平台菜单仅分组模式下出现）；这里只判「有没有选中分组」，
+        // 不用 `if let` 绑名字——绑了也不用，编译器会报未使用警告。
+        if groupFilter != nil, !groupPlatformFilter.isEmpty {
             result = result.filter { $0.platformList.contains(groupPlatformFilter) }
         }
         #endif
@@ -101,8 +100,13 @@ struct LibraryView: View {
     }
 
     /// 虚拟分组「我的最爱」的全体成员（统计区块依据——不受搜索/排序影响）。
+    ///
+    /// 滤掉已销毁的模型：批量删除（清空导入数据 / 整库替换）后 SwiftUI 可能拿**旧数组**
+    /// 再渲染一帧，而读一个已销毁模型（这里下游是 `GroupStatsSectionContent`，会读分数、
+    /// 平台、时长）就是 `Fatal error: This backing data was detached`。卡片自带 `isLive`
+    /// 守卫，但统计区块读的是数组本身，得在这里拦（2026-09-16 崩溃同源，见 `Game.isLive`）。
     private var allFavorites: [Game] {
-        games.filter(\.isFavorite)
+        liveGames.filter(\.isFavorite)
     }
 
     /// 轮播只出现在「全部游戏」起始页：无分组、无平台、无状态、非最爱虚拟分组。
@@ -129,14 +133,17 @@ struct LibraryView: View {
         if let platform {
             return Presets.display(platform, category: .platform, language: language)
         }
-        return groupFilter?.name ?? L10n.tr("library.all", lang: language)
+        // 分组可能已被整库替换删掉（选中态还差一帧才被 RootView 的 onChange 清掉）——
+        // 读死分组的 `name` 就是 SwiftData fatal。
+        if let groupFilter, groupFilter.isLive { return groupFilter.name }
+        return L10n.tr("library.all", lang: language)
     }
 
     /// iOS 起始页内联标题开关（2026-09-05 用户要求）：「全部游戏」+ 轮播页的标题不再占
     /// 导航大标题，改渲染在五页轮播下方、游戏列表上方。仅在实际显示轮播内容页时生效——
     /// 空库 / 搜索无结果（轮播不显示）与其他筛选态（最爱/状态/平台/分组）仍走系统大标题。
     private var showsInlineHomeTitle: Bool {
-        showsHomeCarousel && !games.isEmpty && !visibleGames.isEmpty
+        showsHomeCarousel && !liveGames.isEmpty && !visibleGames.isEmpty
     }
 
     /// 轮播下方的内联标题：字号对齐系统大标题，与其他页标题视觉一致。
@@ -148,8 +155,12 @@ struct LibraryView: View {
 
     /// 切换分组/平台筛选时重置导航上下文：退出已打开的详情页、清空搜索词。
     /// 否则同 case 分支内切换（如平台 A → 平台 B）视图身份不变，path/selectedGame/searchText 会残留。
-    /// 整库替换时同样调用：额外清掉三个持有旧 Game 的 sheet state，否则 sheet 里
-    /// 的编辑/分组/删除页访问 detached 模型即 SwiftData fatal（2026-09-08）。
+    /// 整库替换时同样调用：额外清掉持有旧 Game 的 sheet state，否则 sheet 里
+    /// 的编辑/分组/删除/合并页访问 detached 模型即 SwiftData fatal（2026-09-08）。
+    ///
+    /// ⚠️ 这里清的是**本视图所有**挂在 `libraryReplacing` 门内的 Game 状态。新增一个
+    /// `@State var x: Game?` + `.sheet(item:)` 时，必须同时往这里加一行 —— 漏一个，
+    /// 整库替换后那张 sheet 会带着已删对象重新弹出来（`mergeSourceGame` 就是这么漏的）。
     private func resetNavigationContext() {
         #if os(macOS)
         path = NavigationPath()
@@ -160,6 +171,7 @@ struct LibraryView: View {
         editingGame = nil
         groupPickerGame = nil
         pendingDeleteGame = nil
+        mergeSourceGame = nil
         showingNewGame = false
         showingShare = false
     }
@@ -181,17 +193,22 @@ struct LibraryView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 40)
                 } else {
+                    // 分组页与「我的最爱」页的分支完全相同，故两处逐字一致。
                     #if os(iOS)
-                    switch iosViewMode {
-                    case .grid: gameGrid(visibleGames)
+                    switch viewMode {
+                    // `.squareGrid` 只做在 macOS：`available` 不含它，`resolved(_:)` 也拦得住。
+                    // 并进网格臂只为让 switch 穷尽。
+                    case .grid, .squareGrid: gameGrid(visibleGames)
                     case .wideCard: gameWideCards(visibleGames)
                     case .list: gameList(visibleGames)
                     }
                     #else
-                    if useGridView {
-                        gameGrid(visibleGames)
-                    } else {
-                        gameList(visibleGames)
+                    switch viewMode {
+                    case .grid: gameGrid(visibleGames)
+                    case .squareGrid: gameSquareGrid(visibleGames)
+                    // `.wideCard` 是 iOS 专属，同理由 `available` 挡在外面。
+                    case .wideCard: gameGrid(visibleGames)
+                    case .list: gameList(visibleGames)
                     }
                     #endif
                 }
@@ -207,8 +224,9 @@ struct LibraryView: View {
     }
 
     /// 「全部游戏」起始页顶端的五页轮播。
+    /// 传 `liveGames` 而不是原始 `@Query` 结果：轮播的统计/榜单读的是**数组本身**（没有卡片守卫）。
     private var carousel: some View {
-        HomeCarousel(games: games, onSelect: openDetail)
+        HomeCarousel(games: liveGames, onSelect: openDetail)
     }
 
     /// 虚拟分组「我的最爱」内容：游戏列表在上、统计在下（无评价区块）。
@@ -234,17 +252,22 @@ struct LibraryView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 40)
                 } else {
+                    // 分组页与「我的最爱」页的分支完全相同，故两处逐字一致。
                     #if os(iOS)
-                    switch iosViewMode {
-                    case .grid: gameGrid(visibleGames)
+                    switch viewMode {
+                    // `.squareGrid` 只做在 macOS：`available` 不含它，`resolved(_:)` 也拦得住。
+                    // 并进网格臂只为让 switch 穷尽。
+                    case .grid, .squareGrid: gameGrid(visibleGames)
                     case .wideCard: gameWideCards(visibleGames)
                     case .list: gameList(visibleGames)
                     }
                     #else
-                    if useGridView {
-                        gameGrid(visibleGames)
-                    } else {
-                        gameList(visibleGames)
+                    switch viewMode {
+                    case .grid: gameGrid(visibleGames)
+                    case .squareGrid: gameSquareGrid(visibleGames)
+                    // `.wideCard` 是 iOS 专属，同理由 `available` 挡在外面。
+                    case .wideCard: gameGrid(visibleGames)
+                    case .list: gameList(visibleGames)
                     }
                     #endif
                 }
@@ -270,6 +293,21 @@ struct LibraryView: View {
             }
         }
     }
+
+    /// 方形封面网格（macOS 第三视图）：**列宽/格距与 `gameGrid` 逐字相同**，只有卡片形状不同
+    ///（1:1 满铺 vs 2:3）。这样切换视图时格子位置不跳，用户看到的只是封面比例变了。
+    ///
+    /// 只做在 macOS —— iOS 的三种模式已定（网格/宽卡/列表），`LibraryViewMode.available` 也按平台分了。
+    #if os(macOS)
+    @ViewBuilder
+    private func gameSquareGrid(_ games: [Game]) -> some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150, maximum: 200), spacing: 16, alignment: .top)], spacing: 16) {
+            ForEach(games) { game in
+                gameSquareCard(game)
+            }
+        }
+    }
+    #endif
 
     /// 列表（分组模式下用 LazyVStack 包进同一 ScrollView，避免嵌套 List）。
     @ViewBuilder
@@ -339,8 +377,11 @@ struct LibraryView: View {
         LibrarySortMenuItems(sortRaw: $sortRaw)
     }
 
+    /// 卡片 cell 的唯一包装：`Button` + 按压反馈 + 右键菜单。
+    /// 两种网格（竖版/方形）逐字共用它，只把 `shape` 透传给 `GameCardView` ——
+    /// 自建一份 cell 会丢掉右键菜单与按压反馈。
     @ViewBuilder
-    private func gameCard(_ game: Game) -> some View {
+    private func gameCard(_ game: Game, shape: CardShape = .portrait) -> some View {
         // Button + 按压反馈样式（原 onTapGesture 点按无任何视觉响应，不符 iOS 触控预期）。
         Button {
             #if os(macOS)
@@ -349,12 +390,19 @@ struct LibraryView: View {
             selectedGame = game
             #endif
         } label: {
-            GameCardView(game: game)
+            GameCardView(game: game, shape: shape)
                 .contentShape(Rectangle())
         }
         .buttonStyle(PressFeedbackButtonStyle())
         .contextMenu { cardMenu(for: game) }
     }
+
+    /// 方形网格的 cell，就是上面那个换 `shape`。
+    #if os(macOS)
+    private func gameSquareCard(_ game: Game) -> some View {
+        gameCard(game, shape: .square)
+    }
+    #endif
 
     @ViewBuilder
     private func gameRow(_ game: Game) -> some View {
@@ -423,6 +471,14 @@ struct LibraryView: View {
         } label: {
             Label(L10n.tr("game.groups", lang: language), systemImage: "folder")
         }
+        // 合并入口放在游戏侧：导入之前，`GameMergeSheet` 只能从「外部记录」面板进，
+        // 于是用户自己的两个条目（比如手建的「艾尔登法环」与同步建的「ELDEN RING」）
+        // 反而没有合并的路 —— 而那两个正是最需要合并的。语义与记录侧一致：把这条并进选中的那个。
+        Button {
+            mergeSourceGame = game
+        } label: {
+            Label(L10n.tr("account.merge.title", lang: language), systemImage: "arrow.triangle.merge")
+        }
         Divider()
         Button(role: .destructive) {
             pendingDeleteGame = game
@@ -471,20 +527,42 @@ struct LibraryView: View {
         .onReceive(NotificationCenter.default.publisher(for: UserCustomization.libraryReplacedNotification)) { _ in
             resetNavigationContext()
         }
-        #if os(iOS)
+        // 旧键一次性迁移（**两平台都要跑**）：新键为空时，各平台读自己的历史键折算一次。
+        //
+        // 为什么写在 `DispatchQueue.main.async` 里：`@AppStorage` 在视图更新周期内被同步写回会
+        // 触发一次嵌套的可见性失效。`AppToolbar.swift` 记过这个教训 —— 同步写 `@AppStorage`
+        // 曾把 UI 挂死。放到下一个 runloop 就绕开了。
+        //
+        // 旧键迁移后**不删除**：删了也读不到值（新键已写），而留着可让回退旧版本时不丢偏好。
         .onAppear {
-            // 旧键一次性迁移：无新键 → 按 useGridView（网格 true / 列表 false）折算三态值。
-            // 写入后旧键留着不动（无害；macOS 还在用）。
-            if !didMigrateLibraryViewMode {
-                didMigrateLibraryViewMode = true
-                if UserDefaults.standard.string(forKey: UserCustomization.iosLibraryViewModeKey) == nil {
-                    iosViewModeRaw = useGridView
-                        ? IOSLibraryViewMode.grid.rawValue
-                        : IOSLibraryViewMode.list.rawValue
-                }
+            guard !didMigrateLibraryViewMode else { return }
+            didMigrateLibraryViewMode = true
+            guard UserDefaults.standard.string(forKey: UserCustomization.libraryViewModeKey) == nil else { return }
+            #if os(macOS)
+            // 旧键没写过时 `bool(forKey:)` 给 false（= 列表），但旧代码的**默认值是网格**
+            //（`@AppStorage("useGridView") … = true`）。所以「键不存在」要按网格算，
+            // 否则老用户首启会被无端改成列表视图。
+            let legacy = UserDefaults.standard.object(forKey: UserCustomization.legacyMacGridViewKey) == nil
+                ? true
+                : UserDefaults.standard.bool(forKey: UserCustomization.legacyMacGridViewKey)
+            let migrated = legacy ? LibraryViewMode.grid : LibraryViewMode.list
+            #else
+            // iOS 旧键不存在时同样按网格算 —— 但这里还有一个额外来源：更早的版本把 iOS 的
+            // 视图模式直接写在 macOS 的 `useGridView` 上（迁移注释里记着这段历史），所以旧键也没有时
+            // 再看一眼那个 Bool。
+            let legacyRaw = UserDefaults.standard.string(forKey: UserCustomization.iosLibraryViewModeKey)
+            let migrated: LibraryViewMode
+            if let legacyRaw, let mode = LibraryViewMode(rawValue: legacyRaw) {
+                migrated = LibraryViewMode.available.contains(mode) ? mode : .grid
+            } else if UserDefaults.standard.object(forKey: UserCustomization.legacyMacGridViewKey) != nil {
+                migrated = UserDefaults.standard.bool(forKey: UserCustomization.legacyMacGridViewKey) ? .grid : .list
+            } else {
+                migrated = .grid
             }
+            #endif
+            let raw = migrated.rawValue
+            DispatchQueue.main.async { viewModeRaw = raw }
         }
-        #endif
         // 以下 sheet/弹窗在整库替换锁定期一律不呈现（绑定的 Game 引用已 detached，
         // 呈现即崩；上锁瞬间步骤 9 会同步清掉这些 state，此处是双保险 2026-09-08）。
         .sheet(isPresented: Binding(
@@ -507,17 +585,31 @@ struct LibraryView: View {
             get: { libraryReplacing ? nil : editingGame },
             set: { editingGame = $0 }
         )) { game in
-            #if os(macOS)
-            GameEditView(game: game)
-            #else
-            NavigationStack { GameEditView(game: game) }
-            #endif
+            // 纵深守卫：游戏可能已被别处删掉（合并 / 清空导入数据 / 整库替换），
+            // 而这张 sheet 由上面的 item 绑定撑着、未必赶在那一帧之前关掉。
+            if game.isLive {
+                #if os(macOS)
+                GameEditView(game: game)
+                #else
+                NavigationStack { GameEditView(game: game) }
+                #endif
+            } else {
+                Color.clear
+            }
         }
         .sheet(item: Binding(
-            get: { libraryReplacing ? nil : groupPickerGame },
+            get: { libraryReplacing ? nil : groupPickerGame?.isLive == true ? groupPickerGame : nil },
             set: { groupPickerGame = $0 }
         )) { game in
             GroupPickerSheet(game: game)
+        }
+        .sheet(item: Binding(
+            get: { libraryReplacing ? nil : mergeSourceGame?.isLive == true ? mergeSourceGame : nil },
+            set: { mergeSourceGame = $0 }
+        )) { game in
+            // 只传 ID：这张 sheet 可能在「清空账号导入数据」删游戏的同一刻开着，
+            // 传引用会让它拿旧对象再渲染一帧（见 GameMergeSheet 的说明）。
+            GameMergeSheet(sourceID: game.persistentModelID)
         }
         .platformConfirmDialog(
             L10n.tr("common.confirmDelete", lang: language),
@@ -525,8 +617,10 @@ struct LibraryView: View {
                 get: { pendingDeleteGame != nil && !libraryReplacing },
                 set: { if !$0 { pendingDeleteGame = nil } }
             ),
-            message: pendingDeleteGame.map {
-                L10n.tr("delete.confirmGame", [$0.displayName(for: language)], lang: language)
+            // 判据是 `isLive` 而非 `isDeleted`（见 `Game.isLive`）：确认框弹出后对象仍可能
+            // 被别处删掉（合并会删 source），那时读 `displayName` 就是 SwiftData fatal。
+            message: pendingDeleteGame.flatMap { game in
+                game.isLive ? L10n.tr("delete.confirmGame", [game.displayName(for: language)], lang: language) : nil
             },
             cancelTitle: L10n.tr("common.cancel", lang: language),
             actions: [
@@ -534,7 +628,10 @@ struct LibraryView: View {
                     title: L10n.tr("common.delete", lang: language),
                     isDestructive: true
                 ) {
-                    if let game = pendingDeleteGame {
+                    if let game = pendingDeleteGame, game.isLive {
+                        // 先标记再删：名下的外部记录会被设为「别再导入」，否则下次同步
+                        // 会把刚删掉的游戏原样建回来（见 `GameMerger.ignoreRecords`）。
+                        GameMerger.ignoreRecords(linkedTo: game, in: context)
                         context.delete(game)
                         // 缓存 key = persistentModelID+字段，pk 重用会让旧图贴到新游戏（审计 2026-09-05）。
                         ImageDecodeCache.bump()
@@ -552,7 +649,7 @@ struct LibraryView: View {
                 groupContent(group: group)
             } else if favoritesOnly {
                 favoritesContent
-            } else if games.isEmpty {
+            } else if liveGames.isEmpty {
                 ContentUnavailableView {
                     Image(systemName: "gamecontroller")
                         .font(.system(size: 48))
@@ -568,8 +665,10 @@ struct LibraryView: View {
                 }
             } else {
                 #if os(iOS)
-                switch iosViewMode {
-                case .grid:
+                switch viewMode {
+                // `.squareGrid` 只做在 macOS（`available` 不含它，`resolved` 也拦得住），
+                // 并进网格臂只为让 switch 穷尽。
+                case .grid, .squareGrid:
                     ScrollView {
                         VStack(alignment: .leading, spacing: 16) {
                             if showsHomeCarousel { carousel }
@@ -607,7 +706,10 @@ struct LibraryView: View {
                     }
                 }
                 #else
-                if useGridView {
+                // macOS：三种视图模式（网格 / 方形网格 / 列表）。两个网格态的脚手架逐字相同、
+                // 只差卡片形状，所以各写一臂而不是塞条件进一臂 —— 与上面 iOS 那份同一写法。
+                switch viewMode {
+                case .grid:
                     ScrollView {
                         VStack(alignment: .leading, spacing: 16) {
                             if showsHomeCarousel { carousel }
@@ -615,7 +717,24 @@ struct LibraryView: View {
                         }
                         .padding()
                     }
-                } else {
+                case .squareGrid:
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 16) {
+                            if showsHomeCarousel { carousel }
+                            gameSquareGrid(visibleGames)
+                        }
+                        .padding()
+                    }
+                case .wideCard:
+                    // iOS 专属（`available` 不含它，`resolved` 也拦得住），给网格以保持穷尽。
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 16) {
+                            if showsHomeCarousel { carousel }
+                            gameGrid(visibleGames)
+                        }
+                        .padding()
+                    }
+                case .list:
                     List {
                         if showsHomeCarousel {
                             carousel
@@ -696,24 +815,38 @@ struct LibraryView: View {
                 }
                 .help(L10n.tr("library.sort", lang: language))
             }
-            ToolbarItem(placement: .primaryAction) {
-                // 三按钮装进一整条玻璃长胶囊,右对齐(与搜索框相邻)。
-                HStack(spacing: 0) {
-                    Button {
-                        useGridView.toggle()
-                    } label: {
-                        // 自定义按钮样式会丢掉系统工具栏的自动图标放大,显式给到原生尺寸(15pt)。
-                        Image(systemName: useGridView ? "list.bullet" : "square.grid.2x2")
-                            .font(.system(size: 15))
+            ToolbarItem {
+                // 视图模式（网格 / 方形网格 / 列表）：三态一个 toggle 表达不了，改成同款原生 Menu
+                //（与上面排序菜单一致——系统会给独立菜单单独一条玻璃胶囊，不会并进右侧三连）。
+                // **不用 `Picker`**：`Picker` 在 macOS 工具栏会渲染成下拉，与这里"分段按钮"的观感不一致。
+                // 图标随当前模式变化，勾选态随 `viewMode`；候选取自 `available`（本平台可用集合）。
+                Menu {
+                    ForEach(LibraryViewMode.available) { mode in
+                        Button {
+                            viewModeRaw = mode.rawValue
+                        } label: {
+                            // 与排序菜单同口径：勾选态用 checkmark 陪衬而不是系统 Toggle
+                            //（Toggle 勾选在 macOS 工具栏菜单里不落屏，见 `cardMenu` 同款注释）。
+                            if mode == viewMode {
+                                Label(L10n.tr(mode.labelKey, lang: language), systemImage: "checkmark")
+                            } else {
+                                Text(verbatim: L10n.tr(mode.labelKey, lang: language))
+                            }
+                        }
                     }
-                    .toolbarSegmentStyle()
-                    .help(useGridView ? L10n.tr("library.listView", lang: language) : L10n.tr("library.gridView", lang: language))
-
+                } label: {
+                    Image(systemName: viewMode.systemImage)
+                }
+                .help(L10n.tr("library.viewMode", lang: language))
+            }
+            ToolbarItem(placement: .primaryAction) {
+                // 两按钮装进一整条玻璃长胶囊,右对齐(与搜索框相邻)。
+                HStack(spacing: 0) {
                     Button {
                         showingShare = true
                     } label: {
                         Image(systemName: "square.and.arrow.up")
-                            .font(.system(size: 15))
+                            .font(.system(size: ToolbarMetrics.iconPt))
                     }
                     .toolbarSegmentStyle()
                     .help(L10n.tr("library.share", lang: language))
@@ -722,7 +855,7 @@ struct LibraryView: View {
                         showingNewGame = true
                     } label: {
                         Image(systemName: "plus")
-                            .font(.system(size: 15))
+                            .font(.system(size: ToolbarMetrics.iconPt))
                     }
                     .toolbarSegmentStyle()
                     .help(L10n.tr("library.addGame", lang: language))
@@ -743,32 +876,21 @@ struct LibraryView: View {
                 Menu {
                     LibrarySortMenuItems(sortRaw: $sortRaw)
                     Divider()
-                    #if os(iOS)
                     // 视图三选一（网格 / 单列横向卡 / 列表），勾选态随当前模式。
+                    // 候选取自 `LibraryViewMode.available`（本平台可用集合：这里不含 `.squareGrid`）。
+                    // 此前这里还套了一层 `#if os(iOS) … #else`——本分支整体已在 `#if os(macOS)` 的
+                    // `#else` 里，那个内层判断恒真，`#else` 的旧视图开关永远不可达，已删。
                     Picker(selection: Binding(
-                        get: { iosViewMode },
-                        set: { iosViewModeRaw = $0.rawValue }
+                        get: { viewMode },
+                        set: { viewModeRaw = $0.rawValue }
                     )) {
-                        ForEach(IOSLibraryViewMode.allCases) { m in
-                            Label(
-                                L10n.tr(m.labelKey, lang: language),
-                                systemImage: m == .grid ? "square.grid.2x2" : (m == .wideCard ? "rectangle.ratio.16.to.9" : "list.bullet")
-                            )
-                            .tag(m)
+                        ForEach(LibraryViewMode.available) { m in
+                            Label(L10n.tr(m.labelKey, lang: language), systemImage: m.systemImage)
+                                .tag(m)
                         }
                     } label: {
                         Label(L10n.tr("library.viewMode", lang: language), systemImage: "rectangle.grid.1x2")
                     }
-                    #else
-                    Button {
-                        useGridView.toggle()
-                    } label: {
-                        Label(
-                            L10n.tr(useGridView ? "library.listView" : "library.gridView", lang: language),
-                            systemImage: useGridView ? "list.bullet" : "square.grid.2x2"
-                        )
-                    }
-                    #endif
                     Button {
                         showingShare = true
                     } label: {

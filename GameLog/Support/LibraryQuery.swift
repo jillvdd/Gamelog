@@ -100,6 +100,61 @@ enum LibraryQuery {
     }
 }
 
+
+/// 库视图模式（**双平台共用**）。
+///
+/// macOS 与 iOS 此前各有一套互不相干的机制：macOS 是一个 `@AppStorage("useGridView")` Bool，
+/// iOS 是一个三态字符串枚举。两个 Bool 表达不了三个状态，所以加 macOS 方形网格时先把它们
+/// 合并成这一个枚举，再按平台给出各自可用的子集。
+///
+/// **`wideCard` 只在 iOS、`squareGrid` 只在 macOS**：宽卡是给 iPad 横竖屏分档用的版式
+///（`GameWideCardView` 自算几何），桌面窗口用不上；方形网格是用户点名要的桌面第三种视图。
+/// 可选集合由 `available` 统一给出，两个平台的菜单/Picker 都从它取，不会再漂移。
+enum LibraryViewMode: String, CaseIterable, Identifiable {
+    case grid
+    case squareGrid
+    case wideCard
+    case list
+
+    var id: String { rawValue }
+
+    var labelKey: String {
+        switch self {
+        case .grid: "library.gridView"
+        case .squareGrid: "library.squareGridView"
+        case .wideCard: "library.wideCardView"
+        case .list: "library.listView"
+        }
+    }
+
+    /// 菜单/Picker 里的图标。此前这串三元表达式内联在 iOS 的 Picker 里，加第三态时顺手收进来。
+    var systemImage: String {
+        switch self {
+        case .grid: "square.grid.2x2"
+        case .squareGrid: "square.grid.3x3"
+        case .wideCard: "rectangle.ratio.16.to.9"
+        case .list: "list.bullet"
+        }
+    }
+
+    /// 本平台可选集合。
+    static var available: [LibraryViewMode] {
+        #if os(macOS)
+        [.grid, .squareGrid, .list]
+        #else
+        [.grid, .wideCard, .list]
+        #endif
+    }
+
+    /// 把任意来源的原始值收敛成本平台合法的模式：未知值或**本平台不支持的档位**一律回退网格。
+    /// 后者防的是「同一个键被另一平台的旧版本写过」这类跨版本情形，回退比渲染一个本平台
+    /// 没有对应分支的档位安全（那会落到 `switch` 的默认分支或直接不渲染）。
+    static func resolved(_ raw: String) -> LibraryViewMode {
+        let mode = LibraryViewMode(rawValue: raw) ?? .grid
+        return available.contains(mode) ? mode : .grid
+    }
+}
+
 /// 排序菜单项（macOS 工具栏与 iOS 更多菜单共用；勾选态随 selection）。
 /// 此前 7 个 Button 在 LibraryView 内逐字写两遍，新增排序键要同步改两处。
 struct LibrarySortMenuItems: View {
