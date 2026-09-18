@@ -438,6 +438,9 @@
 "account.version.trial" = "Trial";
 "account.version.unknown" = "Version unknown";
 
+/* Why a rule decided this record does not enter the library (short form: row tag + detail sheet). */
+"account.skip.xboxPC" = "PC only · no play time";
+
 "account.linkError.invalidInput" = "That does not look like a valid credential. Please copy it again.";
 "account.linkError.staleCallback" = "This link belongs to an earlier sign-in. Please sign in again.";
 
@@ -532,7 +535,7 @@
 "account.link.firstPlayed" = "First played";
 "account.link.lastPlayed" = "Last played";
 "account.link.hours" = "Play time";
-"account.link.version" = "Version";
+"account.link.skipReason" = "Skip reason";
 "account.link.current" = "Currently linked to";
 "account.link.unbind" = "Unlink";
 "account.link.unbindHint" = "Unlinking only removes the link — it is reversible. If a later sync matches this record again, it will be linked automatically once more.";
@@ -546,6 +549,7 @@
 "account.link.ignore" = "Stop importing this one";
 "account.link.unignore" = "Import this one again";
 "account.link.ignoreHint" = "Affects only this record: later syncs skip it entirely — no auto-created game, no asking again. It does not unlink a game you already linked; once unlinked, a skipped record stays skipped until you undo this.";
+"account.link.ruleSkippedHint" = "A rule skipped this record (see the skip reason above), so it was not you who ignored it — there is no toggle here. Bind it to a game to bring it back into your library.";
 
 /* ---- Merge ---- */
 

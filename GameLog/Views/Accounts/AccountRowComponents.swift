@@ -270,15 +270,26 @@ struct ExternalRecordRow: View {
 
     // MARK: - 状态标签
 
-    /// 两个标签**并列**，不是 `else if`：一条记录可以同时「已忽略」且「来源已无」，
+    /// 三个标签**并列**，不是 `else if`：一条记录可以同时「已忽略」且「来源已无」，
     /// 后者只说明来源侧没了，前者才是「以后别再自动导入」。
+    ///
+    /// 第三个是**跳过原因**（2026-09-18）：规则判掉的记录现在也进「已忽略」档，光说
+    /// 「已忽略」用户没法判断这是规则判错了还是自己点过 —— 说清原因他才好决定要不要
+    /// 手动绑回来（绑定入口就在这一行的处置面板里）。
+    ///
+    /// ⚠️ 体验版 / 试玩版**不走这个标签**：它们的原因已经印在上面那行
+    /// （`metaText` 的版本文案）里了，同一句话在一行里印两遍是噪音。
+    /// ⚠️ 已经绑到某个游戏上的记录也不印（`game == nil` 那道门）：它已经进库了，
+    /// 「本条被跳过」不再是对当前状态的描述。
     @ViewBuilder
     private var statusTags: some View {
+        let ruleReason = record.game == nil ? record.storedSkipReason : nil
         let tags = (
             absent: !record.presentInLastSync,
-            ignored: record.isIgnored
+            ignored: record.isShownAsIgnored,
+            rule: ruleReason
         )
-        if tags.absent || tags.ignored {
+        if tags.absent || tags.ignored || tags.rule != nil {
             HStack(spacing: 6) {
                 if tags.absent {
                     TagLabel(text: L10n.tr("account.detail.absent", lang: language), tint: .orange)
@@ -286,16 +297,20 @@ struct ExternalRecordRow: View {
                 if tags.ignored {
                     TagLabel(text: L10n.tr("account.detail.ignored", lang: language), tint: .secondary)
                 }
+                if let rule = tags.rule {
+                    TagLabel(text: L10n.tr(rule.labelKey, lang: language), tint: .secondary)
+                }
             }
             .fixedSize()
         }
     }
 
-    /// 第三行：只讲「关联到了哪」。已忽略且未关联的记录**不重复说一遍**（标签已经写着了）。
+    /// 第三行：只讲「关联到了哪」。已忽略（含规则跳过）且未关联的记录**不重复说一遍**
+    /// —— 标签已经写着了，而「待关联」那句会与「已忽略」自相矛盾。
     private var matchDescription: String? {
         if let game = record.game {
             return L10n.tr("account.detail.linkedTo", [game.displayName(for: language)], lang: language)
         }
-        return record.isIgnored ? nil : L10n.tr("account.detail.unmatchedHint", lang: language)
+        return record.isShownAsIgnored ? nil : L10n.tr("account.detail.unmatchedHint", lang: language)
     }
 }

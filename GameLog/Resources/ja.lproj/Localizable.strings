@@ -438,6 +438,9 @@
 "account.version.trial" = "トライアル版";
 "account.version.unknown" = "バージョン不明";
 
+/* ルールにより「ライブラリに入れない」と判定された理由（短句：行内ラベルと詳細シートで共用）。 */
+"account.skip.xboxPC" = "PC のみ・プレイ時間なし";
+
 "account.linkError.invalidInput" = "有効な認証情報ではないようです。もう一度コピーしてください。";
 "account.linkError.staleCallback" = "このリンクは今回のログインのものではありません（前回のものと思われます）。もう一度ログインしてください。";
 
@@ -532,7 +535,7 @@
 "account.link.firstPlayed" = "初回プレイ";
 "account.link.lastPlayed" = "最近のプレイ";
 "account.link.hours" = "プレイ時間";
-"account.link.version" = "バージョン";
+"account.link.skipReason" = "スキップ理由";
 "account.link.current" = "現在の関連付け";
 "account.link.unbind" = "関連付けを解除";
 "account.link.unbindHint" = "解除は関連を外すだけで、やり直せます。次回の同期で再び一致すれば、自動的に関連付けられます。";
@@ -546,6 +549,7 @@
 "account.link.ignore" = "この記録を取り込まない";
 "account.link.unignore" = "この記録を取り込む";
 "account.link.ignoreHint" = "この記録だけに適用されます。以後の同期ではスキップされ、自動作成も確認も行われません。すでに関連付けたゲームが外れることはありませんが、解除したあとは、この設定を戻すまで取り込まれません。";
+"account.link.ruleSkippedHint" = "この記録は手動ではなくルールによってスキップされたものです（理由は上記）。そのためここに切り替えはありません。いずれかのゲームに紐づけるとライブラリに戻ります。";
 
 /* ---- 統合 ---- */
 

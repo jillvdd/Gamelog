@@ -357,7 +357,17 @@ enum ExternalAccountBinder {
     /// - Parameter recordFirstSeenAt: 一条指向它的来源记录的 `firstSeenAt`。
     ///   **`nil` = 已经没有记录指向它了**（空壳清理那种情形）—— 那时指纹无从谈起，
     ///   只认 `isAutoCreated` 这个硬门，不必伪造一个时间戳去凑指纹。
-    private static func isPristineImportGame(_ game: Game, recordFirstSeenAt: Date?) -> Bool {
+    ///
+    /// ⚠️ **不是 `private`、而且是 `nonisolated`**：`ImportCoordinator` 的决策阶梯 ①-a 也用它
+    /// —— 那条路要在「本轮判决该跳过」时决定**能不能**把一条已绑记录摘下来（只摘挂在这种
+    /// 条目上的），而协调器跑在**独立 actor** 上（一个 `@ModelActor`），够不到本类型的
+    /// `@MainActor` 隔离。判据只有这一处该归属：摘下来之后条目就交给本文件的
+    /// `pruneOrphanImportGames`，两边的「什么叫用户没碰过」必须是同一句话，
+    /// 否则会出现「摘了却不删」或反过来。
+    ///
+    /// `nonisolated` 是安全的：本函数只读 `@Model` 的属性（那些属性本身不受 actor 隔离），
+    /// 不碰 context、不发通知、不碰任何 UI 状态。
+    nonisolated static func isPristineImportGame(_ game: Game, recordFirstSeenAt: Date?) -> Bool {
         let looksAutoCreated: Bool
         if let recordFirstSeenAt {
             looksAutoCreated = game.isAutoCreated

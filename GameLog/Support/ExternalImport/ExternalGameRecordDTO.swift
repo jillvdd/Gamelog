@@ -1,5 +1,34 @@
 import Foundation
 
+/// 一次同步里对某条记录的**跳过判决**。
+///
+/// 三态而不是 `ExternalSkipReason?`：`nil` 表达不了「这一轮判过了、不该跳」与「这一轮根本
+/// 判不了」的区别，而这两者在库里的后果正好相反 ——
+/// - **判过了、不该跳**：要**清掉**上一轮的跳过标记（用户可能刚在 PC 上玩了那个游戏，
+///   或者来源改了数据），下一轮它就该重新参加匹配建库；
+/// - **判不了**：必须**原样保留**上一轮的判决。一次网络抖动不该让规则判决翻案 ——
+///   清了的话那批记录会当场被重新建库（用户刚清掉的空壳全回来），
+///   而下一轮同步再删一遍。这种「同步一次多出几个游戏、再同步一次又没了」的抖动
+///   比「多留一条脏记录」糟得多。
+///
+/// 唯一的 `unknown` 来源是 Xbox 的时长取数失败：那时的 `playedSeconds` 全是 nil，
+/// 与「时长真的是 0」在数据上分不开（见 `XboxGameService.records` 的 `playtimeFetched`）。
+enum ExternalSkipVerdict: Equatable {
+    /// 这一轮判不了 —— **不要动库里已有的判决**。
+    case unknown
+    /// 这一轮判过了。`.decided(nil)` = 不该跳；`.decided(.xboxPCWithoutPlaytime)` = 该跳。
+    case decided(ExternalSkipReason?)
+
+    /// 这一轮**判定了要跳**时的原因；`unknown` 与「判定不跳」都是 nil。
+    var skipReason: ExternalSkipReason? {
+        guard case .decided(let reason) = self else { return nil }
+        return reason
+    }
+
+    /// 这一轮压根没做出判决（见本类型说明）。
+    var isUnknown: Bool { self == .unknown }
+}
+
 /// provider 无关的「一条外部游玩记录」。
 ///
 /// **为什么要有这一层**：两家 provider 的原始结构差得很远（任天堂时长是整分钟且没有 concept，
@@ -25,6 +54,17 @@ struct ExternalGameRecordDTO: Equatable {
     /// 版本类型。不传则由标题名启发式判定（`ExternalVersionType.classifyVersion(title:)`）——
     /// 默认值放在这里而不是各 Service 里，是为了两家 provider 的判定口径不可能漂。
     let versionType: ExternalVersionType
+    /// **规则判决的**跳过结论（与 `versionType` 是两个维度：那个说「这条是什么」，
+    /// 这个说「这条要不要进库」）。见 `ExternalSkipVerdict` 的三态说明。
+    ///
+    /// 只有 Xbox 会产出非平凡的判决（`xboxPCWithoutPlaytime`：设备里一台主机都没有、
+    /// 且游玩时长为 0）。体验版 / 试玩版**不走这里** —— 它们由 `versionType` 派生
+    /// （见 `ExternalSkipReason`），把同一件事存两处迟早漂。
+    ///
+    /// 为什么判决必须**在取数层**做完再传下来、而不是入库时现算：判据里有一条是
+    /// 「这一轮时长取数成功了」，那件事只有 `XboxGameService` 知道。落到库里
+    /// （`playedSeconds == nil`）之后，「取数失败」与「时长确实是 0」再也分不开。
+    let skipVerdict: ExternalSkipVerdict
 
     let firstPlayedAt: Date?
     let lastPlayedAt: Date?
@@ -48,6 +88,7 @@ struct ExternalGameRecordDTO: Equatable {
          platform: String,
          platformRaw: String? = nil,
          versionType: ExternalVersionType? = nil,
+         skipVerdict: ExternalSkipVerdict = .decided(nil),
          firstPlayedAt: Date? = nil,
          lastPlayedAt: Date? = nil,
          playedSeconds: Int? = nil,
@@ -61,6 +102,7 @@ struct ExternalGameRecordDTO: Equatable {
         self.platform = platform
         self.platformRaw = platformRaw
         self.versionType = versionType ?? ExternalVersionType.classifyVersion(title: titleName)
+        self.skipVerdict = skipVerdict
         self.firstPlayedAt = firstPlayedAt
         self.lastPlayedAt = lastPlayedAt
         // 负数时长只可能是解析出了 bug。宁可当「没有这个数」（界面显示「—」）也不要让它落库 ——

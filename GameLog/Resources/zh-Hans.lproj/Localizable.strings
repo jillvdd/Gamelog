@@ -438,6 +438,10 @@
 "account.version.trial" = "试玩版";
 "account.version.unknown" = "版本未知";
 
+/* 规则判定「这条不进游戏库」时的原因标签（短句：行内标签与处置面板共用）。
+   目前只有一条规则 —— Xbox「设备里没有主机 + 游玩时长 0」，见 HANDOVER §69。 */
+"account.skip.xboxPC" = "仅 PC 平台且无时长";
+
 "account.linkError.invalidInput" = "这段内容看起来不是有效的登录凭证，请重新复制一次。";
 "account.linkError.staleCallback" = "这个链接不属于本次登录（多半是上一次的），请重新登录一次。";
 
@@ -532,7 +536,7 @@
 "account.link.firstPlayed" = "首次游玩";
 "account.link.lastPlayed" = "最近游玩";
 "account.link.hours" = "游玩时长";
-"account.link.version" = "版本";
+"account.link.skipReason" = "跳过原因";
 "account.link.current" = "当前关联";
 "account.link.unbind" = "解除关联";
 "account.link.unbindHint" = "解除关联只是把关联摘掉，可以反悔：下次同步若又匹配上，会自动重新关联。";
@@ -546,6 +550,7 @@
 "account.link.ignore" = "忽略此条（不再导入）";
 "account.link.unignore" = "恢复导入此条";
 "account.link.ignoreHint" = "只影响这一条：以后同步会跳过它，既不自动建库也不会再问你。它不会把已经关联的游戏摘掉；但解除关联之后，只要还勾着这个，就不会再自动接回来。";
+"account.link.ruleSkippedHint" = "这条记录是按规则跳过的（原因见上方），不是手动忽略的，所以这里没有开关。把它绑定到某个游戏即可让它回到库里。";
 
 /* ---- 合并 ---- */
 

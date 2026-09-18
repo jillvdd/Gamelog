@@ -3588,7 +3588,8 @@ do {
 
     let mapped = halo.map {
         XboxGameService.records(from: [$0], minutes: ["2131196662": 1527],
-                                fallbackPlatform: AccountProvider.xbox.fallbackPlatform)
+                                fallbackPlatform: AccountProvider.xbox.fallbackPlatform,
+                                playtimeFetched: true)
     } ?? []
     check("Xbox 解析: 时长是**整分钟**，统一换算成秒", mapped.first?.playedSeconds == 1527 * 60)
     check("Xbox 解析: 七位小数秒的时间戳能解出来", mapped.first?.lastPlayedAt != nil)
@@ -3611,7 +3612,7 @@ do {
     // 没有时长数据的条目：`playedSeconds` 落 nil（界面显示「—」），**不补 0** ——
     // 「没玩过」与「来源不提供」必须长得不一样（实测：Xbox 360 的 42 个标题一个都没有时长）。
     let silent = titleEntry(#"{"titleId":"999","name":"Xbox 360 Game","devices":["Xbox360"]}"#)
-        .map { XboxGameService.records(from: [$0], minutes: [:], fallbackPlatform: "Xbox Series X|S") } ?? []
+        .map { XboxGameService.records(from: [$0], minutes: [:], fallbackPlatform: "Xbox Series X|S", playtimeFetched: true) } ?? []
     check("Xbox 解析: 批量端点没回的 titleId → playedSeconds 是 nil，**不是 0**",
           silent.first?.playedSeconds == nil)
     check("Xbox 解析: 没有时长的条目仍然入库（游玩记录本身是拿到了的）",
@@ -3621,13 +3622,13 @@ do {
     //    曾经出过一次「清单/判据写对了但调用点没接上」的漏（§63.8 GAP 1），所以两级折叠
     //    落地之后，这里必须有一条从 JSON 一路到 DTO 的断言。
     let ninja = titleEntry(#"{"titleId":"111","name":"Ninja Gaiden Black","mediaItemType":"XboxOriginalGame","devices":["Xbox360","XboxOne","XboxSeries"]}"#)
-        .map { XboxGameService.records(from: [$0], minutes: [:], fallbackPlatform: "Xbox Series X|S") } ?? []
+        .map { XboxGameService.records(from: [$0], minutes: [:], fallbackPlatform: "Xbox Series X|S", playtimeFetched: true) } ?? []
     check("Xbox 入库: 初代游戏经 mediaItemType 落 **Xbox**（不是折叠出来的 Xbox 360）",
           ninja.first?.platform == "Xbox")
     check("Xbox 入库: 但 platformRaw 仍是**完整可用列表**（副标题要说清它能在哪几台上玩）",
           ninja.first?.platformRaw == "Xbox360,XboxOne,XboxSeries")
     let ds3 = titleEntry(#"{"titleId":"222","name":"DARK SOULS III","mediaItemType":"Application","devices":["XboxOne","XboxSeries"]}"#)
-        .map { XboxGameService.records(from: [$0], minutes: [:], fallbackPlatform: "Xbox Series X|S") } ?? []
+        .map { XboxGameService.records(from: [$0], minutes: [:], fallbackPlatform: "Xbox Series X|S", playtimeFetched: true) } ?? []
     check("Xbox 入库: Dark Souls III 的形状（Application + One/Series）→ **Xbox One**",
           ds3.first?.platform == "Xbox One")
 
@@ -3841,6 +3842,102 @@ do {
     check("Xbox 取数: 一条标题都没有时不打时长端点，也不报「没取到时长」",
           empty?.records.isEmpty == true && empty?.playtimeUnavailable == false
           && xblRequests("/v2/player/stats").isEmpty)
+
+    // ⑫ 跳过「仅 PC 端」记录的三条件判据 —— `isPCOnly` 只回答「设备列表」那一问。
+    //    空列表 / nil / 含一台主机 = 都不是 PC-only；全列表 ∈ {PC, Win32} 才是。
+    check("Xbox 跳过判据: [\"PC\"] → PC-only",
+          XboxAPI.isPCOnly(devices: ["PC"]) == true)
+    check("Xbox 跳过判据: [\"Win32\"] → PC-only",
+          XboxAPI.isPCOnly(devices: ["Win32"]) == true)
+    check("Xbox 跳过判据: [\"pc\",\"win32\"] 大小写混用 → PC-only",
+          XboxAPI.isPCOnly(devices: ["pc", "win32"]) == true)
+    check("Xbox 跳过判据: [\"PC\",\"XboxOne\"] → 不是 PC-only（有主机）",
+          XboxAPI.isPCOnly(devices: ["PC", "XboxOne"]) == false)
+    check("Xbox 跳过判据: [\"XboxOne\",\"XboxSeries\"] → 不是 PC-only",
+          XboxAPI.isPCOnly(devices: ["XboxOne", "XboxSeries"]) == false)
+    check("Xbox 跳过判据: [] → 不是 PC-only（空列表不算全 PC）",
+          XboxAPI.isPCOnly(devices: []) == false)
+    check("Xbox 跳过判据: nil → 不是 PC-only",
+          XboxAPI.isPCOnly(devices: nil) == false)
+
+    // ⑬ `records(..., playtimeFetched:)` 三例：
+    //    - PC-only + 0 分钟 + 取数成功 → `.decided(.xboxPCWithoutPlaytime)`
+    //    - PC-only + 有分钟 + 取数成功 → `.decided(nil)`（不该跳，FF15 WE / MCC 的形状）
+    //    - PC-only + 0 分钟 + 取数失败 → `.unknown`（闸门挡住，网络抖动不删库）
+    func pcOnlyZero() -> ExternalGameRecordDTO? {
+        guard let entry = titleEntry(#"{"titleId":"PC1","name":"Some PC Game","devices":["PC"]}"#) else { return nil }
+        return XboxGameService.records(from: [entry], minutes: [:],
+                                       fallbackPlatform: "Xbox Series X|S",
+                                       playtimeFetched: true).first
+    }
+    func pcOnlyWithMinutes() -> ExternalGameRecordDTO? {
+        guard let entry = titleEntry(#"{"titleId":"PC2","name":"FF15 WINDOWS EDITION","devices":["PC"]}"#) else { return nil }
+        return XboxGameService.records(from: [entry], minutes: ["PC2": 3180],
+                                       fallbackPlatform: "Xbox Series X|S",
+                                       playtimeFetched: true).first
+    }
+    func pcOnlyFetchFailed() -> ExternalGameRecordDTO? {
+        guard let entry = titleEntry(#"{"titleId":"PC3","name":"Unfetchable PC Game","devices":["PC"]}"#) else { return nil }
+        return XboxGameService.records(from: [entry], minutes: [:],
+                                       fallbackPlatform: "Xbox Series X|S",
+                                       playtimeFetched: false).first
+    }
+    check("Xbox 跳过三态: PC-only + 0 分钟 + 取数成功 → 判决跳过",
+          pcOnlyZero()?.skipVerdict == .decided(.xboxPCWithoutPlaytime))
+    check("Xbox 跳过三态: PC-only + 有分钟 + 取数成功 → 不跳（FF15 WE / MCC 的形状）",
+          pcOnlyWithMinutes()?.skipVerdict == .decided(nil))
+    check("Xbox 跳过三态: PC-only + 取数失败 → unknown（闸门挡住）",
+          pcOnlyFetchFailed()?.skipVerdict == .unknown)
+    check("Xbox 跳过三态: unknown 时 skipReason 是 nil（绝不清库里已有的判决）",
+          pcOnlyFetchFailed()?.skipVerdict.skipReason == nil)
+
+    // ⑭ `skipReason` / `isSkipped` / `isShownAsIgnored` 派生：
+    //    - Xbox 的跳过走落盘值（`storedSkipReason`）；体验版 / 试玩版走 `versionType` 派生。
+    //    - `isSkipped` = 用户忽略 OR 落库规则判决（不含体验版）。
+    //    - `isShownAsIgnored` = 用户忽略 OR（没进库 AND 有跳过原因）—— 体验版因此也进「已忽略」档。
+    let ctxSkip = ModelContext(container)
+    func makeSkipRecord(skipRaw: String? = nil, versionRaw: String = "full",
+                        linked: Bool = false) -> ExternalGameRecord {
+        let r = ExternalGameRecord(provider: .xbox, externalAccountId: "ACC-SKIP",
+                                   titleId: "SKIP-\(UUID().uuidString.prefix(4))",
+                                   titleName: "Skip Test", platform: "PC",
+                                   versionType: ExternalVersionType(rawValue: versionRaw) ?? .unknown,
+                                   skipReason: skipRaw.flatMap(ExternalSkipReason.init))
+        ctxSkip.insert(r)
+        if linked { r.game = Game(name: "Linked", platform: "PC") }
+        return r
+    }
+    // Xbox 规则跳过（落盘值），没进库。
+    let xboxSkipped = makeSkipRecord(skipRaw: "xboxPC")
+    check("跳过派生: Xbox 落盘值 → storedSkipReason = xboxPC",
+          xboxSkipped.storedSkipReason == .xboxPCWithoutPlaytime)
+    check("跳过派生: Xbox 落盘值 → skipReason = xboxPCWithoutPlaytime",
+          xboxSkipped.skipReason == .xboxPCWithoutPlaytime)
+    check("跳过派生: Xbox 落盘值、没进库 → isSkipped = true",
+          xboxSkipped.isSkipped == true)
+    check("跳过派生: Xbox 落盘值、没进库 → isShownAsIgnored = true",
+          xboxSkipped.isShownAsIgnored == true)
+    // 同一条记录若已手动绑定到某个条目：isSkipped 仍 true，但 isShownAsIgnored 回到 false。
+    let xboxSkippedLinked = makeSkipRecord(skipRaw: "xboxPC", linked: true)
+    check("跳过派生: Xbox 落盘值、已绑定 → isShownAsIgnored = false（不再算忽略）",
+          xboxSkippedLinked.isShownAsIgnored == false)
+    check("跳过派生: Xbox 落盘值、已绑定 → isSkipped 仍为 true（阶梯判据不含绑定）",
+          xboxSkippedLinked.isSkipped == true)
+    // 体验版：走 versionType 派生，storedSkipReason 恒 nil。
+    let demoSkipped = makeSkipRecord(versionRaw: "demo")
+    check("跳过派生: 体验版 → storedSkipReason = nil（不落盘）",
+          demoSkipped.storedSkipReason == nil)
+    check("跳过派生: 体验版 → skipReason = demoVersion（派生值）",
+          demoSkipped.skipReason == .demoVersion)
+    check("跳过派生: 体验版 → isSkipped = false（阶梯另有第 ③ 档）",
+          demoSkipped.isSkipped == false)
+    check("跳过派生: 体验版、没进库 → isShownAsIgnored = true（界面桶也收体验版）",
+          demoSkipped.isShownAsIgnored == true)
+    // 没有任何跳过标记的记录。
+    let notSkipped = makeSkipRecord()
+    check("跳过派生: 普通记录 → skipReason = nil、isSkipped = false",
+          notSkipped.skipReason == nil && notSkipped.isSkipped == false
+          && notSkipped.isShownAsIgnored == false)
 
     ExternalImportStub.clear()
 }

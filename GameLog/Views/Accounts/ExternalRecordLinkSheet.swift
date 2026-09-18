@@ -104,9 +104,12 @@ struct ExternalRecordLinkSheet: View {
                     Text(verbatim: L10n.tr("account.detail.hours", [hours], lang: language))
                 }
             }
-            if record.versionType == .demo || record.versionType == .trial {
-                LabeledContent(L10n.tr("account.link.version", lang: language)) {
-                    Text(verbatim: L10n.tr(record.versionType.labelKey, lang: language))
+            // 「这条为什么不进库」。行上原本只印了体验版/试玩版，2026-09-18 起
+            // **一律走 `skipReason`**：它把规则判决（Xbox「仅 PC 且无时长」）也收进来了，
+            // 而体验版那两档正是它的派生值 —— 用户点开这个面板，问的就是这一句。
+            if let reason = record.skipReason {
+                LabeledContent(L10n.tr("account.link.skipReason", lang: language)) {
+                    Text(verbatim: L10n.tr(reason.labelKey, lang: language))
                 }
             }
         }
@@ -179,14 +182,28 @@ struct ExternalRecordLinkSheet: View {
     /// 一条已忽略的记录只要被关联上就再也撤销不了（按钮整段消失）。
     ///
     /// 动作后**不关面板**：按钮当场翻转成「恢复导入」，用户看得见状态确实变了、也能立刻撤回。
+    ///
+    /// ⚠️ **规则判定跳过的记录不给「忽略此条」**（2026-09-18）：它按规则已经被忽略了，
+    /// 再点一下没有任何效果，摆在那里反而会让用户以为是自己手动忽略的。那一档改成一句
+    /// 说明（原因本身在上面那段「跳过原因」里，不重复印），而「绑定到已有游戏」一个字没少
+    /// —— 规则判掉的记录要回到库里，走的就是手动绑定这一条路。
+    ///
+    /// 唯一的例外是 `record.isIgnored`：**任何开关都必须能撤回来**。删除游戏那条路径会置位
+    /// 忽略（`GameMerger.ignoreRecords`），那种记录若同时带着规则判决，隐藏按钮就成了一个
+    /// 用户永远翻不回去的死状态。
     private var ignoreSection: some View {
-        Section {
+        let ruleSkippedWithoutSwitch = record.storedSkipReason != nil && !record.isIgnored
+        return Section {
             if record.isIgnored {
                 Button { setIgnored(false) } label: {
                     Label(L10n.tr("account.link.unignore", lang: language),
                           systemImage: "arrow.uturn.backward")
                 }
                 .appStandardButton()
+            } else if record.storedSkipReason != nil {
+                LText("account.link.ruleSkippedHint")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
             } else {
                 Button { setIgnored(true) } label: {
                     Label(L10n.tr("account.link.ignore", lang: language),
@@ -197,7 +214,11 @@ struct ExternalRecordLinkSheet: View {
         } header: {
             Text(verbatim: L10n.tr("account.link.autoImport", lang: language))
         } footer: {
-            LText("account.link.ignoreHint")
+            // 规则跳过那一档**不要 footer**：`ignoreHint` 通篇在讲那个不存在的开关
+            //（「只要还勾着这个」），而说明已经写在内容里了。
+            if !ruleSkippedWithoutSwitch {
+                LText("account.link.ignoreHint")
+            }
         }
     }
 

@@ -323,15 +323,19 @@ struct ExternalAccountDetailView: View {
         liveRecords.filter { $0.account?.localId == account.localId }
     }
 
-    /// 待关联 = 还没挂到任何游戏上、也没被忽略。已忽略的单独一档，否则它们会永远混在
-    /// 「待关联」里、看起来像是没人处理（旧版就是这样）。
+    /// 待关联 = 还没挂到任何游戏上、也没被跳过。被跳过（用户点的「忽略」，或规则判定 ——
+    /// 见 `isShownAsIgnored`）的单独一档，否则它们会永远混在「待关联」里、
+    /// 看起来像是没人处理（旧版就是这样）。
     private var unmatchedRecords: [ExternalGameRecord] {
-        mineRecords.filter { $0.game == nil && !$0.isIgnored }
+        mineRecords.filter { $0.game == nil && !$0.isShownAsIgnored }
     }
 
-    /// 已忽略（无论有没有关联）：这一档存在的唯一目的就是**让忽略可撤销**。
+    /// 已忽略（无论有没有关联）：这一档存在的唯一目的就是**让忽略可撤销**，而 2026-09-18 起
+    /// 它同时收**规则判掉**的记录（体验版那一档本来就在里面 —— 用户要求「所有跳过的都算已忽略，
+    /// 这样如果出错还能手动绑定」）。口径的唯一归属是 `ExternalGameRecord.isShownAsIgnored`，
+    /// 那些不对称之处（规则跳过的一旦绑上就不再算）在那里写明了。
     private var ignoredRecords: [ExternalGameRecord] {
-        mineRecords.filter { $0.isIgnored }
+        mineRecords.filter { $0.isShownAsIgnored }
     }
 
     /// 最近游玩优先（没有时间的排最后），同序按标题名字定序 —— 结果稳定，便于定位。

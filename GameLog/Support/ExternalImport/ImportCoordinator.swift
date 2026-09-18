@@ -18,7 +18,8 @@ struct ImportSummary: Equatable {
     var createdGames = 0
     /// 已经绑着 Game、这次原样保留的记录数（含用户手动绑定的）。
     var alreadyLinked = 0
-    /// 被用户标了「已忽略」而跳过自动处理的记录数。
+    /// 被跳过、这一轮没有进游戏库的记录数：用户标了「已忽略」的，**加上**本轮按规则判定
+    /// 跳过、因而被解绑的那些（见决策阶梯 ①-a）。
     var ignored = 0
     /// 库里存在**同一 (provider, account, titleId) 的重复记录**的条数。
     ///
@@ -126,6 +127,18 @@ actor ImportCoordinator {
                 GameLinker.Clue(titleId: record.titleId, conceptId: record.conceptId))
         }
 
+        // 「这个 Game 现在还挂着哪几个平台」—— 只服务下面那个**解绑后的平台校正**（见 `detach`）。
+        // 与 `cluesByGame` 同一趟数据、同一条纪律（正向读 `record.game`，不碰 inverse）。
+        //
+        // 为什么需要它：导入自动建的条目，`platform` 是从**当时那条记录**写下去的。那条记录
+        // 这一轮被判跳过并解绑之后，条目上那个平台就成了没有任何记录支撑的假象 ——
+        // 用户报的 Dead Rising 2 就是这样：声明 `PC`，而它只剩一条 `Xbox One` 记录。
+        var platformsByGame: [PersistentIdentifier: [String]] = [:]
+        for record in allRecords {
+            guard let game = record.game else { continue }
+            platformsByGame[game.persistentModelID, default: []].append(record.platform)
+        }
+
         // 匹配候选 = 库里**全部** Game 的快照（不止本账号关联的那些：同一个游戏可能先由
         // 另一个 Nintendo 账号建了库，这次要并过去）。候选数组与 `candidateGames` 同序，
         // 引擎返回的下标直接用来取对象。
@@ -176,13 +189,46 @@ actor ImportCoordinator {
 
             // 关联决策。顺序即优先级，每一步都有它挡的东西：
             if let game = record.game {
-                // ① 已经绑着 —— **一律不动**。用户手动绑的固然不能动，自动绑的也不该被
-                //    这一轮的运气改写（比如标题名变了导致这次匹配到别的 Game）。
-                summary.alreadyLinked += 1
-                artworkTargets.append((game, dto.imageURLString, sourceTitleChanged))
-            } else if record.isIgnored {
-                // ② 用户说了「这条别再进我的库」，或者这条当时绑着的那个游戏被用户删了
-                //    （删除路径会把记录标成忽略）。不重建 —— 否则用户每同步一次就得删一次。
+                // ①-a **本轮判定该跳过**，而它正挂在「同步替我建的、用户没碰过」的条目上
+                //     → 解绑。这是存量 PC 空壳的清理入口：那些条目本来就是上一轮同步建的，
+                //     不解绑的话第 ① 档会把它们连同记录一起保护下来，永远清不掉。
+                //
+                //     ⚠️ 判据只看 **`dto.skipVerdict`（这一轮的判决）**，不看
+                //     `record.storedSkipReason`（库里那个可能来自上一轮）：时长取数失败的那一轮
+                //     判决是 `.unknown`、库里上一轮的判决原样留着 —— 那时解绑就是拿一个**过期的**
+                //     结论去动用户的数据。
+                //
+                //     ⚠️ 还要求条目是 **pristine**（`isPristineImportGame`）：用户自己建的、
+                //     或往里写过任何数据的条目一律不动，记录照旧挂着，用户可以在记录面板
+                //     手动解绑。库里**不存**「这条是手绑的还是自动绑的」，所以只要可能沾过
+                //     用户的手，就不动它（Halo 2 / Halo Wars: Definitive Edition 就是这一档：
+                //     用户自建的条目，两者都留着）。
+                //
+                //     条目本身**这里不删**：它此刻成了空壳，由同步收尾的
+                //     `pruneOrphanImportGames` 收走 —— 那套判据只有一处该归属。
+                if dto.skipVerdict.skipReason != nil,
+                   ExternalAccountBinder.isPristineImportGame(game,
+                                                              recordFirstSeenAt: record.firstSeenAt) {
+                    Self.detach(record, from: game, platformsByGame: &platformsByGame)
+                    summary.ignored += 1
+                } else {
+                    // ① 已经绑着 —— **一律不动**。用户手动绑的固然不能动，自动绑的也不该被
+                    //    这一轮的运气改写（比如标题名变了导致这次匹配到别的 Game）。
+                    summary.alreadyLinked += 1
+                    artworkTargets.append((game, dto.imageURLString, sourceTitleChanged))
+                }
+            } else if record.isSkipped {
+                // ② 「这条别再进我的库」—— 用户的忽略，或**规则判决**（`storedSkipReason`）。
+                //
+                //    用户那一路：他说了「这条别再进我的库」，或者这条当时绑着的那个游戏被
+                //    用户删了（删除路径会把记录标成忽略）。不重建 —— 否则用户每同步一次就得删一次。
+                //
+                //    规则判决那一路（2026-09-18 新增）：Xbox 的「设备里没有主机 + 时长 0」。
+                //    记录连条目一起判掉，用户要的话可以手动绑回来（`isShownAsIgnored` 的说明）。
+                //
+                //    ⚠️ 判据是 `isSkipped` 而**不是** `isShownAsIgnored`：后者把体验版也
+                //    并了进来，而体验版有自己的第 ③ 档（那是用户看得见的回执，并进来会让
+                //    `excludedByVersion` 永远归零）。
                 //
                 //    ⚠️ 这一档是**可撤销**的：用户在记录面板点「恢复导入」会把标记清掉，
                 //    下一轮同步它就会重新走 ④⑤⑥。以前这个状态由「曾经绑过而现在没绑」隐式
@@ -402,6 +448,42 @@ actor ImportCoordinator {
         candidates[index].clues.append(GameLinker.Clue(titleId: titleId, conceptId: conceptId))
     }
 
+    /// 把一条**本轮判定该跳过**的记录从它挂着的自动建条目上摘下来（阶梯 ①-a），
+    /// 顺手校正条目上那个因此失去依据的平台。
+    ///
+    /// 两件事，第二件是个**窄判据**：
+    ///
+    /// 1. 摘关联。条目本身留着 —— 它若真的再没有任何记录指向，同步收尾的
+    ///    `pruneOrphanImportGames` 会把它收走（判据只有一处该归属）。
+    /// 2. **平台校正**：条目是导入自动建的、且它写着的 `platform` **正好等于刚摘掉那条记录
+    ///    的平台**时，按**剩下记录的平台**重写；一条都不剩就置空（它随后会被清掉，空值不会
+    ///    被人看见，而留着 `PC` 是**假话**）。
+    ///
+    ///    为什么要这一条：导入建库时 `platform` 是从当时那条记录写下去的（`makeGame` 收
+    ///    `dto.platform`）。记录一走，那个平台就没有任何依据了 —— 用户报的 Dead Rising 2
+    ///    就是这样：条目声明 `PC`，而它只剩下一条 `Xbox One` 记录，界面上却仍然把它算成
+    ///    PC 游戏（`Game.platformList` 会把它带进平台筛选与统计分布）。
+    ///
+    ///    判据刻意**窄**：只有「条目的平台恰好就是那条记录的平台」才动。PvZ 这一类
+    ///    （声明 `Xbox 360`、摘掉的是 `Win32` 那条）因此一个字都不改 —— 它的声明与
+    ///    剩下那条记录本来就不矛盾。
+    ///
+    ///    多个剩余平台时按 `Presets.ordered`（全项目唯一的平台排序源）取第一个：
+    ///    fetch 顺序不稳定，不排序就成了掷骰子。
+    private static func detach(_ record: ExternalGameRecord, from game: Game,
+                               platformsByGame: inout [PersistentIdentifier: [String]]) {
+        let id = game.persistentModelID
+        let detachedPlatform = record.platform
+        record.unlink()
+
+        var remaining = platformsByGame[id] ?? []
+        if let index = remaining.firstIndex(of: detachedPlatform) { remaining.remove(at: index) }
+        platformsByGame[id] = remaining
+
+        guard game.isAutoCreated, game.platform == detachedPlatform else { return }
+        game.platform = Presets.ordered(remaining).first ?? ""
+    }
+
     private static func makeRecord(_ dto: ExternalGameRecordDTO, titleId: String,
                                    provider: AccountProvider, externalAccountId: String,
                                    now: Date) -> ExternalGameRecord {
@@ -414,6 +496,7 @@ actor ImportCoordinator {
             platform: dto.platform,
             platformRaw: dto.platformRaw,
             versionType: dto.versionType,
+            skipReason: dto.skipVerdict.skipReason,
             firstPlayedAt: dto.firstPlayedAt,
             lastPlayedAt: dto.lastPlayedAt,
             playedSeconds: dto.playedSeconds,
@@ -513,6 +596,15 @@ actor ImportCoordinator {
         record.platform = dto.platform
         record.platformRaw = dto.platformRaw ?? record.platformRaw
         record.versionType = dto.versionType
+        // 跳过判决：**只有这一轮真的做出了判决时才写**。`.unknown`（时长那一路没取到）
+        // 什么都不做 —— 库里上一轮的判决原样留着，见 `ExternalSkipVerdict`。
+        //
+        // ⚠️ 这是本项目里唯一一处「nil 不清空」要分三种情况的地方：判过了、结论是「不该跳」时，
+        // **清掉旧标记正是目的**（用户可能刚在 PC 上玩过那个游戏，它该回到库里），
+        // 而「判不了」时清掉会把整批记录放回来重建 —— 两者不能用同一句 `??` 表达。
+        if !dto.skipVerdict.isUnknown {
+            record.skipReasonRaw = dto.skipVerdict.skipReason?.rawValue
+        }
         // conceptId 同理不清空：它是 PS4/PS5 双版本唯一的官方合并键，丢一次就再也拿不回来
         // （除非这条记录再出现在响应里），而它是后续合并的依据。
         record.conceptId = dto.conceptId ?? record.conceptId

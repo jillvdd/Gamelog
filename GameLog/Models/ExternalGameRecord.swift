@@ -51,6 +51,37 @@ enum ExternalVersionType: String, CaseIterable, Identifiable, LabelKeyed {
     }
 }
 
+/// 一条外部记录**不进游戏库**的原因。
+///
+/// 存在的理由：跳过这件事此前在库里**没有痕迹**。体验版/试玩版是靠 `versionType` 现算的，
+/// 而 2026-09-18 加的 Xbox 规则（「设备里没有主机 + 游玩时长 0」→ 不导入，见
+/// `XboxGameService`）**没法事后重算** —— 「这一轮没取到时长」与「真的没玩过」在库里
+/// 长得一模一样（都是 `playedSeconds == nil`），拿库里的状态反推会把整轮时长取数失败
+/// 误判成跳过。所以判定必须**落盘**（`ExternalGameRecord.skipReasonRaw`），落在
+/// 「知道这一轮取数成没成」的那一刻。
+///
+/// ⚠️ **落盘的只有 `xboxPCWithoutPlaytime` 这一档**，体验版那两个 case 是 `versionType`
+/// 的派生（见 `skipReason`）—— 同一个事实存两处迟早漂，而 `versionType` 本来就落库了。
+enum ExternalSkipReason: String, LabelKeyed {
+    /// 来源侧只有一个 PC/Win32 设备、且这一轮的游玩时长是 0。
+    /// 判据与闸门见 `XboxGameService.records(from:minutes:fallbackPlatform:playtimeFetched:)`。
+    case xboxPCWithoutPlaytime = "xboxPC"
+    /// 体验版（派生自 `versionType`，不落库）。
+    case demoVersion = "demo"
+    /// 试玩版（派生自 `versionType`，不落库）。
+    case trialVersion = "trial"
+
+    /// 展示文案。体验版那两档**复用 `account.version.*`**（`ExternalVersionType` 的 key）——
+    /// 那两句文案说的是版本性质，本来就只有一处该归属，重写一遍必然与版本标签长得不一样。
+    var labelKey: String {
+        switch self {
+        case .xboxPCWithoutPlaytime: "account.skip.xboxPC"
+        case .demoVersion: ExternalVersionType.demo.labelKey
+        case .trialVersion: ExternalVersionType.trial.labelKey
+        }
+    }
+}
+
 /// 外部记录与 Game 的关联状态。
 ///
 /// ⚠️ 2026-09-16 起已废弃、**不再被任何代码引用**（枚举本身留在这里只为让 `matchStateRaw`
@@ -128,6 +159,21 @@ final class ExternalGameRecord {
     var platformRaw: String?
     /// 版本类型。
     var versionTypeRaw: String = ExternalVersionType.unknown.rawValue
+
+    /// **规则判决**的落库值：来源事实判定「这条不该进游戏库」时写下原因（nil = 没被规则跳过）。
+    ///
+    /// 与 `isIgnored` 是**两件事，刻意分成两个字段**：那个是**用户的意图**（「这条我不要了」，
+    /// 可在记录面板撤销），这个是**来源事实的判决**（「这个标题只跑得在 PC 上、而且一分钟都
+    /// 没玩过」，用户撤销不了，但可以手动把记录绑到某个条目上让它进库）。混成一个字段的话，
+    /// 下一轮同步要么把用户的忽略覆盖掉，要么把判决丢掉 —— 两者都是错的。
+    ///
+    /// 落库而不是每次现算：**「这一轮没取到游玩时长」与「真的没玩过」在库里长得一样**
+    ///（都是 `playedSeconds == nil`），重算会把一次网络抖动升级成「整批记录被判跳过」。
+    /// 写入时机只有一处（`ImportCoordinator.refresh`），那里知道取数成没成。
+    ///
+    /// ⚠️ 只有规则比 `versionType` 更细的那一档需要它（`xboxPCWithoutPlaytime`）；
+    /// 体验版/试玩版由 `skipReason` 从 `versionType` 派生，本字段对它们是 nil。
+    var skipReasonRaw: String?
 
     /// 首次游玩时间（两家来源都给；解析不出则为 nil —— **缺失是正常情况，不阻断入库**）。
     var firstPlayedAt: Date?
@@ -221,6 +267,7 @@ final class ExternalGameRecord {
          conceptId: String? = nil, titleName: String, platform: String,
          platformRaw: String? = nil,
          versionType: ExternalVersionType = .unknown,
+         skipReason: ExternalSkipReason? = nil,
          firstPlayedAt: Date? = nil, lastPlayedAt: Date? = nil,
          playedSeconds: Int? = nil, playCount: Int? = nil,
          trophies: TrophyProgress? = nil,
@@ -235,6 +282,7 @@ final class ExternalGameRecord {
         self.platform = platform
         self.platformRaw = platformRaw
         self.versionTypeRaw = versionType.rawValue
+        self.skipReasonRaw = skipReason?.rawValue
         self.firstPlayedAt = firstPlayedAt
         self.lastPlayedAt = lastPlayedAt
         self.playedSeconds = playedSeconds
@@ -279,6 +327,51 @@ extension ExternalGameRecord {
     var versionType: ExternalVersionType {
         get { ExternalVersionType(rawValue: versionTypeRaw) ?? .unknown }
         set { versionTypeRaw = newValue.rawValue }
+    }
+
+    /// **落库的**规则判决（只看 `skipReasonRaw`，认不出的取值当没有）。
+    ///
+    /// 与 `skipReason` 的差别只有一个，但很要紧：**它不含体验版**。`ImportCoordinator`
+    /// 的决策阶梯要按它分流 —— 体验版有自己的第 ③ 档（`excludedByVersion` 那个计数与
+    /// 「体验版」文案是用户看得见的回执，并进来会让那份回执永远归零）。
+    var storedSkipReason: ExternalSkipReason? {
+        skipReasonRaw.flatMap(ExternalSkipReason.init(rawValue:))
+    }
+
+    /// 「这条为什么不进游戏库」——**阶梯与界面共用的那一个**。
+    ///
+    /// 两级：落库的规则判决优先（`xboxPCWithoutPlaytime`），其余由 `versionType` 派生
+    /// （体验版 / 试玩版：它们照常入库留档，只是不进游戏库，见 `allowsAutoMatching`）。
+    ///
+    /// 派生一档**不落库**的理由：`versionType` 本来就落库了，同一件事存两处迟早漂；
+    /// 而反过来（把体验版也写进 `skipReasonRaw`）会让「这条为什么没进库」这个问题出现
+    /// 两个可能为真的答案。
+    var skipReason: ExternalSkipReason? {
+        if let stored = storedSkipReason { return stored }
+        switch versionType {
+        case .demo: return .demoVersion
+        case .trial: return .trialVersion
+        default: return nil
+        }
+    }
+
+    /// 决策阶梯的判据：**别再自动导入这条**（用户点的「忽略」，或落库的规则判决）。
+    ///
+    /// ⚠️ 体验版**不在其中** —— 见 `storedSkipReason`。两者在界面上是同一档（「已忽略」，
+    /// 见 `isShownAsIgnored`），在阶梯上是相邻的两档，这个不对称是有意的。
+    var isSkipped: Bool { isIgnored || storedSkipReason != nil }
+
+    /// 记录列表的「已忽略」档与行内标签的判据（本页 UI 的唯一入口）。
+    ///
+    /// 两道门的口径**故意不完全一样**，这不是随手写的：
+    /// - **用户点过「忽略此条」**（`isIgnored`）：无论有没有关联都算。那一档的用途是
+    ///   「让忽略可撤销」，把一条已绑定的记录藏起来，用户就再也找不到撤销按钮了（既有行为）。
+    /// - **规则判决**（`skipReason`）：**只有没进库时才算**。用户手工把它绑到某个条目上之后
+    ///   它就不再是「被忽略的记录」了 —— 否则同一条记录会同时出现在「已关联」与「已忽略」
+    ///   两处，而用户刚做完的动作正是「我要它进库」；下一轮同步则因为阶梯第 ① 档保护已绑记录，
+    ///   它也不会被重新摘下来，两边的说法必须一致。
+    var isShownAsIgnored: Bool {
+        isIgnored || (game == nil && skipReason != nil)
     }
 
     /// 去重键（`provider|accountId|titleId`）。仅用于内存字典去重与调试展示，

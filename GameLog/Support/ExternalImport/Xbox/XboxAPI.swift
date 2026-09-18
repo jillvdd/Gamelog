@@ -427,6 +427,25 @@ extension XboxAPI {
         return nil
     }
 
+    /// `devices` → 「这个标题**只有 PC**、一台主机都没有」。
+    ///
+    /// 判据是**列举**而不是「有没有 pc 这一项」：`["PC","XboxOne"]`（跨平台合集的常态）为假，
+    /// 只有每个 token 都落在 `{pc, win32}` 里才为真。认不出的 token（实测见过一条
+    /// `Nintendo Switch`）同样算「不是只有 PC」—— 宁可漏跳也不误跳。
+    ///
+    /// ⚠️ 这个函数**只回答「设备列表」这一问**，跳不跳还取决于另外两条
+    /// （游玩时长为 0、这一轮时长取数成功），三条都在 `XboxGameService.records` 里合。
+    /// 单独看这一条会把 `FINAL FANTASY XV WINDOWS EDITION` / `Halo: 士官長合輯`
+    /// 这类「在 Xbox 上玩的 PC 版」一起误伤 —— 它们的 `devices` 也只有 PC，
+    /// 但时长是 53h / 234h（2026-09-18 真库取证）。
+    static func isPCOnly(devices: [String]?) -> Bool {
+        guard let devices, !devices.isEmpty else { return false }
+        return devices.allSatisfy { device in
+            let key = device.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+            return key == "pc" || key == "win32"
+        }
+    }
+
     /// `platformRaw`（`"XboxOne,XboxSeries"`）→ **每个平台各自的** canonical 值。
     ///
     /// 与 `platform(forDevices:)` 的分工：那个是**入库**用的折算（列表 → 一个「原生那一代」），

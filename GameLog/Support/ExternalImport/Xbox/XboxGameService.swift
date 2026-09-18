@@ -65,7 +65,8 @@ struct XboxGameService {
 
         return Fetched(
             records: Self.records(from: titles, minutes: minutes,
-                                  fallbackPlatform: AccountProvider.xbox.fallbackPlatform),
+                                  fallbackPlatform: AccountProvider.xbox.fallbackPlatform,
+                                  playtimeFetched: !playtimeUnavailable),
             playtimeUnavailable: playtimeUnavailable)
     }
 
@@ -150,14 +151,42 @@ struct XboxGameService {
     /// 猜错会静默合并两个不同的游戏。所以先不填，等能验证时再说（§63 待验证项）。
     ///
     /// ⚠️ `playCount` 恒为 nil：来源不给这个字段（不是解析失败）。
+    ///
+    /// - Parameter playtimeFetched: **这一轮的时长取数成功了**（`!playtimeUnavailable`）。
+    ///   它是「跳过 PC 记录」的**第三道闸门，且必须有** —— 失败时所有 `playedSeconds` 都是 nil，
+    ///   与「时长真的是 0」在库里长得一模一样。少了这道门，一次网络抖动就会把用户
+    ///   整个 PC 端的库当成「没玩过」删掉。**没取到时长 → 这一轮的判决是 `.unknown`**
+    ///   （库里已有的判决原样保留，既不清也不写，见 `ExternalSkipVerdict`）。
+    ///
+    ///   参数**刻意不给默认值**：这道门是安全判据，不是可选配置，加默认值等于让下一个
+    ///   调用点可以在不自知的情况下把它关掉。
     static func records(from titles: [XboxAPI.TitleEntry],
                         minutes: [String: Int],
-                        fallbackPlatform: String) -> [ExternalGameRecordDTO] {
+                        fallbackPlatform: String,
+                        playtimeFetched: Bool) -> [ExternalGameRecordDTO] {
         let records = titles.compactMap { entry -> ExternalGameRecordDTO? in
             guard let titleId = Self.usableTitleId(entry),
                   let titleName = entry.name?
                       .trimmingCharacters(in: .whitespacesAndNewlines),
                   !titleName.isEmpty else { return nil }
+
+            // 「这条要不要」的判决 —— **三条件同时成立**（用户 2026-09-18 拍板的判据）：
+            // ① 设备里一台主机都没有（只有 `PC` / `Win32`）；② 游玩时长是 0；③ 这一轮取数成功。
+            //
+            // ⚠️ 判据**不是**「平台 == PC」：真库里有 41 个条目带 PC 底色，其中
+            // `FINAL FANTASY XV WINDOWS EDITION`（53h）与 `Halo: 士官長合輯`（234h）
+            // 的 `devices` 也只有 PC —— 用户明确说了那两个他就是在 Xbox 上玩的。
+            // 只有「PC-only 且一分钟都没玩过」才是「他不用 Windows 玩游戏」这条事实的表述。
+            //
+            // ⚠️ 判决结果**必须落进 DTO、再落盘**（见 `ExternalSkipReason`）：`playedSeconds == nil`
+            // 与「取数失败」在库里分不开，事后重算会把那一轮没取到时长的记录误判成跳过。
+            // 三条判据合完是**三态**：取数失败 → `.unknown`（库里已有的判决一个字不动），
+            // 取数成功 → `.decided(原因或 nil)`。
+            let playedMinutes = minutes[titleId] ?? 0
+            let skipVerdict: ExternalSkipVerdict = playtimeFetched
+                ? .decided(playedMinutes == 0 && XboxAPI.isPCOnly(devices: entry.devices)
+                           ? .xboxPCWithoutPlaytime : nil)
+                : .unknown
 
             return ExternalGameRecordDTO(
                 titleId: titleId,
@@ -165,6 +194,7 @@ struct XboxGameService {
                 platform: XboxAPI.platform(forMediaItemType: entry.mediaItemType,
                                            devices: entry.devices) ?? fallbackPlatform,
                 platformRaw: XboxAPI.platformRaw(forDevices: entry.devices),
+                skipVerdict: skipVerdict,
                 // 来源不给首次游玩时间（实测 330 条里一个字都没有）—— 留 nil，**不编**。
                 firstPlayedAt: nil,
                 lastPlayedAt: XboxAPI.parseTimestamp(entry.titleHistory?.lastTimePlayed),
