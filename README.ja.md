@@ -85,10 +85,10 @@
 ### 1. アプリのインストール
 
 #### macOS
-- Releases より `GameLog-beta-3.2.dmg` をダウンロードし、マウント後に `GameLog.app` を `Applications` フォルダへドラッグ＆ドロップしてください。
+- Releases より `GameLog-beta-3.3.dmg` をダウンロードし、マウント後に `GameLog.app` を `Applications` フォルダへドラッグ＆ドロップしてください。
 
 #### iOS / iPadOS（無署名 IPA）
-- `dist/` フォルダにある `GameLog-beta-3.2.ipa`（実機 arm64 用バイナリ）を取得します。
+- `dist/` フォルダにある `GameLog-beta-3.3.ipa`（実機 arm64 用バイナリ）を取得します。
 - TrollStore、eSign、AltStore、SideStore 等のお好みのツールで再署名してインストールしてください。
 
 ### 2. デモデータのインポート

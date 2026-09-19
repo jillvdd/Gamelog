@@ -85,10 +85,10 @@
 ### 1. Installation
 
 #### macOS
-- Download `GameLog-beta-3.2.dmg` from the Releases page, open it, and drag `GameLog.app` to your `Applications` folder.
+- Download `GameLog-beta-3.3.dmg` from the Releases page, open it, and drag `GameLog.app` to your `Applications` folder.
 
 #### iOS / iPadOS (Unsigned IPA)
-- Grab `GameLog-beta-3.2.ipa` from the `dist/` directory.
+- Grab `GameLog-beta-3.3.ipa` from the `dist/` directory.
 - Re-sign and install using your preferred method (TrollStore, eSign, AltStore, SideStore, etc.).
 
 ### 2. Quick Demo Dataset

@@ -123,6 +123,29 @@ func run() -> Int {
         check("单卡横版渲染成功", false)
     }
 
+    // 单卡方版 (1:1)
+    if let png = ShareCardRenderer.renderData(content: .single(game, size: .square), language: language),
+       let size = pngSize(png) {
+        check("单卡方版尺寸 1200x1200（实际 \(size.width)x\(size.height)）", size.width == 1200 && size.height == 1200)
+    } else {
+        check("单卡方版渲染成功", false)
+    }
+
+    // 单卡社交版 (4:5)
+    if let png = ShareCardRenderer.renderData(content: .single(game, size: .portrait), language: language),
+       let size = pngSize(png) {
+        check("单卡社交版尺寸 1080x1350（实际 \(size.width)x\(size.height)）", size.width == 1080 && size.height == 1350)
+    } else {
+        check("单卡社交版渲染成功", false)
+    }
+
+    // 浅色主题渲染测试
+    if let png = ShareCardRenderer.renderData(content: .single(game, size: .phone), language: language, theme: .editorialLight) {
+        check("雪岭纯白主题渲染成功", !png.isEmpty)
+    } else {
+        check("雪岭纯白主题渲染成功", false)
+    }
+
     // 无评分路径（单卡竖版，未通关状态徽章路径）
     if let png = ShareCardRenderer.renderPNG(content: .single(plain, size: .phone), language: language) {
         check("无评分单卡渲染成功（未评分路径）", !png.isEmpty)

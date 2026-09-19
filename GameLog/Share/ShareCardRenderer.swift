@@ -37,13 +37,14 @@ enum ShareCardRenderer {
     static func renderData(
         content: ShareCardContent,
         language: String,
+        theme: ShareTheme = .brand,
         scale: CGFloat = 1,
         format: OutputFormat = .png
     ) -> Data? {
         let canvas = content.canvasSize
         let clamped = min(max(scale, 0.05), maxBitmapDimension / max(canvas.width, canvas.height))
 
-        let view = ShareCardView(content: content, theme: .brand)
+        let view = ShareCardView(content: content, theme: theme)
             .environment(\.appLanguageCode, language)
             .frame(width: canvas.width, height: canvas.height)
 

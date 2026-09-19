@@ -25,20 +25,45 @@ private enum ShareExportFormat: String, CaseIterable, Identifiable {
     var fileExtension: String { self == .jpeg ? "jpg" : "png" }
 }
 
-/// 分享面板：勾选游戏（单选→单卡，多选→总览图）或勾选分组（单选→分组分享卡），
-/// 选尺寸与格式，实时预览（降采样提速），保存/分享时才渲全尺寸。
+/// 移动端分流标签：效果预览 vs 挑选游戏。
+private enum CompactShareTab: Int, CaseIterable {
+    case preview = 0
+    case select = 1
+}
+
+/// 按钮位置 PreferenceKey，供 iPadOS 系统分享 Popover 精准锚定。
+private struct ShareButtonRectKey: PreferenceKey {
+    static var defaultValue: CGRect = .zero
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        let n = nextValue()
+        if n != .zero { value = n }
+    }
+}
+
+/// 分享面板：
+/// - macOS / iPadOS 宽屏下展现双栏大屏工作台；
+/// - iPhone 紧凑屏展现单列自适应流；
+/// - 支持 4 种尺寸（9:16 / 16:9 / 1:1 / 4:5）、双质感主题、总览排序、快速过滤与批量选择。
 struct SharePanelView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appLanguageCode) private var language
+    #if !os(macOS)
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    #endif
+
     @Query(sort: \Game.createdAt) private var games: [Game]
     @Query(sort: \GameGroup.name) private var groups: [GameGroup]
     var preselected: [Game] = []
 
     @State private var mode: ShareMode = .games
+    @State private var compactTab: CompactShareTab = .preview
     @State private var selectedIDs: Set<PersistentIdentifier> = []
     @State private var selectedGroupID: PersistentIdentifier?
     @State private var searchText = ""
+    @State private var platformFilter: String? = nil
+    @State private var sortOption: ShareSortOption = .selection
     @State private var size: ShareSize = .phone
+    @State private var themeMode: ShareThemeMode = .brandDark
     @State private var overviewTitle = ""
     @State private var groupTitle = ""
     @State private var renderedData: Data?
@@ -49,13 +74,46 @@ struct SharePanelView: View {
     @State private var showingStyleEditor = false
     /// 统计要素配置变更代际：编辑器保存后 +1 触发分组卡重渲染。
     @State private var statsRevision = 0
-    #if os(iOS)
+    #if !os(macOS)
     @State private var showingFullscreenPreview = false
+    @State private var shareButtonRect: CGRect = .zero
     #endif
     @AppStorage(UserCustomization.usernameKey) private var username = ""
 
+    private var isRegularScreen: Bool {
+        #if os(macOS)
+        return true
+        #else
+        return horizontalSizeClass == .regular
+        #endif
+    }
+
+    private var liveGames: [Game] { games.filter(\.isLive) }
+    private var liveGroups: [GameGroup] { groups.filter(\.isLive) }
+
+    private var allPlatforms: [String] {
+        Array(Set(liveGames.flatMap(\.platformList))).sorted()
+    }
+
+    private var visibleGames: [Game] {
+        searchText.isEmpty ? liveGames : liveGames.filter { $0.matches(search: searchText) }
+    }
+
+    private var filteredGames: [Game] {
+        var list = visibleGames
+        if let platformFilter {
+            if platformFilter == "completed" {
+                list = list.filter(\.isCompletedOrLongRunning)
+            } else {
+                list = list.filter { $0.platformList.contains(platformFilter) }
+            }
+        }
+        return list
+    }
+
     private var selectedGames: [Game] {
-        liveGames.filter { selectedIDs.contains($0.persistentModelID) }
+        let raw = liveGames.filter { selectedIDs.contains($0.persistentModelID) }
+        return sortOption.sort(games: raw, language: language)
     }
 
     private var selectedGroup: GameGroup? {
@@ -63,18 +121,8 @@ struct SharePanelView: View {
         return liveGroups.first { $0.persistentModelID == selectedGroupID }
     }
 
-    /// 还活着的游戏 / 分组。本面板从 `GameDetailView` 直接弹出，**没有** `libraryReplacing`
-    /// 门 —— 整库替换或「清空该账号导入数据」之后，`@Query` 会滞后一帧，而分享卡渲染读的是
-    /// 封面的外置存储（必 fault），那就是 2026-09-16 那条 `backing data detached` fatal。
-    /// 判据见 `Game.isLive`。
-    private var liveGames: [Game] { games.filter(\.isLive) }
-    private var liveGroups: [GameGroup] { groups.filter(\.isLive) }
-
-    private var visibleGames: [Game] {
-        searchText.isEmpty ? liveGames : liveGames.filter { $0.matches(search: searchText) }
-    }
-
     private var isMulti: Bool { selectedGames.count > 1 }
+    private var isSingleShare: Bool { preselected.count == 1 && mode == .games }
 
     /// 当前预览对应的内容；无有效选择则 nil。
     private var currentContent: ShareCardContent? {
@@ -113,92 +161,472 @@ struct SharePanelView: View {
 
     var body: some View {
         Group {
-            #if os(macOS)
-            VStack(spacing: 0) {
-                header
-                Divider()
-                HStack(spacing: 0) {
-                    selectionList
-                        .frame(width: 300)
-                    Divider()
-                    previewColumn
-                }
-                Divider()
-                controls
+            if isRegularScreen {
+                regularSplitLayout
+            } else {
+                compactShareBody
             }
-            // minWidth 900：主窗最小 980（对齐 Music）下放得下——左栏 300 + 预览 ~570。
-            // 此前 1060 是按主窗 minWidth 1150 定的，主窗缩小后必须跟着降。
-            .frame(minWidth: 900, minHeight: 700)
-            #else
-            // iOS 纵向三段：① 预览 + 输出设置（尺寸/格式）置顶；② 模式+搜索一行，
-            // 勾选列表吃掉全部弹性空间（最大化）；③ 标题 + 样式/导出一行收在底部拇指区。
-            // 「点按查看大图」提示行已删（点预览即全屏，符合手机直觉）。macOS 三栏布局不动。
-            VStack(spacing: 0) {
-                header
-                Divider()
-                previewColumn
-                    .frame(height: 200)
-                HStack(spacing: 12) {
-                    SegmentSlider(
-                        titles: ShareSize.allCases.map { L10n.tr($0 == .phone ? "share.phone" : "share.desktop", lang: language) },
-                        selection: Binding(
-                            get: { ShareSize.allCases.firstIndex(of: size) ?? 0 },
-                            set: { size = ShareSize.allCases[$0] }
-                        )
-                    )
-                    .frame(width: 168)
-                    formatPicker
-                    Spacer(minLength: 0)
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                Divider()
-                HStack(spacing: 10) {
-                    modeSegment
-                        .frame(width: 168)
-                    searchField
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                gameGroupList
-                Divider()
-                VStack(spacing: 10) {
-                    if mode == .groups {
-                        BorderedTextField(text: groupTitleBinding, placeholder: L10n.tr("share.groupTitle", lang: language))
-                    } else if isMulti {
-                        BorderedTextField(text: overviewTitleBinding, placeholder: L10n.tr("share.overviewTitle", lang: language))
-                    }
-                    HStack(spacing: 8) {
-                        styleSettingsButton
-                        exportButtons
-                        Spacer(minLength: 0)
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 10)
-                .padding(.bottom, 12)
-            }
-            #endif
         }
-        // 面板跟随系统明暗（2026-08-27 用户定稿，原为强制深色——浅色系统下 iOS 弹出时
-        // 会闪一次暗色切换）。预览画布仍用固定品牌深底衬同样固定深色的分享卡，
-        // 卡片本体全是写死颜色（ShareTheme.brand），两种外观下渲染结果一致。
         .onAppear(perform: setup)
         .onChange(of: mode) { _, _ in scheduleRerender() }
         .onChange(of: selectedIDs) { _, _ in scheduleRerender() }
         .onChange(of: selectedGroupID) { _, _ in scheduleRerender() }
         .onChange(of: size) { _, _ in scheduleRerender() }
+        .onChange(of: themeMode) { _, _ in scheduleRerender() }
+        .onChange(of: sortOption) { _, _ in scheduleRerender() }
         .onChange(of: overviewTitle) { _, _ in scheduleRerender() }
         .onChange(of: groupTitle) { _, _ in scheduleRerender() }
+        .onChange(of: games) { _, newGames in
+            if selectedIDs.isEmpty && CommandLine.arguments.contains("-ShareSelectTop") {
+                let top = Array(newGames.filter(\.isLive).prefix(6))
+                selectedIDs = Set(top.map(\.persistentModelID))
+            }
+        }
         .onChange(of: exportFormat) { _, _ in scheduleRerender() }
         .onChange(of: statsRevision) { _, _ in scheduleRerender() }
         .sheet(isPresented: $showingStyleEditor) {
             ShareStyleConfigurator { statsRevision += 1 }
         }
         .onDisappear { renderTask?.cancel() }
+        #if !os(macOS)
+        .onPreferenceChange(ShareButtonRectKey.self) { shareButtonRect = $0 }
+        #endif
     }
 
-    // MARK: - 头部
+
+    // MARK: - 大屏双栏工作台布局 (macOS / iPadOS regular)
+
+    private var regularSplitLayout: some View {
+        VStack(spacing: 0) {
+            header
+            Divider()
+            HStack(spacing: 0) {
+                selectionList
+                    .frame(width: 310)
+                Divider()
+                VStack(spacing: 0) {
+                    previewColumn
+                    Divider()
+                    regularControls
+                }
+            }
+        }
+        #if os(macOS)
+        .frame(minWidth: 920, minHeight: 700)
+        #endif
+    }
+
+    // MARK: - 移动端紧凑布局 (iPhone / compact)
+
+    @ViewBuilder
+    private var compactShareBody: some View {
+        if isSingleShare {
+            compactSingleLayout
+        } else {
+            compactOverviewLayout
+        }
+    }
+
+    /// 单游戏分享专属纯净流：居中沉浸式大预览，无任何多余列表与检索噪音
+    private var compactSingleLayout: some View {
+        VStack(spacing: 0) {
+            HStack {
+                if let game = preselected.first {
+                    Text(verbatim: game.displayName(for: language))
+                        .font(.headline)
+                        .lineLimit(1)
+                } else {
+                    LText("share.preview")
+                        .font(.headline)
+                }
+                Spacer()
+                closeButton
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 16)
+            .padding(.bottom, 12)
+
+            Divider()
+
+            previewColumn
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            Divider()
+
+            VStack(spacing: 12) {
+                HStack(spacing: 8) {
+                    sizePillsRow
+                    Spacer(minLength: 0)
+                    themePillToggle
+                    styleSettingsMenuButton
+                }
+
+                #if os(macOS)
+                exportButtons
+                #else
+                compactActionButtons
+                #endif
+
+                if let saveMessage {
+                    Text(verbatim: saveMessage)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .padding(.bottom, 16)
+        }
+    }
+
+    /// 多游戏总览分享：分流「效果预览」与「挑选游戏」双 Tab
+    private var compactOverviewLayout: some View {
+        VStack(spacing: 0) {
+            compactOverviewHeader
+            Divider()
+
+            if compactTab == .preview {
+                compactOverviewPreviewTab
+            } else {
+                compactOverviewSelectionTab
+            }
+        }
+    }
+
+    private var compactOverviewHeader: some View {
+        HStack(spacing: 12) {
+            SegmentSlider(
+                titles: [
+                    L10n.tr("share.tab.preview", lang: language),
+                    overviewSelectTabTitle
+                ],
+                selection: Binding(
+                    get: { compactTab.rawValue },
+                    set: {
+                        compactTab = CompactShareTab(rawValue: $0) ?? .preview
+                        triggerSelectionHaptic()
+                    }
+                )
+            )
+            .frame(maxWidth: .infinity)
+
+            closeButton
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 14)
+        .padding(.bottom, 10)
+    }
+
+    private var overviewSelectTabTitle: String {
+        let count = mode == .groups ? (selectedGroup != nil ? 1 : 0) : selectedIDs.count
+        if count == 0 {
+            return L10n.tr("share.tab.select", lang: language)
+        } else {
+            return L10n.tr("share.tab.selectWithCount", [count], lang: language)
+        }
+    }
+
+    /// 效果预览 Tab：聚焦大图与画幅/主题调整，带快速跳回挑选的指示胶囊
+    private var compactOverviewPreviewTab: some View {
+        VStack(spacing: 0) {
+            previewColumn
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            Divider()
+
+            VStack(spacing: 10) {
+                Button {
+                    compactTab = .select
+                    triggerSelectionHaptic()
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: mode == .groups ? "folder.fill" : "checkmark.circle.fill")
+                            .font(.system(size: 11))
+                        Text(verbatim: jumpToSelectionLinkText)
+                            .font(.system(size: 12, weight: .medium))
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 10, weight: .semibold))
+                    }
+                    .foregroundStyle(Color.accentColor)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 5)
+                    .background(Capsule().fill(Color.accentColor.opacity(0.12)))
+                }
+                .buttonStyle(.plain)
+
+                if mode == .groups {
+                    BorderedTextField(text: groupTitleBinding, placeholder: L10n.tr("share.groupTitle", lang: language))
+                } else if isMulti {
+                    BorderedTextField(text: overviewTitleBinding, placeholder: L10n.tr("share.overviewTitle", lang: language))
+                }
+
+                HStack(spacing: 8) {
+                    sizePillsRow
+                    Spacer(minLength: 0)
+                    themePillToggle
+                    styleSettingsMenuButton
+                }
+
+                #if os(macOS)
+                exportButtons
+                #else
+                compactActionButtons
+                #endif
+
+                if let saveMessage {
+                    Text(verbatim: saveMessage)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 10)
+            .padding(.bottom, 14)
+        }
+    }
+
+    private var jumpToSelectionLinkText: String {
+        if mode == .groups {
+            if let group = selectedGroup {
+                return "\(group.name) (\(group.games.count))"
+            } else {
+                return L10n.tr("share.noneSelectedGroup", lang: language)
+            }
+        } else {
+            return L10n.tr("share.selectedCountLink", [selectedIDs.count], lang: language)
+        }
+    }
+
+    /// 挑选游戏 Tab：专属全屏高度流畅列表与完整过滤
+    private var compactOverviewSelectionTab: some View {
+        VStack(spacing: 0) {
+            VStack(spacing: 8) {
+                HStack(spacing: 8) {
+                    if !liveGroups.isEmpty {
+                        modeSegment
+                            .frame(width: 156)
+                    }
+                    searchField
+                }
+                if mode == .games {
+                    filterChips
+                    listToolbar
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.top, 8)
+            .padding(.bottom, 4)
+
+            Divider()
+
+            gameGroupList
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            HStack {
+                Text(verbatim: selectionCountFooterText)
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+
+                Spacer()
+
+                Button {
+                    compactTab = .preview
+                    triggerSelectionHaptic()
+                } label: {
+                    HStack(spacing: 5) {
+                        Text(verbatim: L10n.tr("share.viewPreview", lang: language))
+                        Image(systemName: "arrow.right")
+                    }
+                    .font(.system(size: 13, weight: .semibold))
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(Color.accentColor)
+                    .foregroundStyle(Color.white)
+                    .clipShape(Capsule())
+                }
+                .buttonStyle(PressFeedbackButtonStyle(pressedOpacity: 0.7))
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(.thinMaterial)
+            .overlay(Divider(), alignment: .top)
+        }
+    }
+
+    private var selectionCountFooterText: String {
+        if mode == .groups {
+            if let group = selectedGroup {
+                return "\(group.name) (\(group.games.count))"
+            } else {
+                return L10n.tr("share.noneSelectedGroup", lang: language)
+            }
+        } else {
+            return L10n.tr("share.selectedCount", [selectedIDs.count], lang: language)
+        }
+    }
+
+    // MARK: - 扁平微胶囊控制组件
+
+    private var sizePillsRow: some View {
+        HStack(spacing: 4) {
+            ForEach([ShareSize.phone, .portrait, .square, .desktop]) { s in
+                sizePillButton(s)
+            }
+        }
+    }
+
+    private func sizePillButton(_ s: ShareSize) -> some View {
+        Button {
+            size = s
+            triggerSelectionHaptic()
+        } label: {
+            Text(verbatim: sizeShortTitle(s))
+                .font(.system(size: 11, weight: size == s ? .semibold : .medium))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(
+                    Capsule().fill(size == s ? Color.accentColor : Color.semantic(.quaternarySystemFill))
+                )
+                .foregroundStyle(size == s ? Color.white : Color.primary)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func sizeShortTitle(_ s: ShareSize) -> String {
+        switch s {
+        case .phone: return L10n.tr("share.size.short.phone", lang: language)
+        case .portrait: return L10n.tr("share.size.short.portrait", lang: language)
+        case .square: return L10n.tr("share.size.short.square", lang: language)
+        case .desktop: return L10n.tr("share.size.short.desktop", lang: language)
+        }
+    }
+
+    private var themePillToggle: some View {
+        Button {
+            themeMode = (themeMode == .brandDark ? .editorialLight : .brandDark)
+            triggerSelectionHaptic()
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: themeMode == .brandDark ? "moon.stars.fill" : "sun.max.fill")
+                    .font(.system(size: 11))
+                    .foregroundStyle(themeMode == .brandDark ? Color.orange : Color.yellow)
+                Text(verbatim: themeShortTitle(themeMode))
+                    .font(.system(size: 11, weight: .medium))
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(Capsule().fill(Color.semantic(.quaternarySystemFill)))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func themeShortTitle(_ t: ShareThemeMode) -> String {
+        switch t {
+        case .brandDark: return L10n.tr("share.theme.short.dark", lang: language)
+        case .editorialLight: return L10n.tr("share.theme.short.light", lang: language)
+        }
+    }
+
+    private var styleSettingsMenuButton: some View {
+        Menu {
+            Section(L10n.tr("share.format", lang: language)) {
+                Picker(L10n.tr("share.format", lang: language), selection: $exportFormat) {
+                    ForEach(ShareExportFormat.allCases) { f in
+                        Text(verbatim: L10n.tr(f == .jpeg ? "share.format.jpeg" : "share.format.png", lang: language))
+                            .tag(f)
+                    }
+                }
+            }
+            Section {
+                Button {
+                    showingStyleEditor = true
+                } label: {
+                    Label(L10n.tr("share.styleSettings", lang: language), systemImage: "slider.horizontal.3")
+                }
+            }
+        } label: {
+            HStack(spacing: 3) {
+                Image(systemName: "gearshape")
+                    .font(.system(size: 11))
+                Text(verbatim: exportFormat == .jpeg ? "JPEG" : "PNG")
+                    .font(.system(size: 11, weight: .medium))
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 8))
+            }
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(Capsule().fill(Color.semantic(.quaternarySystemFill)))
+        }
+        .buttonStyle(.plain)
+    }
+
+    #if !os(macOS)
+    private var compactActionButtons: some View {
+        HStack(spacing: 12) {
+            Button {
+                saveImageToAlbum()
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.down.to.line")
+                        .font(.system(size: 13, weight: .medium))
+                    Text(verbatim: L10n.tr("share.saveToAlbum", lang: language))
+                        .font(.system(size: 14, weight: .medium))
+                }
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(maxWidth: .infinity)
+                .frame(height: 44)
+                .background(Color.semantic(.controlBackground))
+                .foregroundStyle(Color.primary)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+            .buttonStyle(PressFeedbackButtonStyle(pressedOpacity: 0.7))
+            .disabled(currentContent == nil)
+
+            if let url = shareURL {
+                Button {
+                    presentShareSheet(url: url, sourceRect: shareButtonRect)
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: 13, weight: .semibold))
+                        Text(verbatim: L10n.tr("share.shareAction", lang: language))
+                            .font(.system(size: 14, weight: .semibold))
+                    }
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 44)
+                    .background(Color.accentColor)
+                    .foregroundStyle(Color.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+                .buttonStyle(PressFeedbackButtonStyle(pressedOpacity: 0.7))
+                .background(GeometryReader { geo in
+                    Color.clear.preference(key: ShareButtonRectKey.self, value: geo.frame(in: .global))
+                })
+            } else {
+                HStack(spacing: 6) {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 13, weight: .semibold))
+                    Text(verbatim: L10n.tr("share.shareAction", lang: language))
+                        .font(.system(size: 14, weight: .semibold))
+                }
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(maxWidth: .infinity)
+                .frame(height: 44)
+                .background(Color.accentColor.opacity(0.35))
+                .foregroundStyle(Color.white.opacity(0.8))
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+        }
+    }
+    #endif
+
+    // MARK: - 头部组件
 
     @ViewBuilder
     private var header: some View {
@@ -206,34 +634,50 @@ struct SharePanelView: View {
             LText("share.selectGames")
                 .font(.headline)
             Spacer()
-            Button {
-                dismiss()
-            } label: {
-                Image(systemName: "xmark.circle.fill")
-            }
-            .buttonStyle(.borderless)
-            .foregroundStyle(.secondary)
-            .help(L10n.tr("common.close", lang: language))
+            closeButton
         }
-        #if os(macOS)
-        .padding()
-        #else
-        // iOS sheet 顶缘到标题只有默认 16pt，视觉贴边突兀；macOS 布局不动。
-        .padding(.top, 24)
-        .padding(.bottom, 14)
         .padding(.horizontal, 20)
-        #endif
+        .padding(.top, isRegularScreen ? 16 : 20)
+        .padding(.bottom, 12)
     }
 
-    // MARK: - 选择列表
+    private var closeButton: some View {
+        Button {
+            dismiss()
+        } label: {
+            Image(systemName: "xmark.circle.fill")
+                .font(.system(size: 20))
+        }
+        .buttonStyle(.borderless)
+        .foregroundStyle(.secondary)
+        .help(L10n.tr("common.close", lang: language))
+    }
 
-    /// 模式分段（按游戏/按分组）。macOS 左栏与 iOS 工具行共用。
+    // MARK: - 左栏组件
+
+    private var selectionList: some View {
+        VStack(spacing: 0) {
+            modeSegment
+                .padding(10)
+            searchField
+                .padding([.horizontal, .bottom], 10)
+            if mode == .games {
+                filterChips
+                listToolbar
+            }
+            gameGroupList
+        }
+    }
+
     private var modeSegment: some View {
         SegmentSlider(
             titles: ShareMode.allCases.map { L10n.tr($0 == .games ? "share.byGames" : "share.byGroups", lang: language) },
             selection: Binding(
                 get: { ShareMode.allCases.firstIndex(of: mode) ?? 0 },
-                set: { mode = ShareMode.allCases[$0] }
+                set: {
+                    mode = ShareMode.allCases[$0]
+                    triggerSelectionHaptic()
+                }
             )
         )
     }
@@ -242,14 +686,100 @@ struct SharePanelView: View {
         BorderedTextField(text: $searchText, placeholder: L10n.tr("library.search", lang: language))
     }
 
-    /// 样式设置入口。macOS 左栏通栏按钮；iOS 文字胶囊（与导出按钮同行，省宽度去图标）。
+    private var filterChips: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                filterChip(title: L10n.tr("share.filter.all", lang: language), isSelected: platformFilter == nil) {
+                    platformFilter = nil
+                    triggerSelectionHaptic()
+                }
+                filterChip(title: L10n.tr("share.filter.completed", lang: language), isSelected: platformFilter == "completed") {
+                    platformFilter = platformFilter == "completed" ? nil : "completed"
+                    triggerSelectionHaptic()
+                }
+                ForEach(allPlatforms, id: \.self) { plat in
+                    filterChip(
+                        title: Presets.display(plat, category: .platform, language: language),
+                        isSelected: platformFilter == plat
+                    ) {
+                        platformFilter = platformFilter == plat ? nil : plat
+                        triggerSelectionHaptic()
+                    }
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+        }
+    }
+
+    private func filterChip(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(verbatim: title)
+                .font(.system(size: 11, weight: isSelected ? .semibold : .regular))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(
+                    Capsule().fill(isSelected ? Color.accentColor.opacity(0.2) : Color.semantic(.quaternarySystemFill))
+                )
+                .overlay(
+                    Capsule().stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 1)
+                )
+                .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var listToolbar: some View {
+        HStack(spacing: 6) {
+            Menu {
+                Picker(L10n.tr("share.sort", lang: language), selection: $sortOption) {
+                    ForEach(ShareSortOption.allCases) { opt in
+                        Text(verbatim: sortTitle(opt)).tag(opt)
+                    }
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.up.arrow.down")
+                        .font(.system(size: 10))
+                    Text(verbatim: sortTitle(sortOption))
+                        .font(.system(size: 11))
+                        .lineLimit(1)
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Capsule().fill(Color.semantic(.quaternarySystemFill)))
+            }
+            .buttonStyle(.plain)
+
+            Spacer(minLength: 0)
+
+            Button {
+                selectAllFiltered()
+            } label: {
+                Text(verbatim: L10n.tr("share.selectAll", lang: language))
+                    .font(.system(size: 11))
+            }
+            .buttonStyle(.borderless)
+
+            Button {
+                deselectAll()
+            } label: {
+                Text(verbatim: L10n.tr("share.deselectAll", lang: language))
+                    .font(.system(size: 11))
+            }
+            .buttonStyle(.borderless)
+            .disabled(selectedIDs.isEmpty)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
+    }
+
     private var styleSettingsButton: some View {
         Button {
             showingStyleEditor = true
         } label: {
             #if os(macOS)
             Label(L10n.tr("share.styleSettings", lang: language), systemImage: "slider.horizontal.3")
-                .frame(maxWidth: .infinity)
             #else
             Text(verbatim: L10n.tr("share.styleSettings", lang: language))
                 .lineLimit(1)
@@ -262,11 +792,10 @@ struct SharePanelView: View {
         #endif
     }
 
-    /// 游戏/分组勾选列表本体。
     private var gameGroupList: some View {
         List {
             if mode == .games {
-                ForEach(visibleGames) { game in
+                ForEach(filteredGames) { game in
                     Button {
                         toggle(game)
                     } label: {
@@ -315,30 +844,12 @@ struct SharePanelView: View {
         .listStyle(.plain)
     }
 
-    /// macOS 左栏：模式 + 搜索 + 样式入口 + 列表（竖排）。iOS 面板另行组合（见 body）。
-    private var selectionList: some View {
-        VStack(spacing: 0) {
-            modeSegment
-                .padding(10)
-            searchField
-                .padding([.horizontal, .bottom], 10)
-            styleSettingsButton
-                .padding([.horizontal, .bottom], 10)
-            gameGroupList
-        }
-    }
-
-    /// 分享面板列表里的小缩略图框（26×34）。画图的判据与 `frame` **共用这一个数**，
-    /// 见 `GameRowView.thumbSize` 那条说明。
     private static let coverThumbSize = CGSize(width: 26, height: 34)
     private static var coverThumbAspect: CGFloat { coverThumbSize.width / coverThumbSize.height }
 
     private func coverThumb(_ game: Game) -> some View {
         Group {
             if let image = game.coverImage {
-                // 比 26×34 这个框宽的图（1:1 图标、导入的横图）完整显示、上下留空；
-                // 竖版封面比它窄 → 照旧填满裁切。缩略图尺寸不变，列表不跳。
-                // 见 `AppImage.letterboxes(inBoxAspect:)`。
                 Image(appImage: image).resizable()
                     .aspectRatio(contentMode: image.letterboxes(inBoxAspect: Self.coverThumbAspect) ? .fit : .fill)
             } else {
@@ -353,6 +864,7 @@ struct SharePanelView: View {
     }
 
     private func toggle(_ game: Game) {
+        triggerSelectionHaptic()
         if selectedIDs.contains(game.persistentModelID) {
             selectedIDs.remove(game.persistentModelID)
         } else {
@@ -360,8 +872,8 @@ struct SharePanelView: View {
         }
     }
 
-    /// 分组单选：再勾其他分组会取消当前选择；选中时同步标题默认值为分组名。
     private func toggleGroup(_ group: GameGroup) {
+        triggerSelectionHaptic()
         if selectedGroupID == group.persistentModelID {
             selectedGroupID = nil
         } else {
@@ -370,7 +882,24 @@ struct SharePanelView: View {
         }
     }
 
-    // MARK: - 预览列
+    private func selectAllFiltered() {
+        triggerSelectionHaptic()
+        if mode == .games {
+            let ids = filteredGames.map(\.persistentModelID)
+            selectedIDs.formUnion(ids)
+        }
+    }
+
+    private func deselectAll() {
+        triggerSelectionHaptic()
+        if mode == .games {
+            selectedIDs.removeAll()
+        } else {
+            selectedGroupID = nil
+        }
+    }
+
+    // MARK: - 预览工作台
 
     private var previewColumn: some View {
         VStack(spacing: 0) {
@@ -378,11 +907,12 @@ struct SharePanelView: View {
                 Image(appImage: image)
                     .resizable()
                     .scaledToFit()
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                    .shadow(color: Color.black.opacity(0.18), radius: 8, x: 0, y: 3)
+                    .padding(14)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .padding(16)
                     .background(BrandPalette.background)
-                    // iOS 点预览全屏看大图：按钮化带按压反馈（原 onTapGesture 无视觉响应）。
-                    #if os(iOS)
+                    #if !os(macOS)
                     .contentShape(Rectangle())
                     .onTapGesture { showingFullscreenPreview = true }
                     #endif
@@ -393,18 +923,19 @@ struct SharePanelView: View {
                 } description: {
                     LText(mode == .groups ? "share.noneSelectedGroup" : "share.noneSelected")
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(BrandPalette.background)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        #if os(iOS)
+        #if !os(macOS)
         .fullScreenCover(isPresented: $showingFullscreenPreview) {
             fullscreenViewer
         }
         #endif
     }
 
-    #if os(iOS)
-    /// 全屏查看预览大图（点任意处关闭）。
+    #if !os(macOS)
     private var fullscreenViewer: some View {
         ZStack(alignment: .topTrailing) {
             Color.black.ignoresSafeArea()
@@ -427,74 +958,82 @@ struct SharePanelView: View {
     }
     #endif
 
-    // MARK: - 底部控制
+    // MARK: - 控制栏组件
 
-    private var controls: some View {
-        Group {
-            #if os(macOS)
-            HStack(spacing: 16) {
-                SegmentSlider(
-                    titles: ShareSize.allCases.map { L10n.tr($0 == .phone ? "share.phone" : "share.desktop", lang: language) },
-                    selection: Binding(
-                        get: { ShareSize.allCases.firstIndex(of: size) ?? 0 },
-                        set: { size = ShareSize.allCases[$0] }
-                    )
-                )
-                .frame(width: 240)
-
+    private var regularControls: some View {
+        VStack(spacing: 8) {
+            HStack(spacing: 8) {
+                sizePicker
+                themePicker
                 formatPicker
-
+                styleSettingsButton
+                Spacer(minLength: 0)
+            }
+            HStack(spacing: 8) {
                 if mode == .groups {
                     BorderedTextField(text: groupTitleBinding, placeholder: L10n.tr("share.groupTitle", lang: language))
-                        .frame(width: 200)
                 } else if isMulti {
                     BorderedTextField(text: overviewTitleBinding, placeholder: L10n.tr("share.overviewTitle", lang: language))
-                        .frame(width: 200)
                 }
-
-                Spacer()
+                Spacer(minLength: 0)
                 exportButtons
             }
-            #else
-            // iOS 控制区压缩：尺寸滑块与格式按钮并排一行（macOS 分开两处不动），
-            // 省下的纵向空间全部让给上方勾选列表。
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 12) {
-                    SegmentSlider(
-                        titles: ShareSize.allCases.map { L10n.tr($0 == .phone ? "share.phone" : "share.desktop", lang: language) },
-                        selection: Binding(
-                            get: { ShareSize.allCases.firstIndex(of: size) ?? 0 },
-                            set: { size = ShareSize.allCases[$0] }
-                        )
-                    )
-                    formatPicker
-                }
+            if let saveMessage {
+                Text(verbatim: saveMessage)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+    }
 
-                if mode == .groups {
-                    BorderedTextField(text: groupTitleBinding, placeholder: L10n.tr("share.groupTitle", lang: language))
-                } else if isMulti {
-                    BorderedTextField(text: overviewTitleBinding, placeholder: L10n.tr("share.overviewTitle", lang: language))
-                }
-
-                HStack {
-                    exportButtons
-                    Spacer()
-                }
-                if let saveMessage {
-                    Text(verbatim: saveMessage)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+    private var sizePicker: some View {
+        Menu {
+            Picker(L10n.tr("share.size", lang: language), selection: $size) {
+                ForEach(ShareSize.allCases) { s in
+                    Text(verbatim: sizeTitle(s)).tag(s)
                 }
             }
-            #endif
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: sizeIcon(size))
+                    .font(.system(size: 11))
+                Text(verbatim: sizeTitle(size))
+                    .font(.system(size: 12, weight: .medium))
+                    .lineLimit(1)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Capsule().fill(Color.semantic(.quaternarySystemFill)))
         }
-        .padding()
+        .buttonStyle(.plain)
+    }
+
+    private var themePicker: some View {
+        Menu {
+            Picker(L10n.tr("share.theme", lang: language), selection: $themeMode) {
+                ForEach(ShareThemeMode.allCases) { tm in
+                    Text(verbatim: themeTitle(tm)).tag(tm)
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: themeMode == .brandDark ? "moon.stars.fill" : "sun.max.fill")
+                    .font(.system(size: 11))
+                    .foregroundStyle(themeMode == .brandDark ? Color.orange : Color.yellow)
+                Text(verbatim: themeTitle(themeMode))
+                    .font(.system(size: 12, weight: .medium))
+                    .lineLimit(1)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Capsule().fill(Color.semantic(.quaternarySystemFill)))
+        }
+        .buttonStyle(.plain)
     }
 
     private var formatPicker: some View {
-        // iOS 的 Picker/Menu 系统样式都渲染成裸文字（iOS 26 忽略 .menuStyle(.button) 的边框），
-        // 手动给 label 胶囊底，与相邻 bordered 按钮观感一致；macOS 保持系统菜单选框。
-        #if os(iOS)
         Menu {
             Picker(L10n.tr("share.format", lang: language), selection: $exportFormat) {
                 ForEach(ShareExportFormat.allCases) { f in
@@ -504,23 +1043,14 @@ struct SharePanelView: View {
             }
         } label: {
             Text(verbatim: L10n.tr(exportFormat == .jpeg ? "share.format.jpeg" : "share.format.png", lang: language))
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
+                .font(.system(size: 12, weight: .medium))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
                 .background(Capsule().fill(Color.semantic(.quaternarySystemFill)))
         }
-        #else
-        Picker(L10n.tr("share.format", lang: language), selection: $exportFormat) {
-            ForEach(ShareExportFormat.allCases) { f in
-                Text(verbatim: L10n.tr(f == .jpeg ? "share.format.jpeg" : "share.format.png", lang: language))
-                    .tag(f)
-            }
-        }
-        .pickerStyle(.menu)
-        .fixedSize()
-        #endif
+        .buttonStyle(.plain)
     }
 
-    /// 导出按钮组：macOS「保存图片」（NSSavePanel）；iOS「保存到相册」+ 系统分享单。
     private var exportButtons: some View {
         Group {
             #if os(macOS)
@@ -535,7 +1065,6 @@ struct SharePanelView: View {
                     .disabled(true)
             }
             #else
-            // iOS 与样式设置同行排布，去图标 + 可收缩文本保证三语都单行放得下。
             Button {
                 saveImageToAlbum()
             } label: {
@@ -545,16 +1074,19 @@ struct SharePanelView: View {
             }
             .appStandardButton()
             .disabled(currentContent == nil)
+
             if let url = shareURL {
-                // iOS 26 sheet 内嵌 ShareLink 静默失败，改用 UIKit 直接 present 系统分享单。
                 Button {
-                    presentShareSheet(url: url)
+                    presentShareSheet(url: url, sourceRect: shareButtonRect)
                 } label: {
                     Text(verbatim: L10n.tr("share.openShareSheet", lang: language))
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
                 }
                 .appStandardButton()
+                .background(GeometryReader { geo in
+                    Color.clear.preference(key: ShareButtonRectKey.self, value: geo.frame(in: .global))
+                })
             } else {
                 Button(L10n.tr("share.openShareSheet", lang: language)) {}
                     .appStandardButton()
@@ -564,24 +1096,103 @@ struct SharePanelView: View {
         }
     }
 
+    // MARK: - 文案与图标助手
+
+    private func sizeTitle(_ s: ShareSize) -> String {
+        switch s {
+        case .phone: return L10n.tr("share.phone", lang: language)
+        case .desktop: return L10n.tr("share.desktop", lang: language)
+        case .square: return L10n.tr("share.square", lang: language)
+        case .portrait: return L10n.tr("share.portrait", lang: language)
+        }
+    }
+
+    private func sizeIcon(_ s: ShareSize) -> String {
+        switch s {
+        case .phone: return "iphone"
+        case .desktop: return "display"
+        case .square: return "square"
+        case .portrait: return "rectangle.portrait"
+        }
+    }
+
+    private func themeTitle(_ t: ShareThemeMode) -> String {
+        switch t {
+        case .brandDark: return L10n.tr("share.theme.brandDark", lang: language)
+        case .editorialLight: return L10n.tr("share.theme.editorialLight", lang: language)
+        }
+    }
+
+    private func sortTitle(_ s: ShareSortOption) -> String {
+        switch s {
+        case .selection: return L10n.tr("share.sort.default", lang: language)
+        case .score: return L10n.tr("share.sort.score", lang: language)
+        case .date: return L10n.tr("share.sort.date", lang: language)
+        case .releaseYear: return L10n.tr("share.sort.releaseYear", lang: language)
+        case .title: return L10n.tr("share.sort.title", lang: language)
+        }
+    }
+
+    private func triggerSelectionHaptic() {
+        #if !os(macOS)
+        UISelectionFeedbackGenerator().selectionChanged()
+        #endif
+    }
+
+    private func triggerSuccessHaptic() {
+        #if !os(macOS)
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        #endif
+    }
+
     // MARK: - 渲染管线（预览降采样、导出全尺寸）
 
     private func setup() {
         if !preselected.isEmpty {
             selectedIDs = Set(preselected.map(\.persistentModelID))
+        } else if CommandLine.arguments.contains("-ShareSelectTop") {
+            let topGames = Array(liveGames.prefix(6))
+            selectedIDs = Set(topGames.map(\.persistentModelID))
+        }
+        if let idx = CommandLine.arguments.firstIndex(of: "-ShareSize"), idx + 1 < CommandLine.arguments.count {
+            let val = CommandLine.arguments[idx + 1]
+            if let matched = ShareSize.allCases.first(where: { $0.rawValue == val }) {
+                size = matched
+            }
+        }
+        if let idx = CommandLine.arguments.firstIndex(of: "-ShareTheme"), idx + 1 < CommandLine.arguments.count {
+            let val = CommandLine.arguments[idx + 1]
+            if let matched = ShareThemeMode.allCases.first(where: { $0.rawValue == val }) {
+                themeMode = matched
+            }
+        }
+        if CommandLine.arguments.contains("-ShareTabSelect") {
+            compactTab = .select
         }
         overviewTitle = defaultOverviewTitle()
-        // 不在此直接 rerender：上面的 state 写入会触发 onChange → scheduleRerender
+        scheduleRerender()
+
+        Task { @MainActor in
+            for _ in 0..<15 {
+                if !liveGames.isEmpty {
+                    if CommandLine.arguments.contains("-ShareSelectTop") && selectedIDs.isEmpty {
+                        let topGames = Array(liveGames.prefix(6))
+                        selectedIDs = Set(topGames.map(\.persistentModelID))
+                        scheduleRerender()
+                    }
+                    break
+                }
+                try? await Task.sleep(nanoseconds: 100_000_000)
+            }
+        }
     }
 
-    /// 总览图默认标题：设了用户名 →「{用户名}的游戏簿」，未设 → app 品牌名。
     private func defaultOverviewTitle() -> String {
         let name = username.trimmingCharacters(in: .whitespaces)
         if name.isEmpty { return L10n.tr("app.menu", lang: language) }
         return L10n.tr("share.brandUser", [name], lang: language)
     }
 
-    /// 防抖重渲染（250ms）：勾选/改字过程中只出降采样小图，保持流畅。
     private func scheduleRerender() {
         renderTask?.cancel()
         renderTask = Task { @MainActor in
@@ -593,28 +1204,30 @@ struct SharePanelView: View {
 
     private func rerenderPreview() {
         guard let content = currentContent else {
+            NSLog("GameLog: rerenderPreview guard currentContent failed, selectedGames count: %d", selectedGames.count)
             clearPreview()
             return
         }
+        NSLog("GameLog: rerenderPreview starting render for %d games, size: %@, theme: %@", selectedGames.count, size.rawValue, themeMode.rawValue)
         if let data = ShareCardRenderer.renderData(
-            content: content, language: language,
+            content: content, language: language, theme: themeMode.theme,
             scale: ShareCardRenderer.previewScale, format: exportFormat.rendererFormat
         ) {
+            NSLog("GameLog: rerenderPreview success, bytes: %d", data.count)
             applyRendered(data)
         } else {
+            NSLog("GameLog: rerenderPreview ShareCardRenderer returned nil")
             clearPreview()
         }
     }
 
-    /// 全尺寸导出数据（保存/分享时才调用）。
     private func renderFullData() -> Data? {
         guard let content = currentContent else { return nil }
         return ShareCardRenderer.renderData(
-            content: content, language: language, scale: 1, format: exportFormat.rendererFormat
+            content: content, language: language, theme: themeMode.theme, scale: 1, format: exportFormat.rendererFormat
         )
     }
 
-    /// 导出文件基础名（游戏名/分组名，清理非法字符）。
     private var exportBaseName: String {
         let raw: String
         if mode == .groups, let group = selectedGroup {
@@ -633,7 +1246,6 @@ struct SharePanelView: View {
 
     private func applyRendered(_ data: Data) {
         renderedData = data
-        // 临时文件名唯一化，避免分享目标缓存陈旧内容。
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("GameLog-share-\(UUID().uuidString.prefix(6)).\(exportFormat.fileExtension)")
         if (try? data.write(to: url)) != nil {
@@ -662,7 +1274,6 @@ struct SharePanelView: View {
     }
 
     #if !os(macOS)
-    /// iOS：把全尺寸渲染的图片存入系统相册（仅「添加」权限）。
     private func saveImageToAlbum() {
         guard let data = renderFullData(), let image = UIImage(data: data) else {
             saveMessage = L10n.tr("share.saveFailed", lang: language)
@@ -676,9 +1287,12 @@ struct SharePanelView: View {
                         PHAssetChangeRequest.creationRequestForAsset(from: image)
                     } completionHandler: { success, _ in
                         DispatchQueue.main.async {
-                            saveMessage = success
-                                ? L10n.tr("share.savedToAlbum", lang: language)
-                                : L10n.tr("share.saveFailed", lang: language)
+                            if success {
+                                triggerSuccessHaptic()
+                                saveMessage = L10n.tr("share.savedToAlbum", lang: language)
+                            } else {
+                                saveMessage = L10n.tr("share.saveFailed", lang: language)
+                            }
                         }
                     }
                 default:

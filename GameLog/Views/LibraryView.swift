@@ -535,6 +535,11 @@ struct LibraryView: View {
         //
         // 旧键迁移后**不删除**：删了也读不到值（新键已写），而留着可让回退旧版本时不丢偏好。
         .onAppear {
+            if CommandLine.arguments.contains("-OpenShare") || CommandLine.arguments.contains("-OpenSingleShare") {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                    showingShare = true
+                }
+            }
             guard !didMigrateLibraryViewMode else { return }
             didMigrateLibraryViewMode = true
             guard UserDefaults.standard.string(forKey: UserCustomization.libraryViewModeKey) == nil else { return }
@@ -579,7 +584,7 @@ struct LibraryView: View {
             get: { showingShare && !libraryReplacing },
             set: { showingShare = $0 }
         )) {
-            SharePanelView()
+            SharePanelView(preselected: CommandLine.arguments.contains("-OpenSingleShare") ? (liveGames.first.map { [$0] } ?? []) : [])
         }
         .sheet(item: Binding(
             get: { libraryReplacing ? nil : editingGame },

@@ -5,14 +5,19 @@ import UIKit
 /// iOS 系统分享单（UIActivityViewController）直接呈现。
 /// 规避 SwiftUI sheet 内嵌 ShareLink 在 iOS 26 静默失败的问题（备份导出与分享面板共用此入口）。
 @discardableResult
-func presentShareSheet(url: URL) -> Bool {
+func presentShareSheet(url: URL, sourceRect: CGRect? = nil) -> Bool {
     guard let top = topPresentedViewController() else { return false }
     let vc = UIActivityViewController(activityItems: [url], applicationActivities: nil)
     // iPad 上 activity 控制器需 popover 锚点；iPhone 无需。
     if let popover = vc.popoverPresentationController {
         popover.sourceView = top.view
-        popover.sourceRect = CGRect(x: top.view.bounds.midX, y: top.view.bounds.midY, width: 0, height: 0)
-        popover.permittedArrowDirections = []
+        if let rect = sourceRect, rect != .zero {
+            popover.sourceRect = rect
+            popover.permittedArrowDirections = [.up, .down, .left, .right]
+        } else {
+            popover.sourceRect = CGRect(x: top.view.bounds.midX, y: top.view.bounds.midY, width: 0, height: 0)
+            popover.permittedArrowDirections = []
+        }
     }
     top.present(vc, animated: true)
     return true

@@ -5,6 +5,8 @@ import SwiftUI
 enum ShareSize: String, CaseIterable, Identifiable {
     case phone
     case desktop
+    case square
+    case portrait
 
     var id: String { rawValue }
 
@@ -12,6 +14,51 @@ enum ShareSize: String, CaseIterable, Identifiable {
         switch self {
         case .phone: CGSize(width: 1080, height: 1920)
         case .desktop: CGSize(width: 1920, height: 1080)
+        case .square: CGSize(width: 1200, height: 1200)
+        case .portrait: CGSize(width: 1080, height: 1350)
+        }
+    }
+}
+
+/// 总览图排序选项。
+enum ShareSortOption: String, CaseIterable, Identifiable {
+    case selection
+    case score
+    case date
+    case releaseYear
+    case title
+
+    var id: String { rawValue }
+
+    func sort(games: [Game], language: String) -> [Game] {
+        switch self {
+        case .selection:
+            return games
+        case .score:
+            return games.sorted {
+                let s1 = $0.libraryScore ?? -1
+                let s2 = $1.libraryScore ?? -1
+                if s1 != s2 { return s1 > s2 }
+                return $0.displayName(for: language).localizedCaseInsensitiveCompare($1.displayName(for: language)) == .orderedAscending
+            }
+        case .date:
+            return games.sorted {
+                let d1 = $0.latestCompletionDate ?? .distantPast
+                let d2 = $1.latestCompletionDate ?? .distantPast
+                if d1 != d2 { return d1 > d2 }
+                return $0.displayName(for: language).localizedCaseInsensitiveCompare($1.displayName(for: language)) == .orderedAscending
+            }
+        case .releaseYear:
+            return games.sorted {
+                let y1 = $0.releaseDate ?? .distantPast
+                let y2 = $1.releaseDate ?? .distantPast
+                if y1 != y2 { return y1 > y2 }
+                return $0.displayName(for: language).localizedCaseInsensitiveCompare($1.displayName(for: language)) == .orderedAscending
+            }
+        case .title:
+            return games.sorted {
+                $0.displayName(for: language).localizedCaseInsensitiveCompare($1.displayName(for: language)) == .orderedAscending
+            }
         }
     }
 }
@@ -50,13 +97,21 @@ enum ShareCardLayout {
     static let headerHeightPhone: CGFloat = 300
     static let headerHeightDesktop: CGFloat = 240
 
-    // MARK: 总览图：列数随数量自适应（少量选大格、上百款自动密排，画布高度可控）
+    // MARK: 总览图：列数随数量与画幅自适应
 
     static func overviewColumns(gameCount: Int, size: ShareSize) -> Int {
         switch size {
         case .phone:
             if gameCount <= 4 { return 2 }
             if gameCount <= 15 { return 3 }
+            return 4
+        case .portrait:
+            if gameCount <= 4 { return 2 }
+            if gameCount <= 12 { return 3 }
+            return 4
+        case .square:
+            if gameCount <= 4 { return 2 }
+            if gameCount <= 9 { return 3 }
             return 4
         case .desktop:
             if gameCount <= 8 { return 4 }
@@ -71,8 +126,8 @@ enum ShareCardLayout {
     }
 
     static func overviewCaptionHeight(size: ShareSize) -> CGFloat {
-        let rowHeight: CGFloat = size == .phone ? 26 : 22
-        let nameBlock: CGFloat = size == .phone ? 56 : 51
+        let rowHeight: CGFloat = (size == .phone || size == .portrait) ? 26 : 22
+        let nameBlock: CGFloat = (size == .phone || size == .portrait) ? 56 : 51
         return nameBlock + CGFloat(tileFieldRows()) * rowHeight
     }
 
@@ -82,23 +137,32 @@ enum ShareCardLayout {
         return CGSize(width: width, height: width * 3 / 2 + overviewCaptionHeight(size: size))
     }
 
+    static func headerHeight(size: ShareSize) -> CGFloat {
+        switch size {
+        case .phone: return headerHeightPhone
+        case .portrait: return 260
+        case .square: return 220
+        case .desktop: return headerHeightDesktop
+        }
+    }
+
     static func overviewSize(gameCount: Int, size: ShareSize) -> CGSize {
         let count = max(gameCount, 1)
         let columns = overviewColumns(gameCount: count, size: size)
         let rows = Int(ceil(Double(count) / Double(columns)))
         let cell = overviewCellWidth(columns: columns, size: size)
-        let header = size == .phone ? headerHeightPhone : headerHeightDesktop
+        let header = headerHeight(size: size)
         let height = header + CGFloat(rows) * cell.height + CGFloat(rows - 1) * gap + gap
         return CGSize(width: size.pixels.width, height: height)
     }
 
-    // MARK: 分组分享卡布局（竖版 3 列 / 横版 5 列，超出按内容拉高画布）
+    // MARK: 分组分享卡布局（横版 5 列，非横版 3 列，超出按内容拉高画布）
 
     static let groupColumnsPhone: Int = 3
     static let groupColumnsDesktop: Int = 5
 
     static func groupTileWidth(size: ShareSize) -> CGFloat {
-        if size == .phone {
+        if size != .desktop {
             return (size.pixels.width - 2 * 72 - CGFloat(groupColumnsPhone - 1) * 24) / CGFloat(groupColumnsPhone)
         }
         return 160
@@ -110,7 +174,7 @@ enum ShareCardLayout {
     }
 
     static func groupRows(gameCount: Int, size: ShareSize) -> Int {
-        let columns = size == .phone ? groupColumnsPhone : groupColumnsDesktop
+        let columns = size == .desktop ? groupColumnsDesktop : groupColumnsPhone
         return Int(ceil(Double(max(gameCount, 1)) / Double(columns)))
     }
 
@@ -141,17 +205,17 @@ enum ShareCardLayout {
             return CGSize(width: size.pixels.width,
                           height: max(size.pixels.height, fixed + gamesHeight + platformHeight))
         }
-        // 手机分支
-        let rows = gameCount == 0 ? 0 : groupRows(gameCount: n, size: .phone)
+        // 竖版及方版分支
+        let rows = gameCount == 0 ? 0 : groupRows(gameCount: n, size: size)
         let gamesHeight: CGFloat = rows == 0
             ? 0
-            : CGFloat(rows) * groupCellHeight(size: .phone) + CGFloat(rows - 1) * 24
+            : CGFloat(rows) * groupCellHeight(size: size) + CGFloat(rows - 1) * 24
         let platformHeight: CGFloat = platformCount == 0
             ? 0
             // 「按平台分布」标签行(~66) + 条形区。
             : 66 + CGFloat(platformCount) * 40 + CGFloat(max(platformCount - 1, 0)) * 20
         // 固定部分估算：顶/标题(2行)/引言/统计块(默认全开)/平台标签/弹性间距保底值/水印。
-        let fixed: CGFloat = 1080
+        let fixed: CGFloat = size == .square ? 920 : (size == .portrait ? 1000 : 1080)
         let contentHeight = fixed + platformHeight + gamesHeight
         return CGSize(width: size.pixels.width, height: max(size.pixels.height, contentHeight))
     }
@@ -252,7 +316,21 @@ enum ShareGroupStatsConfig {
     }
 }
 
-// MARK: - 主题（品牌化固定深色，不再跟随系统）
+// MARK: - 主题（支持经典暗金与雪岭纯白）
+
+enum ShareThemeMode: String, CaseIterable, Identifiable {
+    case brandDark
+    case editorialLight
+
+    var id: String { rawValue }
+
+    var theme: ShareTheme {
+        switch self {
+        case .brandDark: return .brand
+        case .editorialLight: return .editorialLight
+        }
+    }
+}
 
 struct ShareTheme {
     let background: Color
@@ -261,15 +339,28 @@ struct ShareTheme {
     let secondary: Color
     let accent: Color
     let separator: Color
+    var isDark: Bool = true
 
-    /// 固定深色品牌主题：暖调近黑底 + 琥珀橙强调（沿用原深色主题 accent）。
+    /// 经典暗金主题：暖调近黑底 + 琥珀橙强调。
     static let brand = ShareTheme(
         background: BrandPalette.background,
         surface: BrandPalette.surface,
         text: Color(white: 0.95),
         secondary: Color(white: 0.60),
         accent: BrandPalette.accent,
-        separator: Color(white: 0.22)
+        separator: Color(white: 0.22),
+        isDark: true
+    )
+
+    /// 雪岭纯白主题：温润白灰底 + 纯白卡片 + 深炭黑文字 + 琥珀橙强调。
+    static let editorialLight = ShareTheme(
+        background: Color(red: 0.965, green: 0.965, blue: 0.972),
+        surface: Color.white,
+        text: Color(red: 0.12, green: 0.12, blue: 0.14),
+        secondary: Color(red: 0.48, green: 0.49, blue: 0.52),
+        accent: Color(red: 0.92, green: 0.46, blue: 0.10),
+        separator: Color(red: 0.86, green: 0.87, blue: 0.89),
+        isDark: false
     )
 }
 
@@ -451,8 +542,10 @@ struct ShareCardView: View {
         switch content {
         case .single(let game, let size):
             switch size {
-            case .phone: SingleCardVertical(game: game, theme: theme)
-            case .desktop: SingleCardHorizontal(game: game, theme: theme)
+            case .desktop:
+                SingleCardHorizontal(game: game, theme: theme)
+            case .phone, .portrait, .square:
+                SingleCardVertical(game: game, theme: theme, size: size)
             }
         case .overview(let games, let title, let size):
             OverviewCard(games: games, title: title, size: size, theme: theme)
@@ -611,8 +704,7 @@ private struct ScoreRow: View {
     }
 }
 
-/// 库分右上角胶囊：仿真玻璃（分享卡经 ImageRenderer 出图，`.glassEffect` 在渲染管线中
-/// 不产出内容——实测整枚胶囊消失；用半透明深底 + 高光描边在模糊垫底上呈现玻璃质感）。
+/// 库分右上角胶囊：仿真玻璃质感（自适应深浅主题）。
 private struct ScoreCapsule: View {
     let game: Game
     let theme: ShareTheme
@@ -623,43 +715,82 @@ private struct ScoreCapsule: View {
             Text(verbatim: String(format: "%.1f", score))
                 .font(.system(size: fontSize, weight: .bold))
                 .monospacedDigit()
-                .foregroundStyle(.white)
+                .foregroundStyle(theme.isDark ? .white : theme.text)
                 .padding(.horizontal, fontSize * 0.55)
                 .frame(height: fontSize * 1.6)
-                .background(Capsule().fill(Color.black.opacity(0.38)))
-                .overlay(Capsule().stroke(Color.white.opacity(0.16), lineWidth: 1))
-                .shadow(color: .black.opacity(0.3), radius: 8, y: 2)
+                .background(Capsule().fill(theme.isDark ? Color.black.opacity(0.38) : Color.white.opacity(0.92)))
+                .overlay(Capsule().stroke(theme.isDark ? Color.white.opacity(0.16) : Color.black.opacity(0.08), lineWidth: 1))
+                .shadow(color: Color.black.opacity(theme.isDark ? 0.3 : 0.08), radius: 8, y: 2)
         }
     }
 }
 
-// MARK: - 单卡 · 竖版 9:16
+// MARK: - 单卡 · 竖版 / 社交版 / 方版
 
 private struct SingleCardVertical: View {
     let game: Game
     let theme: ShareTheme
+    var size: ShareSize = .phone
+
+    private var isSquare: Bool { size == .square }
+    private var isPortrait: Bool { size == .portrait }
+
+    private var posterMaxHeight: CGFloat {
+        if isSquare { return 520 }
+        if isPortrait { return 660 }
+        return 990
+    }
+    private var posterMaxWidth: CGFloat {
+        if isSquare { return 460 }
+        if isPortrait { return 560 }
+        return 720
+    }
+    private var topPadding: CGFloat {
+        if isSquare { return 36 }
+        if isPortrait { return 48 }
+        return 72
+    }
+    private var titleSize: CGFloat {
+        if isSquare { return 50 }
+        if isPortrait { return 58 }
+        return 66
+    }
+    private var horizontalPadding: CGFloat {
+        if isSquare { return 52 }
+        if isPortrait { return 56 }
+        return 64
+    }
+    private var bottomPadding: CGFloat {
+        if isSquare { return 32 }
+        if isPortrait { return 38 }
+        return 46
+    }
 
     var body: some View {
         ZStack {
             BlurredCoverBackdrop(game: game, theme: theme)
 
-            // 清晰海报：上部居中，框贴合封面真实比例（上限宽 720 / 高 990），任何比例都满框无留白。
+            // 清晰海报：上部居中，框贴合封面真实比例，任何比例都满框无留白，配高级高光微描边。
             CoverImage(game: game, theme: theme, mode: .fit)
                 .aspectRatio(coverAspect(game), contentMode: .fit)
-                .frame(maxWidth: 720, maxHeight: 990)
-                .clipShape(RoundedRectangle(cornerRadius: 26))
-                .shadow(color: .black.opacity(0.5), radius: 30, y: 12)
-                .padding(.top, 72)
+                .frame(maxWidth: posterMaxWidth, maxHeight: posterMaxHeight)
+                .clipShape(RoundedRectangle(cornerRadius: isSquare ? 18 : 26))
+                .overlay(
+                    RoundedRectangle(cornerRadius: isSquare ? 18 : 26)
+                        .stroke(theme.isDark ? Color.white.opacity(0.14) : Color.black.opacity(0.08), lineWidth: 1.5)
+                )
+                .shadow(color: .black.opacity(theme.isDark ? 0.5 : 0.18), radius: 26, y: 10)
+                .padding(.top, topPadding)
                 .frame(maxHeight: .infinity, alignment: .top)
 
-            ScoreCapsule(game: game, theme: theme, fontSize: 50)
-                .padding(32)
+            ScoreCapsule(game: game, theme: theme, fontSize: isSquare ? 40 : (isPortrait ? 44 : 50))
+                .padding(isSquare ? 24 : 32)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
 
             // 信息面板贴底。
             VStack(alignment: .leading, spacing: 0) {
                 Text(verbatim: game.displayName(for: language))
-                    .font(.system(size: 66, weight: .bold))
+                    .font(.system(size: titleSize, weight: .bold))
                     .foregroundStyle(theme.text)
                     .lineLimit(2)
 
@@ -667,46 +798,49 @@ private struct SingleCardVertical: View {
                     Text(verbatim: game.platformList
                         .map { Presets.display($0, category: .platform, language: language) }
                         .joined(separator: " · "))
-                        .font(.system(size: 29, weight: .medium))
+                        .font(.system(size: isSquare ? 23 : 27, weight: .medium))
                         .foregroundStyle(theme.secondary)
                         .lineLimit(2)
-                        .padding(.top, 16)
+                        .padding(.top, isSquare ? 10 : 14)
                 }
 
-                MetaLine(game: game, theme: theme, fontSize: 27)
-                    .padding(.top, 12)
+                MetaLine(game: game, theme: theme, fontSize: isSquare ? 22 : 25)
+                    .padding(.top, isSquare ? 8 : 10)
 
                 if game.isCompletedOrLongRunning {
-                    DegreePill(game: game, theme: theme, fontSize: 24)
-                        .padding(.top, 18)
+                    DegreePill(game: game, theme: theme, fontSize: isSquare ? 20 : 23)
+                        .padding(.top, isSquare ? 12 : 16)
                 }
 
                 if !game.reviewTitle.isEmpty {
                     Text(verbatim: game.reviewTitle)
-                        .font(.system(size: 33, weight: .medium))
+                        .font(.system(size: isSquare ? 26 : 30, weight: .medium))
                         .foregroundStyle(theme.accent)
-                        .lineLimit(3)
-                        .padding(.top, 24)
+                        .lineLimit(2)
+                        .padding(.top, isSquare ? 16 : 20)
                 }
 
                 if game.isCompletedOrLongRunning {
-                    DimensionBars(game: game, theme: theme, labelSize: 24, valueSize: 26, barHeight: 11)
-                        .padding(.top, 28)
-                    ScoreRow(game: game, theme: theme, numberSize: 86)
-                        .padding(.vertical, 30)
+                    DimensionBars(game: game, theme: theme,
+                                  labelSize: isSquare ? 20 : 23,
+                                  valueSize: isSquare ? 22 : 25,
+                                  barHeight: isSquare ? 9 : 11)
+                        .padding(.top, isSquare ? 18 : 24)
+                    ScoreRow(game: game, theme: theme, numberSize: isSquare ? 68 : (isPortrait ? 76 : 86))
+                        .padding(.vertical, isSquare ? 20 : 26)
                 } else {
                     StatusHeroBadge(game: game, theme: theme)
-                        .padding(.top, 34)
-                        .padding(.bottom, 24)
+                        .padding(.top, isSquare ? 22 : 30)
+                        .padding(.bottom, isSquare ? 16 : 20)
                 }
 
-                BrandWatermark(theme: theme, fontSize: 25)
+                BrandWatermark(theme: theme, fontSize: isSquare ? 21 : 24)
             }
-            .padding(.horizontal, 64)
-            .padding(.bottom, 46)
+            .padding(.horizontal, horizontalPadding)
+            .padding(.bottom, bottomPadding)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
         }
-        .frame(width: 1080, height: 1920)
+        .frame(width: size.pixels.width, height: size.pixels.height)
         .background(theme.background)
     }
 
@@ -724,12 +858,16 @@ private struct SingleCardHorizontal: View {
             BlurredCoverBackdrop(game: game, theme: theme)
 
             HStack(spacing: 0) {
-                // 左：清晰海报，框贴合封面真实比例。
+                // 左：清晰海报，框贴合封面真实比例，配高级高光微描边。
                 CoverImage(game: game, theme: theme, mode: .fit)
                     .aspectRatio(coverAspect(game), contentMode: .fit)
                     .frame(maxHeight: 920)
                     .clipShape(RoundedRectangle(cornerRadius: 24))
-                    .shadow(color: .black.opacity(0.5), radius: 26, y: 10)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 24)
+                            .stroke(theme.isDark ? Color.white.opacity(0.14) : Color.black.opacity(0.08), lineWidth: 1.5)
+                    )
+                    .shadow(color: .black.opacity(theme.isDark ? 0.5 : 0.16), radius: 26, y: 10)
                     .padding(.leading, 84)
 
                 // 右：信息栏。内容顶对齐海报上缘，水印钉在栏底。
@@ -814,7 +952,7 @@ private struct OverviewCard: View {
         ShareCardLayout.overviewCellWidth(columns: columns, size: size)
     }
     private var headerHeight: CGFloat {
-        size == .phone ? ShareCardLayout.headerHeightPhone : ShareCardLayout.headerHeightDesktop
+        ShareCardLayout.headerHeight(size: size)
     }
     private var rows: Int { Int(ceil(Double(max(games.count, 1)) / Double(columns))) }
 
@@ -944,6 +1082,10 @@ private struct OverviewCell: View {
             .frame(width: cellSize.width, height: cellSize.width * 3 / 2)
             .background(theme.surface)
             .clipShape(RoundedRectangle(cornerRadius: 14))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14)
+                    .stroke(theme.isDark ? Color.white.opacity(0.12) : Color.black.opacity(0.06), lineWidth: 1)
+            )
 
             Text(verbatim: game.displayName(for: language))
                 .font(.system(size: nameSize, weight: .semibold))
@@ -1393,6 +1535,10 @@ private struct GroupGameTile: View {
             .frame(width: tileSize, height: tileSize * 3 / 2)
             .background(theme.surface)
             .clipShape(RoundedRectangle(cornerRadius: 10))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(theme.isDark ? Color.white.opacity(0.12) : Color.black.opacity(0.06), lineWidth: 1)
+            )
 
             Text(verbatim: game.displayName(for: language))
                 .font(.system(size: nameSize, weight: .medium))
