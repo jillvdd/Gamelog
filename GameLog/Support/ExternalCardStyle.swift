@@ -38,7 +38,20 @@ enum ExternalCardStyle {
     /// `trailingPlaceholder` 这个参数连同它存在的理由一并删除。
     /// 收窄的另一半动机是「密度」而不是「宽度」本身：510 的卡里「环 + 两行数字」右侧
     /// 空着一大片（用户：「playstation 卡片的空白还是太多了」），2×2 正好把那片空白吃掉。
+    /// 三张卡的基准/默认宽度上限（单列堆叠或紧凑时）。
     static let maxWidth: CGFloat = 412
+
+    /// 弹性并排时单张卡片的最大允许宽度（避免在超大屏上过度拉伸造成留白稀疏）。
+    static let maxElasticWidth: CGFloat = 520
+
+    /// 计算给定容器宽度下的最佳卡片列宽（单列或双列自适应）。
+    static func columnWidth(for containerWidth: CGFloat) -> CGFloat {
+        if containerWidth >= twoUpMinWidth {
+            let twoColWidth = (containerWidth - columnSpacing) / 2
+            return min(maxElasticWidth, max(maxWidth, twoColWidth))
+        }
+        return min(containerWidth, maxWidth)
+    }
 
     /// 卡片**并排**时的列间距。
     static let columnSpacing: CGFloat = 16

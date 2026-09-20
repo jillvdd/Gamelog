@@ -19,7 +19,9 @@ struct ExternalSourceHeader: View {
     @Environment(\.appLanguageCode) private var language
 
     let brandName: String
-    /// 副标题（奖杯卡的 `PS3/PS4 · NPWR-08547`）。nil / 空 = 不渲染那一行。
+    /// 来源侧游戏原始标题。nil / 空 = 不渲染那一行。
+    var titleName: String?
+    /// 副标题（平台与编号，如 `PS3/PS4 · NPWR-08547`、`Xbox One` 或 `Nintendo Switch`）。nil / 空 = 不渲染那一行。
     var subtitle: String?
     /// 来源账号展示名。nil / 空 = 不渲染「来源：」。
     var sourceName: String?
@@ -29,6 +31,12 @@ struct ExternalSourceHeader: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(verbatim: brandName)
                     .font(.subheadline.weight(.semibold))
+                if let titleName, !titleName.isEmpty {
+                    Text(verbatim: titleName)
+                        .font(.subheadline)
+                        .foregroundStyle(.primary)
+                        .lineLimit(2)
+                }
                 if let subtitle, !subtitle.isEmpty {
                     Text(verbatim: subtitle)
                         .font(.caption)

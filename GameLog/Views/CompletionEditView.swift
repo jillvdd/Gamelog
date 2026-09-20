@@ -180,6 +180,7 @@ struct CompletionEditView: View {
             newCompletion.game = game
             context.insert(newCompletion)
         }
+        try? context.save()
         dismiss()
     }
 }

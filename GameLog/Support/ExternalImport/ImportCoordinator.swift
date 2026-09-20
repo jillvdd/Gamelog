@@ -212,32 +212,36 @@ actor ImportCoordinator {
                     Self.detach(record, from: game, platformsByGame: &platformsByGame)
                     summary.ignored += 1
                 } else {
-                    // ① 已经绑着 —— **一律不动**。用户手动绑的固然不能动，自动绑的也不该被
-                    //    这一轮的运气改写（比如标题名变了导致这次匹配到别的 Game）。
+                    // ① 已经绑着 —— 一律不动。如果已绑的游戏尚未标记版本且记录为 Demo，补齐 demo 标记。
+                    if (record.versionType == .demo || record.versionType == .trial) && game.version == nil {
+                        game.version = .demo
+                    }
                     summary.alreadyLinked += 1
                     artworkTargets.append((game, dto.imageURLString, sourceTitleChanged))
                 }
             } else if record.isSkipped {
-                // ② 「这条别再进我的库」—— 用户的忽略，或**规则判决**（`storedSkipReason`）。
-                //
-                //    用户那一路：他说了「这条别再进我的库」，或者这条当时绑着的那个游戏被
-                //    用户删了（删除路径会把记录标成忽略）。不重建 —— 否则用户每同步一次就得删一次。
-                //
-                //    规则判决那一路（2026-09-18 新增）：Xbox 的「设备里没有主机 + 时长 0」。
-                //    记录连条目一起判掉，用户要的话可以手动绑回来（`isShownAsIgnored` 的说明）。
-                //
-                //    ⚠️ 判据是 `isSkipped` 而**不是** `isShownAsIgnored`：后者把体验版也
-                //    并了进来，而体验版有自己的第 ③ 档（那是用户看得见的回执，并进来会让
-                //    `excludedByVersion` 永远归零）。
-                //
-                //    ⚠️ 这一档是**可撤销**的：用户在记录面板点「恢复导入」会把标记清掉，
-                //    下一轮同步它就会重新走 ④⑤⑥。以前这个状态由「曾经绑过而现在没绑」隐式
-                //    推出来，于是用户点「解除关联」也会掉进这里、且永远出不来 —— 那正是
-                //    「关联 / 解除关联 / 不再导入」三件事糊成一团的根源。
+                // ② 「这条别再进我的库」—— 用户的忽略，或规则判决（storedSkipReason）。
                 summary.ignored += 1
-            } else if !GameLinker.allowsAutoMatching(record.versionType) {
-                // ③ 体验版/试玩版：入库留档，但不进游戏库。
-                summary.excludedByVersion += 1
+            } else if dto.versionType == .demo || dto.versionType == .trial {
+                // ③ 体验版/试玩版：独立建库并标记为 .demo（不自动合并入未标记的正规完整游戏）。
+                if let (index, _) = GameLinker.match(dto, among: candidates),
+                   candidateGames[index].version == .demo {
+                    let game = candidateGames[index]
+                    Self.link(record, to: game, titleId: titleId, conceptId: dto.conceptId,
+                              candidates: &candidates, index: index)
+                    summary.autoLinked += 1
+                    artworkTargets.append((game, dto.imageURLString, sourceTitleChanged))
+                } else if autoCreateGames {
+                    let game = Self.makeGame(from: dto, sourceLocale: sourceLocale, now: now)
+                    modelContext.insert(game)
+                    candidateGames.append(game)
+                    candidates.append(GameLinker.LinkCandidate(names: Self.matchNames(of: game),
+                                                               clues: [GameLinker.Clue(titleId: titleId, conceptId: dto.conceptId)]))
+                    Self.link(record, to: game, titleId: titleId, conceptId: dto.conceptId,
+                              candidates: &candidates, index: candidates.count - 1)
+                    summary.createdGames += 1
+                    artworkTargets.append((game, dto.imageURLString, sourceTitleChanged))
+                }
             } else if let (index, _) = GameLinker.match(dto, among: candidates) {
                 // ④ 强键命中现有 Game。
                 let game = candidateGames[index]
@@ -522,8 +526,10 @@ actor ImportCoordinator {
                                  sourceLocale: String, now: Date) -> Game {
         // 主名先留空：来源标题该落在哪个名字槽由 `applyTitleLanguage` 决定，
         // 中日文标题不该在 `name` 里也留一份（见那个函数的注释）。
+        let version: GameVersion? = (dto.versionType == .demo || dto.versionType == .trial) ? .demo : nil
         let game = Game(name: "", platform: dto.platform,
-                        createdAt: now, status: .unclassified, isAutoCreated: true)
+                        createdAt: now, status: .unclassified, isAutoCreated: true,
+                        version: version)
         applyTitleLanguage(game, title: dto.titleName, sourceLocale: sourceLocale)
         return game
     }

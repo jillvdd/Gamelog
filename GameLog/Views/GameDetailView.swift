@@ -440,6 +440,7 @@ struct GameDetailView: View {
             // 与上面同一条 guard 纪律，读已销毁模型的 `displayName` 同样是 fatal。
             let account = record.account
             return TrophySource(id: record.persistentModelID,
+                                titleName: record.titleName,
                                 progress: progress,
                                 accountName: (account?.isLive == true) ? account?.displayName : nil,
                                 platformText: record.psnPlatformDisplay,
@@ -465,6 +466,7 @@ struct GameDetailView: View {
     /// 持有引用就会在下一帧读已销毁模型（判据见 `Game.isLive`）。`id` 只用来给 `ForEach` 定序。
     private struct TrophySource: Identifiable {
         let id: PersistentIdentifier
+        let titleName: String
         let progress: TrophyProgress
         let accountName: String?
         /// 来源给的**平台列表**（`PS3/PS4`）—— 见 `ExternalGameRecord.psnPlatformDisplay`。
@@ -497,7 +499,9 @@ struct GameDetailView: View {
             // 与 `trophySources` 同一条 guard 纪律，读已销毁模型的 `displayName` 同样是 fatal。
             let account = record.account
             return PlayActivitySource(id: record.persistentModelID,
+                                      titleName: record.titleName,
                                       accountName: (account?.isLive == true) ? account?.displayName : nil,
+                                      platformText: record.platform.isEmpty ? nil : record.platform,
                                       titleId: record.titleId,
                                       firstPlayedAt: record.firstPlayedAt,
                                       lastPlayedAt: record.lastPlayedAt,
@@ -514,7 +518,10 @@ struct GameDetailView: View {
     /// 游玩记录卡的来源数据（版式见 `PlayActivityView`）。值类型、不持有 `@Model`，理由同 `TrophySource`。
     private struct PlayActivitySource: Identifiable {
         let id: PersistentIdentifier
+        let titleName: String
         let accountName: String?
+        /// 平台名（如「Nintendo Switch」）。
+        let platformText: String?
         /// 来源侧标题 ID。**不上屏**（16 位十六进制，用户认不出来），只用于同分时的稳定排序。
         let titleId: String
         let firstPlayedAt: Date?
@@ -543,6 +550,7 @@ struct GameDetailView: View {
             // 与 `trophySources` 同一条 guard 纪律，读已销毁模型的 `displayName` 同样是 fatal。
             let account = record.account
             return XboxSource(id: record.persistentModelID,
+                              titleName: record.titleName,
                               accountName: (account?.isLive == true) ? account?.displayName : nil,
                               achievements: record.achievements,
                               platformText: record.xboxPlatformDisplay,
@@ -561,6 +569,7 @@ struct GameDetailView: View {
     /// 成就卡的来源数据（版式见 `XboxAchievementView`）。值类型、不持有 `@Model`，理由同 `TrophySource`。
     private struct XboxSource: Identifiable {
         let id: PersistentIdentifier
+        let titleName: String
         let accountName: String?
         /// 成就进度。nil = 这条记录没有成就数据（卡片两格显示 `—`）。
         let achievements: AchievementProgress?
@@ -682,6 +691,7 @@ struct GameDetailView: View {
     @ViewBuilder
     private func externalActivitySection(width: CGFloat) -> some View {
         let items = externalCardItems
+        let colWidth = ExternalCardStyle.columnWidth(for: width)
         if items.count > 1, width >= ExternalCardStyle.twoUpMinWidth {
             // 外层这个 `VStack(spacing: 28)` 不会改变间距：页面那个
             // `VStack(alignment: .leading, spacing: 28)` 里，卡片本来就是这个间距，
@@ -689,23 +699,15 @@ struct GameDetailView: View {
             VStack(alignment: .leading, spacing: 28) {
                 ForEach(Self.cardRows(items)) { row in
                     HStack(alignment: .top, spacing: ExternalCardStyle.columnSpacing) {
-                        ForEach(row.items) { externalCard($0) }
+                        ForEach(row.items) { externalCard($0, cardWidth: colWidth) }
                     }
                     // 行**自己**铺满整宽，余量落到右边、卡片保持左对齐 —— 与堆叠版式一致。
-                    //
-                    // ⚠️ 这里**不能**改用尾巴上的 `Spacer(minLength: 0)`（2026-09-18 修的 bug）：
-                    // `HStack` 的 `spacing` 是按**子视图个数**算的，那个 `Spacer` 也是一个子视图，
-                    // 于是两张卡之间被插了**两段** 16pt，每张卡只剩 (840 − 32) ÷ 2 = **404**，
-                    // 而单列时是 412 —— 用户在并排阈值那个窗口下正好看到「单列卡比并排宽一点点」。
-                    // 用 `frame(maxWidth:)` 铺行的话行里只有卡片子视图，间距只算一次。
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
         } else {
-            // ⚠️ 这里**不能**也包一层 `VStack`：一条记录都没有时，那个空 `VStack` 会成为
-            // 页面的一个子视图，凭空白占 28pt 间距（页面的 spacing 按子视图个数算）。
-            // `ForEach` 直接向外交卡片，与旧版逐字一致。
-            ForEach(items) { externalCard($0) }
+            // 单列堆叠分支：卡片在宽度允许范围内自适应撑开
+            ForEach(items) { externalCard($0, cardWidth: colWidth) }
         }
     }
 
@@ -775,27 +777,34 @@ struct GameDetailView: View {
     /// 画一张卡。三种卡的入参各自取自上面那三个来源数组 —— 这里**只转发、不做判断**，
     /// 入场判据与排序都在各自的 `xxxSources` 里。
     @ViewBuilder
-    private func externalCard(_ item: ExternalCardItem) -> some View {
+    private func externalCard(_ item: ExternalCardItem, cardWidth: CGFloat? = nil) -> some View {
         switch item {
         case .trophy(let source):
             TrophyProgressView(progress: source.progress,
                                sourceName: source.accountName,
+                               titleName: source.titleName,
                                platformText: source.platformText,
                                titleCode: source.titleCode,
                                firstPlayedAt: source.firstPlayedAt,
                                lastPlayedAt: source.lastPlayedAt,
-                               hours: source.hours)
+                               hours: source.hours,
+                               cardWidth: cardWidth)
         case .xbox(let source):
             XboxAchievementView(achievements: source.achievements,
                                 sourceName: source.accountName,
+                                titleName: source.titleName,
                                 platformText: source.platformText,
                                 lastPlayedAt: source.lastPlayedAt,
-                                hours: source.hours)
+                                hours: source.hours,
+                                cardWidth: cardWidth)
         case .playActivity(let source):
             PlayActivityView(sourceName: source.accountName,
+                             titleName: source.titleName,
+                             platformText: source.platformText,
                              firstPlayedAt: source.firstPlayedAt,
                              lastPlayedAt: source.lastPlayedAt,
-                             hours: source.hours)
+                             hours: source.hours,
+                             cardWidth: cardWidth)
         }
     }
 
@@ -1074,6 +1083,7 @@ struct GameDetailView: View {
                     // 纵深守卫：这条记录可能在确认框弹出后被别处删掉（见 `Completion.isLive`）。
                     if let completion = pendingDeleteCompletion, completion.isLive {
                         context.delete(completion)
+                        try? context.save()
                     }
                 }
             ]
@@ -1093,6 +1103,7 @@ struct GameDetailView: View {
                     // （见 `GameMerger.ignoreRecords`）。
                     GameMerger.ignoreRecords(linkedTo: game, in: context)
                     context.delete(game)
+                    try? context.save()
                     // 缓存 key = persistentModelID+字段，pk 删除后可能被新插入行重用——
                     // 不清缓存旧图会贴到新游戏上（2026-09-05 审计）。
                     ImageDecodeCache.bump()
@@ -1185,10 +1196,8 @@ struct GameDetailView: View {
                 }
             }
             #else
-            // iPad 宽版式（需求④→用户追加竖屏同款，2026-09-05）：只要 iPad 且已评分，
-            // 横竖屏都把评分卡放信息右侧（macOS wideHeader 同款双栏）。竖屏有横幅时
-            // 信息列 ~378pt 容纳名字/元数据/状态滑块；未评分回落旧分支。iPhone 不变。
-            if iPadLayout.isPad, game.libraryScore != nil, !hideCover {
+            // iPad 宽版式（基于实测可用宽度 width >= 680，防止分屏/浮窗过窄时强行三栏挤扁）：
+            if iPadLayout.isPad, width >= 680, game.libraryScore != nil, !hideCover {
                 // 无横幅版式（无横向封面/无背景图）：封面 + 信息 + 评分卡三栏。
                 HStack(alignment: .top, spacing: 24) {
                     coverBlock
@@ -1197,20 +1206,20 @@ struct GameDetailView: View {
                         LocalizedNamesSubtitle(game: game, currentLanguage: language, font: .body)
                         metadataFlowRow
                         DetailStatusPicker(status: $detailStatus)
-                            .frame(maxWidth: 720, alignment: .leading)
+                            .frame(maxWidth: 640, alignment: .leading)
                     }
                     scoreCard
                     Spacer(minLength: 0)
                 }
-            } else if iPadLayout.isPad, game.libraryScore != nil {
-                // 有横幅（hideCover）：横幅已在 body 层铺满，信息 + 评分卡双栏。
+            } else if iPadLayout.isPad, width >= 580, game.libraryScore != nil {
+                // 有横幅（hideCover）或中等宽度：横幅已在 body 层铺满，信息 + 评分卡双栏。
                 HStack(alignment: .top, spacing: 24) {
                     VStack(alignment: .leading, spacing: 12) {
                         nameRow
                         LocalizedNamesSubtitle(game: game, currentLanguage: language, font: .body)
                         metadataFlowRow
                         DetailStatusPicker(status: $detailStatus)
-                            .frame(maxWidth: 720, alignment: .leading)
+                            .frame(maxWidth: 640, alignment: .leading)
                     }
                     scoreCard
                     Spacer(minLength: 0)
@@ -1264,34 +1273,30 @@ struct GameDetailView: View {
         .frame(width: width, height: imageHeight)
     }
 
-    /// macOS 宽窗头部（2026-08-26 用户定稿）：封面单独在顶带（右移 48pt、左右全留白）；
-    /// 名字/其他语言名/元数据行贴内容左缘；评分卡在名字块右侧、顶端与游戏名平齐；
-    /// 状态滑块限宽 720 独占一行（在左列内、元数据下方）。未评分（想玩等）不渲染评分卡。
-    /// 左列字号/间距按「与右侧评分卡视觉平衡」调校：名字 30pt、行距 12/8。
-    /// 2026-08-27 追加：已设背景图时顶带换为 heroBanner——hero 作无虚化背景铺满横幅、
-    /// 位于名字行与评分卡上方；同设 Logo 时横幅前景以 Logo 替代 2:3 封面。
+    /// macOS 宽窗头部：
+    /// - 无背景图时：左侧竖版封面 + 中间名字/别名/元数据/状态滑块 + 右侧评分卡（经典主机媒体横向看板，不再有孤立顶带）。
+    /// - 已设背景图时：heroBanner 已在顶带铺满视口，下方信息列在左、评分卡在右。
     @ViewBuilder
     private func wideHeader(width: CGFloat, hideCoverBand: Bool) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            if !hideCoverBand {
-                coverBlock
-                    .padding(.leading, 48)
-            }
-
             HStack(alignment: .top, spacing: 24) {
+                if !hideCoverBand {
+                    coverBlock
+                }
+
                 VStack(alignment: .leading, spacing: 12) {
                     nameRow
                     LocalizedNamesSubtitle(game: game, currentLanguage: language, font: .body)
                     metadataFlowRow
+                    DetailStatusPicker(status: $detailStatus)
+                        .frame(maxWidth: 640, alignment: .leading)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
                 if game.libraryScore != nil {
                     scoreCard
                 }
-                Spacer(minLength: 0)
             }
-
-            DetailStatusPicker(status: $detailStatus)
-                .frame(maxWidth: 720, alignment: .leading)
         }
     }
 
@@ -1663,11 +1668,11 @@ struct GameDetailView: View {
             if hasReview {
                 wideContent(contentWidth: min(1500, width) - 56)
             } else {
-                completionsSection
+                completionsSection(twoColumn: true)
             }
         } else {
             reviewSection
-            completionsSection
+            completionsSection(twoColumn: false)
         }
     }
 
@@ -1737,13 +1742,13 @@ struct GameDetailView: View {
                 }
             }
             .frame(width: max(340, contentWidth * 0.58), alignment: .leading)
-            completionsSection
+            completionsSection(twoColumn: false)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
     @ViewBuilder
-    private var completionsSection: some View {
+    private func completionsSection(twoColumn: Bool = false) -> some View {
         // 已通关/长线游玩显示通关记录区；想玩等在玩轻量状态隐藏（数据保留，切回已通关恢复显示）。
         // 用本地 detailStatus 即时反映点击，避免依赖 game.statusValue（模型写入延后到 onDisappear）。
         if detailStatus.isCompletedOrLongRunning {
@@ -1765,6 +1770,16 @@ struct GameDetailView: View {
                 if game.sortedCompletions.isEmpty {
                     LText("library.noResult")
                         .foregroundStyle(.secondary)
+                } else if twoColumn && game.sortedCompletions.count > 1 {
+                    LazyVGrid(columns: [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)], spacing: 16) {
+                        ForEach(game.sortedCompletions) { completion in
+                            CompletionCardView(
+                                completion: completion,
+                                onEdit: { editingCompletion = completion },
+                                onDelete: { pendingDeleteCompletion = completion }
+                            )
+                        }
+                    }
                 } else {
                     ForEach(game.sortedCompletions) { completion in
                         CompletionCardView(

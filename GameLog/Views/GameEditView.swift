@@ -230,6 +230,9 @@ struct GameEditView: View {
     @State private var groupIDs: Set<PersistentIdentifier> = []
     /// 状态机状态（想玩/在玩等轻量状态新建时无需通关记录与评分）。
     @State private var status = GameStatus.completed
+    /// 游戏版本选项（默认关闭；开启后选 demo 或 other）。
+    @State private var hasCustomVersion = false
+    @State private var customVersion: GameVersion = .demo
 
     // 首条通关记录（仅新建时）
     @State private var platform = Presets.platforms[0]
@@ -306,6 +309,19 @@ struct GameEditView: View {
                     collapsible: true,
                     value: $platform
                 )
+                Toggle(L10n.tr("game.version.enable", lang: language), isOn: $hasCustomVersion)
+                if hasCustomVersion {
+                    Picker(L10n.tr("game.version.title", lang: language), selection: $customVersion) {
+                        ForEach(GameVersion.allCases) { v in
+                            Text(verbatim: L10n.tr(v.labelKey, lang: language)).tag(v)
+                        }
+                    }
+                    #if os(macOS)
+                    .pickerStyle(.segmented)
+                    #else
+                    .pickerStyle(.menu)
+                    #endif
+                }
                 if status != .completed {
                     LText("game.statusHint")
                         .font(.caption)
@@ -643,6 +659,8 @@ struct GameEditView: View {
         aliases = game.aliases
         nameZh = game.nameZh ?? ""
         nameJa = game.nameJa ?? ""
+        hasCustomVersion = game.version != nil
+        customVersion = game.version ?? .demo
         hasReleaseDate = game.releaseDate != nil
         releaseDate = game.releaseDate ?? Date()
         developer = game.developer ?? ""
@@ -799,7 +817,8 @@ struct GameEditView: View {
                 // 与上方校验同口径：入库用 trim 后的标题（iOS 编辑 sheet / 写字台保存也是 trim 口径）。
                 reviewTitle: reviewTitle.trimmingCharacters(in: .whitespaces),
                 reviewBody: reviewBody,
-                status: status
+                status: status,
+                version: hasCustomVersion ? customVersion : nil
             )
             context.insert(newGame)
             newGame.groups = allGroups.filter { groupIDs.contains($0.persistentModelID) }
@@ -855,6 +874,7 @@ struct GameEditView: View {
             game.nameZh = nameZhTrimmed.isEmpty ? nil : nameZhTrimmed
             game.nameJa = nameJaTrimmed.isEmpty ? nil : nameJaTrimmed
             game.statusValue = status
+            game.version = hasCustomVersion ? customVersion : nil
             game.platform = platform
             game.aliases = aliases
             game.releaseDate = hasReleaseDate ? releaseDate : nil
@@ -873,6 +893,7 @@ struct GameEditView: View {
             game.groups = allGroups.filter { groupIDs.contains($0.persistentModelID) }
             game.updatedAt = .now
         }
+        try? context.save()
         // 图片可能已变更（编辑写回 / 新建带图），解码缓存按模型 ID 做 key，需全量失效。
         ImageDecodeCache.bump()
         dismiss()

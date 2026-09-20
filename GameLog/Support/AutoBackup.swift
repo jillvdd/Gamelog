@@ -372,7 +372,7 @@ final class AutoBackup: ObservableObject {
         }
 
         // 1. 恢复前快照（throw 即中断，不再有"快照失败仍继续替换"）。
-        await onProgress(0.02)
+        onProgress(0.02)
         try await writeSnapshot(context: context)
 
         // 2. 后台 decode + 重建 + save。
@@ -380,7 +380,7 @@ final class AutoBackup: ObservableObject {
         //    导致 JSONDecoder throw（2026-09-18 真机复现）。挪进 Task.detached 后，decode 完
         //    data 即可被 ARC 释放，不再与 DTO 对象树同时压在内存里。
         //    step 3 需要的定制字段（username 等）从 task 里作为 tuple 返回。
-        await onProgress(0.05)
+        onProgress(0.05)
         let container = context.container
         typealias CustomizationFields = (username: String?, avatarBase64: String?, iconBase64: String?,
                                          bannerTitle: String?, bannerSubtitle: String?, bannerBackgroundBase64: String?)
@@ -397,7 +397,7 @@ final class AutoBackup: ObservableObject {
         }.value
 
         // 3. 主线程定制回写（DB 已落盘成功后才写文件/UserDefaults；写序不变量在内）。
-        await onProgress(0.93)
+        onProgress(0.93)
         try UserCustomization.applyCustomization(
             username: customization.username,
             avatarBase64: customization.avatarBase64,
@@ -411,12 +411,12 @@ final class AutoBackup: ObservableObject {
         ImageDecodeCache.bump()
 
         // 5. 主线程广播整库替换（观察者在主线程重置导航，防后台 post 跑错线程）。
-        await onProgress(0.97)
+        onProgress(0.97)
         NotificationCenter.default.post(name: UserCustomization.libraryReplacedNotification, object: nil)
 
         // 6. 先解锁再补一次自动备份：performWrite 被 isImporting 守卫拦住，
         // 必须解锁后才调；defer 的二次清零幂等无害。
-        await onProgress(1.0)
+        onProgress(1.0)
         isImporting = false
         importProgress = nil
         scheduleWrite()

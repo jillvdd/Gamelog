@@ -31,8 +31,10 @@ enum ArtworkKind: String, CaseIterable, Identifiable, Hashable {
 
     // MARK: - 表驱动配置
 
-    /// 编辑页标题 / Toggle 文案 key（如 game.square）。
-    var labelKey: String { "game.\(rawValue)" }
+    /// 编辑页标题 / Toggle 文案 key（如 game.cover / game.square）。
+    var labelKey: String {
+        self == .poster ? "game.cover" : "game.\(rawValue)"
+    }
 
     /// 搜索面板标题 key（cover.title / cover.titleSquare …）。
     var searchTitleKey: String {

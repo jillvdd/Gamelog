@@ -18,7 +18,9 @@ struct GameLogApp: App {
             LinkedAccount.self, ExternalGameRecord.self
         ])
         do {
+            PlatformMigration.sanitizeDefaultStore()
             let container = try ModelContainer(for: schema)
+            PlatformMigration.sanitizeDatabase(at: container.configurations.first?.url)
             // 平台旧名迁移：改写有副作用（fetch 全量实体 → save），挪到后台异步执行，
             // 避免大库冷启动在主线程同步遍历全部实体造成白屏卡顿（2026-09-18 iOS 真机问题）。
             // 迁移幂等：一次性 UserDefaults 闸门保证只跑一次，多次启动无害。

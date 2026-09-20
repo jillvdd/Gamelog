@@ -76,6 +76,15 @@ enum LogoBannerHorizontal: String, CaseIterable, Identifiable, LabelKeyed {
     var labelKey: String { "logo.horizontal.\(rawValue)" }
 }
 
+/// 游戏版本：普通完整版（默认无标记/nil）/ 试玩版（Demo）/ 其他（如 Apple Music 等软件、或 RetroArch 等侧载 homebrew）。
+enum GameVersion: String, CaseIterable, Identifiable, LabelKeyed {
+    case demo
+    case other
+
+    var id: String { rawValue }
+    var labelKey: String { "game.version.\(rawValue)" }
+}
+
 /// 一个游戏（库条目）。创建时带首条通关记录，之后可追加。
 /// 多语言名字：`name` 为英文名（必须、canonical），`nameZh`/`nameJa` 可选；
 /// 展示时按当前语言用 `displayName(for:)` 回退（中文→nameZh，日文→nameJa，其余→name；
@@ -122,8 +131,8 @@ final class Game {
     var logoSize: String = LogoBannerSize.medium.rawValue
     var logoVertical: String = LogoBannerVertical.bottom.rawValue
     var logoHorizontal: String = LogoBannerHorizontal.leading.rawValue
-    var reviewTitle: String
-    var reviewBody: String
+    var reviewTitle: String = ""
+    var reviewBody: String = ""
     var createdAt: Date
     /// 最近一次编辑时间（编辑详情保存时更新）；nil = 从未编辑（排序时退回 createdAt）。
     var updatedAt: Date?
@@ -139,6 +148,19 @@ final class Game {
     /// **用户一旦编辑过这个游戏，标记不撤销** —— 撤销与否由清理动作自己判断（见
     /// `ExternalAccountBinder.purgeImportedData`：有用户数据的一律保留）。
     var isAutoCreated: Bool = false
+
+    /// 版本类型（GameVersion.rawValue；nil 或空为标准完整版，"demo" 为试玩版，"other" 为其他软件/工具）。
+    var versionTypeRaw: String? = nil
+
+    var version: GameVersion? {
+        get {
+            guard let raw = versionTypeRaw, !raw.isEmpty else { return nil }
+            return GameVersion(rawValue: raw)
+        }
+        set {
+            versionTypeRaw = newValue?.rawValue
+        }
+    }
 
     @Relationship(deleteRule: .cascade, inverse: \Completion.game)
     var completions: [Completion]
@@ -169,7 +191,8 @@ final class Game {
          logoVertical: LogoBannerVertical = .bottom, logoHorizontal: LogoBannerHorizontal = .leading,
          reviewTitle: String = "", reviewBody: String = "",
          createdAt: Date = .now, status: GameStatus = .completed,
-         isFavorite: Bool = false, isAutoCreated: Bool = false) {
+         isFavorite: Bool = false, isAutoCreated: Bool = false,
+         version: GameVersion? = nil) {
         self.name = name
         self.nameZh = nameZh
         self.nameJa = nameJa
@@ -194,6 +217,7 @@ final class Game {
         self.status = status.rawValue
         self.isFavorite = isFavorite
         self.isAutoCreated = isAutoCreated
+        self.versionTypeRaw = version?.rawValue
         self.completions = []
         self.copies = []
         self.groups = []

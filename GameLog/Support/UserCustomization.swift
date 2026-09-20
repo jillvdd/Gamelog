@@ -52,6 +52,8 @@ enum UserCustomization {
     /// 取代了此前 macOS 的 `useGridView` Bool 与 iOS 的 `customization.iosLibraryViewMode` 两个键 ——
     /// 两个 Bool 表达不了三个状态（macOS 加方形网格后是 grid/squareGrid/list）。
     static let libraryViewModeKey = "customization.libraryViewMode"
+    /// 游戏库展示 Demo / 其他项目开关（默认开启，排序菜单底部切换，跨会话记忆）。
+    static let libraryShowDemosKey = "library.showDemos"
     /// **旧键，仅供迁移读取**：iOS 库视图三态。新写入一律走 `libraryViewModeKey`。
     /// LibraryView 首次读取时若新键为空，则由它（或 macOS 的 `useGridView`）折算一次并写上。
     /// 迁移后不再删除：删了也读不到值，且留着可让用户回退旧版本时不丢偏好。

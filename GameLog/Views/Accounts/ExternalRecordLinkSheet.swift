@@ -57,7 +57,7 @@ struct ExternalRecordLinkSheet: View {
     private var form: some View {
         Form {
             headerSection
-            if record.game != nil { currentLinkSection }
+            if let game = record.liveGame { currentLinkSection(game: game) }
             suggestionsSection
             browseSection
             ignoreSection
@@ -72,7 +72,7 @@ struct ExternalRecordLinkSheet: View {
         }
         .sheet(isPresented: $showingMerge) {
             // 只传 ID：合并面板里的 source 可能在同步/清空时被删（见 GameMergeSheet 的说明）。
-            if let source = record.game {
+            if let source = record.liveGame {
                 GameMergeSheet(sourceID: source.persistentModelID)
             }
         }
@@ -115,11 +115,40 @@ struct ExternalRecordLinkSheet: View {
         }
     }
 
-    private var currentLinkSection: some View {
-        Section {
-            LabeledContent(L10n.tr("account.link.current", lang: language)) {
-                Text(verbatim: record.game?.displayName(for: language) ?? "")
+    private func currentLinkSection(game: Game) -> some View {
+        let disp = game.displayName(for: language)
+        let english = game.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let hasEnglish = !english.isEmpty && english != disp
+        let platformName = Presets.display(game.platform, category: .platform, language: language)
+
+        return Section {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Image(systemName: "link")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Text(verbatim: disp)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(2)
+                }
+                HStack(spacing: 6) {
+                    Text(verbatim: platformName)
+                        .font(.caption2.weight(.medium))
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1.5)
+                        .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 3))
+                        .foregroundStyle(.secondary)
+                    if hasEnglish {
+                        Text(verbatim: english)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                }
             }
+            .padding(.vertical, 3)
+
             Button { unbind() } label: {
                 // 不是 `link.badge.plus`（那是「建立关联」的语义，写在「解除关联」上是反的）。
                 // SF Symbols 没有 `link.badge.minus`，用 `minus.circle` 表意。
@@ -130,6 +159,8 @@ struct ExternalRecordLinkSheet: View {
                 Label(L10n.tr("account.link.merge", lang: language), systemImage: "arrow.triangle.merge")
             }
             .appStandardButton()
+        } header: {
+            Text(verbatim: L10n.tr("account.link.current", lang: language))
         } footer: {
             LText("account.link.unbindHint")
         }
@@ -229,7 +260,7 @@ struct ExternalRecordLinkSheet: View {
     /// 已关联的那个要剔掉 —— 它是最容易命中「完全同名」的一条，可点它等于什么都没做
     /// （只把面板关掉），而真正该看的是别的候选。当前关联已经单列在上面那一段了。
     private var suggestions: [Game] {
-        let linked = record.game?.persistentModelID
+        let linked = record.liveGame?.persistentModelID
         return GameMerger.suggestions(for: record, among: liveGames)
             .filter { $0.persistentModelID != linked }
     }
@@ -248,7 +279,7 @@ struct ExternalRecordLinkSheet: View {
     /// 旧条目若是导入自动建的就永远留成一个空壳（用户报的「合并了但库里还是两条」）。
     /// 清掉了就按整库替换那一套收尾 —— 用户可能正停在那个空壳的详情页上。
     private func bind(to game: Game) {
-        let previous = record.game
+        let previous = record.liveGame
         GameMerger.bind(record, to: game)
         try? context.save()
         pruneIfOrphaned(previous)
@@ -257,7 +288,7 @@ struct ExternalRecordLinkSheet: View {
     }
 
     private func unbind() {
-        let previous = record.game
+        let previous = record.liveGame
         GameMerger.unbind(record)
         try? context.save()
         // 解绑同样会让旧条目失去最后一个指向它的记录。**不置 `isIgnored`**（那是另一个动作），

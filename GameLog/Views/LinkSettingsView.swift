@@ -387,12 +387,12 @@ struct LinkSettingsView: View {
         return "GameLog-backup-\(formatter.string(from: Date())).json"
     }
 
+    #if os(macOS)
     private func export() {
         // 禁重入：同步编码期间按钮已禁用，此处是双保险（2026-09-08）。
         guard !isExporting else { return }
         isExporting = true
         defer { isExporting = false }
-        #if os(macOS)
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.json]
         panel.nameFieldStringValue = backupFileName()
@@ -405,10 +405,8 @@ struct LinkSettingsView: View {
         } catch {
             statusMessage = L10n.tr("backup.exportFailed", lang: language)
         }
-        #else
-        // iOS：阶段 3 用 ShareLink（系统分享单，含 AirDrop）导出备份。
-        #endif
     }
+    #endif
 
     #if os(macOS)
     /// macOS 分享备份：编码整库 → 写临时文件 → 从「分享备份」按钮位置弹出系统分享面板（含 AirDrop）。

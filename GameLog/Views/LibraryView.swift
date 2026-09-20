@@ -39,6 +39,7 @@ struct LibraryView: View {
     /// 分组视图内局部平台过滤（不持久化，切换分组即重置）。
     @State private var groupPlatformFilter = ""
     @AppStorage("librarySort") private var sortRaw = LibrarySort.recentEdit.rawValue
+    @AppStorage(UserCustomization.libraryShowDemosKey) private var showDemos = true
     /// 隐藏上方毛玻璃（设置「个性化」开关）：开启 = 无标题 + 完全无毛玻璃（全局应用，各页面一致）。
     @AppStorage(UserCustomization.hideToolbarGlassKey) private var hideToolbarGlass = false
 
@@ -84,7 +85,8 @@ struct LibraryView: View {
         if let groupFilter, !groupFilter.isLive { return [] }
         var result = LibraryQuery.filter(
             games: liveGames, group: groupFilter,
-            platform: platform, status: statusFilter, search: searchText
+            platform: platform, status: statusFilter, search: searchText,
+            showDemos: showDemos
         )
         if favoritesOnly {
             result = result.filter(\.isFavorite)
@@ -638,6 +640,7 @@ struct LibraryView: View {
                         // 会把刚删掉的游戏原样建回来（见 `GameMerger.ignoreRecords`）。
                         GameMerger.ignoreRecords(linkedTo: game, in: context)
                         context.delete(game)
+                        try? context.save()
                         // 缓存 key = persistentModelID+字段，pk 重用会让旧图贴到新游戏（审计 2026-09-05）。
                         ImageDecodeCache.bump()
                     }

@@ -141,6 +141,7 @@ enum GameMerger {
         }
 
         // ② 标量字段：只补空。
+        if Self.isBlank(target.name) { target.name = Self.nonBlank(source.name) ?? "" }
         if Self.isBlank(target.nameZh) { target.nameZh = Self.nonBlank(source.nameZh) }
         if Self.isBlank(target.nameJa) { target.nameJa = Self.nonBlank(source.nameJa) }
         if target.releaseDate == nil { target.releaseDate = source.releaseDate }

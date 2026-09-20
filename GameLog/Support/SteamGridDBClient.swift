@@ -46,8 +46,12 @@ struct SteamGridDBClient {
 
     /// 搜索游戏。
     func search(term: String) async throws -> [SteamGridDBGameHit] {
-        let query = term.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? term
-        let url = URL(string: "\(Self.base)/search/autocomplete/\(query)")!
+        var allowed = CharacterSet.urlPathAllowed
+        allowed.remove(charactersIn: "/?#[]@!$&'()*+,;=")
+        let query = term.addingPercentEncoding(withAllowedCharacters: allowed) ?? term
+        guard let url = URL(string: "\(Self.base)/search/autocomplete/\(query)") else {
+            throw URLError(.badURL)
+        }
         let data = try await requestData(url)
         let response = try JSONDecoder().decode(SteamGridDBResponse<[SteamGridDBGameHit]>.self, from: data)
         return response.success ? response.data : []
@@ -55,7 +59,9 @@ struct SteamGridDBClient {
 
     /// 取某个游戏的封面列表（竖版 600x900 优先，也取横版 460x215 兜底）。
     func grids(for gameID: Int) async throws -> [SteamGridDBGrid] {
-        let url = URL(string: "\(Self.base)/grids/game/\(gameID)?dimensions=600x900,460x215")!
+        guard let url = URL(string: "\(Self.base)/grids/game/\(gameID)?dimensions=600x900,460x215") else {
+            throw URLError(.badURL)
+        }
         let data = try await requestData(url)
         let response = try JSONDecoder().decode(SteamGridDBResponse<[SteamGridDBGrid]>.self, from: data)
         return response.success ? response.data : []
@@ -71,7 +77,9 @@ struct SteamGridDBClient {
     /// 封面浏览分页结果（**只取 2:3 竖版 600x900**——本 app 封面主格式，用户拍板；
     /// API 每页 50 条，`page` 从 0 起）。热门游戏 2:3 也有数十张（RE4 2005 ≈ 41 张），分页渐进浏览。
     func gridsPage(for gameID: Int, page: Int) async throws -> GridPage {
-        let url = URL(string: "\(Self.base)/grids/game/\(gameID)?dimensions=600x900&page=\(page)")!
+        guard let url = URL(string: "\(Self.base)/grids/game/\(gameID)?dimensions=600x900&page=\(page)") else {
+            throw URLError(.badURL)
+        }
         let data = try await requestData(url)
         let response = try JSONDecoder().decode(SteamGridDBResponse<[SteamGridDBGrid]>.self, from: data)
         return GridPage(grids: response.success ? response.data : [],
@@ -82,7 +90,9 @@ struct SteamGridDBClient {
     /// 取某个游戏的宽幅横图 heroes（1920×620 / 3840×1240 等，适合背景/横幅用途）。
     /// 响应结构与 grids 完全一致，复用 SteamGridDBGrid。
     func heroes(for gameID: Int) async throws -> [SteamGridDBGrid] {
-        let url = URL(string: "\(Self.base)/heroes/game/\(gameID)")!
+        guard let url = URL(string: "\(Self.base)/heroes/game/\(gameID)") else {
+            throw URLError(.badURL)
+        }
         let data = try await requestData(url)
         let response = try JSONDecoder().decode(SteamGridDBResponse<[SteamGridDBGrid]>.self, from: data)
         return response.success ? response.data : []
@@ -90,7 +100,9 @@ struct SteamGridDBClient {
 
     /// 取某个游戏的透明 clear logo（PNG，适合叠在背景/封面上）。
     func logos(for gameID: Int) async throws -> [SteamGridDBGrid] {
-        let url = URL(string: "\(Self.base)/logos/game/\(gameID)")!
+        guard let url = URL(string: "\(Self.base)/logos/game/\(gameID)") else {
+            throw URLError(.badURL)
+        }
         let data = try await requestData(url)
         let response = try JSONDecoder().decode(SteamGridDBResponse<[SteamGridDBGrid]>.self, from: data)
         return response.success ? response.data : []
@@ -100,7 +112,9 @@ struct SteamGridDBClient {
     /// **342×482 / 660×930**（SGDB `dimensions` 过滤；这两档是用户指定的非 2:3 竖版尺寸）。
     func bannerCandidates(for gameID: Int) async throws -> [SteamGridDBGrid] {
         async let heros = heroes(for: gameID)
-        let url = URL(string: "\(Self.base)/grids/game/\(gameID)?dimensions=342x482,660x930")!
+        guard let url = URL(string: "\(Self.base)/grids/game/\(gameID)?dimensions=342x482,660x930") else {
+            throw URLError(.badURL)
+        }
         let data = try await requestData(url)
         let resp = try JSONDecoder().decode(SteamGridDBResponse<[SteamGridDBGrid]>.self, from: data)
         let cards = resp.success ? resp.data : []
@@ -110,7 +124,9 @@ struct SteamGridDBClient {
 
     /// 横向封面浏览分页结果（**只取 920×430 横版**——游戏横向封面主格式；API 每页 50 条，`page` 从 0 起）。
     func landscapesPage(for gameID: Int, page: Int) async throws -> GridPage {
-        let url = URL(string: "\(Self.base)/grids/game/\(gameID)?dimensions=920x430&page=\(page)")!
+        guard let url = URL(string: "\(Self.base)/grids/game/\(gameID)?dimensions=920x430&page=\(page)") else {
+            throw URLError(.badURL)
+        }
         let data = try await requestData(url)
         let response = try JSONDecoder().decode(SteamGridDBResponse<[SteamGridDBGrid]>.self, from: data)
         return GridPage(grids: response.success ? response.data : [],
@@ -121,7 +137,9 @@ struct SteamGridDBClient {
     /// 方形封面浏览分页结果（**只取 1:1 方形**——SGDB 方形有 512×512 与 1024×1024 两档，双档都查；
     /// 客户端再按 width == height 过滤兜住未来新增的方图尺寸。API 每页 50 条，`page` 从 0 起）。
     func squaresPage(for gameID: Int, page: Int) async throws -> GridPage {
-        let url = URL(string: "\(Self.base)/grids/game/\(gameID)?dimensions=512x512,1024x1024&page=\(page)")!
+        guard let url = URL(string: "\(Self.base)/grids/game/\(gameID)?dimensions=512x512,1024x1024&page=\(page)") else {
+            throw URLError(.badURL)
+        }
         let data = try await requestData(url)
         let response = try JSONDecoder().decode(SteamGridDBResponse<[SteamGridDBGrid]>.self, from: data)
         let all = response.success ? response.data : []

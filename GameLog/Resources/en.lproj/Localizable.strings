@@ -11,6 +11,7 @@
 "library.sortByScoreDesc" = "Average Score (High to Low)";
 "library.sortByRecentEdit" = "Recently Edited";
 "library.sortByValueDesc" = "Highest Value";
+"library.showDemos" = "Show Demos & Others";
 "library.sort" = "Sort";
 "library.gridView" = "Grid View";
 "library.squareGridView" = "Square Grid";
@@ -384,6 +385,10 @@
 
 "game.status" = "Status";
 "game.statusHint" = "Add completion records and scores when marked as Completed.";
+"game.version.enable" = "Game Version";
+"game.version.title" = "Version Type";
+"game.version.demo" = "Demo";
+"game.version.other" = "Other";
 "status.backlog" = "Backlog";
 "status.playing" = "Playing";
 "status.paused" = "Paused";
@@ -510,6 +515,7 @@
 "account.detail.relinkHint" = "Signing in again refreshes the credential stored on this device. Already-synced records are untouched.";
 "account.detail.filter" = "Filter";
 "account.detail.filter.unmatched" = "Unlinked %1$d";
+"account.detail.filter.demo" = "Demo %1$d";
 "account.detail.filter.ignored" = "Not imported %1$d";
 "account.detail.filter.all" = "All %1$d";
 "account.detail.noRecords" = "No records yet. Tap \"Sync Now\" above.";

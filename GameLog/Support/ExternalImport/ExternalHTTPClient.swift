@@ -196,11 +196,12 @@ final class ExternalHTTPClient {
     /// 取号式节流：**先把时间戳占住再放锁**，并发调用各拿各的槽位，
     /// 不会出现「同时算完、同时放行」的惊群。
     private func throttle() async throws {
-        throttleLock.lock()
-        let now = Date()
-        let slot = max(now, nextAvailableAt ?? now)
-        nextAvailableAt = slot.addingTimeInterval(minimumRequestInterval)
-        throttleLock.unlock()
+        let (slot, now) = throttleLock.withLock { () -> (Date, Date) in
+            let now = Date()
+            let slot = max(now, nextAvailableAt ?? now)
+            nextAvailableAt = slot.addingTimeInterval(minimumRequestInterval)
+            return (slot, now)
+        }
 
         let wait = slot.timeIntervalSince(now)
         if wait > 0 { try await Task.sleep(nanoseconds: UInt64(wait * 1_000_000_000)) }

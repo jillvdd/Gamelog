@@ -36,8 +36,14 @@ struct GameChoiceRow: View {
                 Text(verbatim: Presets.display(game.platform, category: .platform, language: language))
                 if let trailing {
                     Text(verbatim: trailing)
-                } else if let zh = game.nameZh, zh != game.displayName(for: language) {
-                    Text(verbatim: zh)
+                } else {
+                    let disp = game.displayName(for: language)
+                    let english = game.name.trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !english.isEmpty && english != disp {
+                        Text(verbatim: english)
+                    } else if let zh = game.nameZh, zh != disp {
+                        Text(verbatim: zh)
+                    }
                 }
             }
             .font(.caption)
@@ -126,27 +132,26 @@ struct ExternalRecordRow: View {
     @Environment(\.appLanguageCode) private var language
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            // 标题截断、标签靠右钉住：标签是这条记录唯一的状态说明，被长标题挤掉就白做了。
-            HStack(spacing: 6) {
-                Text(verbatim: record.titleName)
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-                Spacer(minLength: 6)
-                statusTags
+        if !record.isLive {
+            Color.clear
+        } else {
+            VStack(alignment: .leading, spacing: 3) {
+                // 标题截断、标签靠右钉住：标签是这条记录唯一的状态说明，被长标题挤掉就白做了。
+                HStack(spacing: 6) {
+                    Text(verbatim: record.titleName)
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+                    Spacer(minLength: 6)
+                    statusTags
+                }
+                metaLine
+                trophyLine
+                achievementLine
+                linkStatusLine
             }
-            metaLine
-            trophyLine
-            achievementLine
-            if let matchDescription {
-                Text(verbatim: matchDescription)
-                    .font(.caption2)
-                    .foregroundStyle(record.game == nil ? Color.secondary : AccountUI.linkedTint)
-                    .lineLimit(1)
-            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .contentShape(Rectangle())
     }
 
     // MARK: - 第二行（平台 · 首次 · 最近 · 时长）
@@ -283,7 +288,7 @@ struct ExternalRecordRow: View {
     /// 「本条被跳过」不再是对当前状态的描述。
     @ViewBuilder
     private var statusTags: some View {
-        let ruleReason = record.game == nil ? record.storedSkipReason : nil
+        let ruleReason = record.liveGame == nil ? record.storedSkipReason : nil
         let tags = (
             absent: !record.presentInLastSync,
             ignored: record.isShownAsIgnored,
@@ -305,12 +310,62 @@ struct ExternalRecordRow: View {
         }
     }
 
-    /// 第三行：只讲「关联到了哪」。已忽略（含规则跳过）且未关联的记录**不重复说一遍**
-    /// —— 标签已经写着了，而「待关联」那句会与「已忽略」自相矛盾。
-    private var matchDescription: String? {
-        if let game = record.game {
-            return L10n.tr("account.detail.linkedTo", [game.displayName(for: language)], lang: language)
+    // MARK: - 第四行（关联结果）
+
+    /// 关联状态行：已关联展示降噪胶囊徽章（平台 + 主名 + 英文原名），未关联展示温和提示。
+    @ViewBuilder
+    private var linkStatusLine: some View {
+        if let game = record.liveGame {
+            linkedGameBadge(game: game)
+        } else if !record.isShownAsIgnored {
+            HStack(spacing: 4) {
+                Image(systemName: "link.badge.plus")
+                    .font(.system(size: 10))
+                Text(verbatim: L10n.tr("account.detail.unmatchedHint", lang: language))
+            }
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
         }
-        return record.isShownAsIgnored ? nil : L10n.tr("account.detail.unmatchedHint", lang: language)
+    }
+
+    /// 已关联游戏的降噪胶囊徽章：弱化高亮颜色，整合平台、主名与英文名。
+    private func linkedGameBadge(game: Game) -> some View {
+        let disp = game.displayName(for: language)
+        let english = game.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let hasEnglish = !english.isEmpty && english != disp
+        let platformName = Presets.display(game.platform, category: .platform, language: language)
+
+        return HStack(spacing: 5) {
+            Image(systemName: "link")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(.secondary)
+
+            Text(verbatim: platformName)
+                .font(.system(size: 10, weight: .medium))
+                .padding(.horizontal, 4)
+                .padding(.vertical, 1)
+                .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 3))
+                .foregroundStyle(.secondary)
+
+            Text(verbatim: disp)
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+
+            if hasEnglish {
+                Text(verbatim: "·")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+                Text(verbatim: english)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2.5)
+        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 5))
+        .lineLimit(1)
     }
 }

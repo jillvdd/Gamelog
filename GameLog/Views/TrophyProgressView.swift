@@ -74,6 +74,8 @@ struct TrophyProgressView: View {
     let progress: TrophyProgress
     /// 来源账号展示名。nil / 空 = 不渲染「来源：」。
     var sourceName: String?
+    /// 来源侧原始标题。
+    var titleName: String?
     /// 这条记录的**平台列表**（来源给的 `PS3,PS4` → 显示 `PS3/PS4`）。
     /// 由调用点传 `ExternalGameRecord.psnPlatformDisplay` —— 拆逗号 / 规范化 / 丢掉认不出的
     /// 那一项这些规则在模型上只有那一处，不在这里再写一遍。
@@ -90,6 +92,8 @@ struct TrophyProgressView: View {
     /// 小时数。**由调用点传 `ExternalGameRecord.displayHours`** —— 取整规则（四舍五入、
     /// 不足 1 小时按 1 小时）在模型上只有那一处，不在这里再写一遍。
     var hours: Int?
+    /// 自定义卡片宽度（nil 时使用 ExternalCardStyle 弹性上限）
+    var cardWidth: CGFloat? = nil
 
     /// 一种版式：头部 / 环 + 总数 / 四格 / 游玩三项，从上到下。
     ///
@@ -107,7 +111,7 @@ struct TrophyProgressView: View {
             playStats
         }
         .padding(ExternalCardStyle.contentPadding)
-        .frame(maxWidth: ExternalCardStyle.maxWidth, alignment: .leading)
+        .frame(maxWidth: cardWidth ?? ExternalCardStyle.maxElasticWidth, alignment: .leading)
         .appPanelSurface()
     }
 
@@ -119,6 +123,7 @@ struct TrophyProgressView: View {
 
     private var header: some View {
         ExternalSourceHeader(brandName: AccountProvider.playstation.brandName,
+                             titleName: titleName,
                              subtitle: subtitle,
                              sourceName: sourceName)
     }

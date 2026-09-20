@@ -336,7 +336,7 @@ enum ExternalSyncDriver {
             var trophyUnavailable = false
             var claimedTrophySets: Set<String> = []
             do {
-                let trophies = try await PSNTrophyService(
+                let trophies = PSNTrophyService(
                     auth: auth, accountId: account.externalAccountId,
                     acceptLanguage: locale)
                 let titles = try await trophies.fetchTrophyTitles()

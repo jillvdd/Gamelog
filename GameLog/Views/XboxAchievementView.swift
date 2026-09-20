@@ -52,6 +52,8 @@ struct XboxAchievementView: View {
     var achievements: AchievementProgress?
     /// 来源账号展示名。nil / 空 = 不渲染「来源：」。
     var sourceName: String?
+    /// 来源侧原始标题。
+    var titleName: String?
     /// 来源给的**可用平台列表**（`Xbox One/Xbox Series X|S`）——
     /// 由调用点传 `ExternalGameRecord.xboxPlatformDisplay`（拆列表 / 丢认不出的项
     /// 这些规则在模型上只有那一处，不在这里再写一遍）。
@@ -59,13 +61,16 @@ struct XboxAchievementView: View {
     /// 最近游玩。**Xbox 没有「首次游玩」**（来源不提供），所以只有这一项。
     var lastPlayedAt: Date?
     /// 小时数。**由调用点传 `ExternalGameRecord.displayHours`**（取整规则在模型上只有那一处）。
-    var hours: Int?
+    let hours: Int?
+    /// 自定义卡片宽度（nil 时使用 ExternalCardStyle 弹性上限）
+    var cardWidth: CGFloat? = nil
 
     @Environment(\.appLanguageCode) private var language
 
     var body: some View {
         VStack(alignment: .leading, spacing: ExternalCardStyle.blockSpacing) {
             ExternalSourceHeader(brandName: AccountProvider.xbox.brandName,
+                                 titleName: titleName,
                                  subtitle: platformText,
                                  sourceName: sourceName)
             statsRow
@@ -73,7 +78,7 @@ struct XboxAchievementView: View {
         .padding(ExternalCardStyle.contentPadding)
         // ⚠️ 宽度上限必须**在 `appPanelSurface()` 之前**：顺序反过来的话面板会先铺满整宽，
         // 再在满宽的面板上画一条窄内容 —— 看起来就是「这块面板左边挤了四个数字」。
-        .frame(maxWidth: ExternalCardStyle.maxWidth, alignment: .leading)
+        .frame(maxWidth: cardWidth ?? ExternalCardStyle.maxElasticWidth, alignment: .leading)
         .appPanelSurface()
     }
 

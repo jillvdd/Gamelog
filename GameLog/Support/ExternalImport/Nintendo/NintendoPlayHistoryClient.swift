@@ -283,7 +283,7 @@ struct NintendoPlayHistoryClient {
             if let system = entry.system {
                 rawPlatform = rawPlatform ?? system
                 if let canonical = ExternalPlatformNormalizer.canonical(fromRaw: system) {
-                    minutesByPlatform[canonical, default: 0] += minutes
+                    minutesByPlatform[canonical, default: 0] += max(0.001, minutes)
                 }
             }
 
@@ -320,22 +320,14 @@ struct NintendoPlayHistoryClient {
             )
         }
 
-        /// 决定这条记录归入哪个平台。**三档优先级，顺序不能反**：
+        /// 决定这条记录归入哪个平台。三档优先级：
         ///
-        /// ① **titleId 前缀**（`NintendoTitleId`）—— 实测下来只有它真的可靠。
-        ///    真账号上的 374 条记录**全部**退到了兜底值 `Nintendo Switch`，说明
-        ///    `entry.system`（`platform` / `deviceType`）要么是 nil、要么给的是我们认不出来的取值；
-        ///    而 titleId 前缀在同一批数据上是 100% 正确的（连图片 CDN 都印证了同一套划分）。
-        /// ② **`entry.system` 归一化后的时长占优值** —— 接口哪天真的给了平台，以它为准。
+        /// ① **`entry.system` 硬件代号的时长占优值**（`BEE` → Nintendo Switch 2、`HAC` → Nintendo Switch、`WUP` → Wii U）：
+        ///    来源侧接口直接给出了硬件运行平台（Switch 2 独占版与强化版均为 BEE，Switch 1 均为 HAC）。
+        /// ② **titleId 前缀**（`NintendoTitleId`）：在来源侧未提供 system 字段时的兜底判决（0400 → Switch 2、0100 → Switch、0005 → Wii U、0004 → 3DS）。
         /// ③ provider 兜底平台 —— 前两档都没有时的最后一道，保证 `platform` 非空。
-        ///
-        /// ⚠️ ①② 回答的不是同一个问题：前缀说「这个游戏是哪个平台的商品」，
-        /// `system` 说「用户在哪台机器上玩的」。同一个 Switch 1 游戏在 Switch 2 上玩，
-        /// 两者会不一致 —— 这里取前者，因为平台在库里是一级**筛选**维度，用户要按
-        /// 「这个游戏属于哪个平台」筛，而不是按「我最近用哪台机器」。
-        /// 取舍的代价写在 `ExternalGameRecordDTO.platform` 上（一条记录只存得下一个平台）。
         static func platform(titleId: String, dominant: String?, fallbackPlatform: String) -> String {
-            NintendoTitleId.platform(forTitleId: titleId) ?? dominant ?? fallbackPlatform
+            dominant ?? NintendoTitleId.platform(forTitleId: titleId) ?? fallbackPlatform
         }
     }
 }

@@ -42,6 +42,7 @@ struct ExternalAccountDetailView: View {
 
     enum Filter: String, CaseIterable, Identifiable {
         case unmatched
+        case demo
         case ignored
         case all
         var id: String { rawValue }
@@ -271,6 +272,8 @@ struct ExternalAccountDetailView: View {
             Picker(L10n.tr("account.detail.filter", lang: language), selection: $filter) {
                 LText("account.detail.filter.unmatched", args: [unmatchedRecords.count])
                     .tag(Filter.unmatched)
+                LText("account.detail.filter.demo", args: [demoRecords.count])
+                    .tag(Filter.demo)
                 LText("account.detail.filter.ignored", args: [ignoredRecords.count])
                     .tag(Filter.ignored)
                 LText("account.detail.filter.all", args: [mineRecords.count])
@@ -323,17 +326,17 @@ struct ExternalAccountDetailView: View {
         liveRecords.filter { $0.account?.localId == account.localId }
     }
 
-    /// 待关联 = 还没挂到任何游戏上、也没被跳过。被跳过（用户点的「忽略」，或规则判定 ——
-    /// 见 `isShownAsIgnored`）的单独一档，否则它们会永远混在「待关联」里、
-    /// 看起来像是没人处理（旧版就是这样）。
+    /// 待关联 = 还没挂到任何游戏上、也没被跳过（Demo 未关联时也包含在内）。
     private var unmatchedRecords: [ExternalGameRecord] {
-        mineRecords.filter { $0.game == nil && !$0.isShownAsIgnored }
+        mineRecords.filter { $0.liveGame == nil && !$0.isIgnored && $0.storedSkipReason == nil }
     }
 
-    /// 已忽略（无论有没有关联）：这一档存在的唯一目的就是**让忽略可撤销**，而 2026-09-18 起
-    /// 它同时收**规则判掉**的记录（体验版那一档本来就在里面 —— 用户要求「所有跳过的都算已忽略，
-    /// 这样如果出错还能手动绑定」）。口径的唯一归属是 `ExternalGameRecord.isShownAsIgnored`，
-    /// 那些不对称之处（规则跳过的一旦绑上就不再算）在那里写明了。
+    /// Demo / 试玩版：由来源规则判定为试玩版或测试版的记录。
+    private var demoRecords: [ExternalGameRecord] {
+        mineRecords.filter { $0.versionType == .demo || $0.versionType == .trial }
+    }
+
+    /// 已忽略（无论有没有关联）：这一档存在的唯一目的就是**让忽略可撤销**。
     private var ignoredRecords: [ExternalGameRecord] {
         mineRecords.filter { $0.isShownAsIgnored }
     }
@@ -343,6 +346,7 @@ struct ExternalAccountDetailView: View {
         let base: [ExternalGameRecord]
         switch filter {
         case .unmatched: base = unmatchedRecords
+        case .demo: base = demoRecords
         case .ignored: base = ignoredRecords
         case .all: base = mineRecords
         }
@@ -370,8 +374,8 @@ struct ExternalAccountDetailView: View {
             var extras = record.searchExtras
             // ⚠️ 已关联条目的名字要**先判 `isLive` 再读**：批量删除 / 整库替换之后
             // `record.game` 可能已经是一个销毁的模型，读它的 `allNames` 是 SwiftData fatal
-            //（见 `Game.isLive`）。`allNames` 已含 `primaryName`，不必再单独塞一个。
-            if let game = record.game, game.isLive {
+            //（见 `Game.isLive` / `ExternalGameRecord.liveGame`）。`allNames` 已含 `primaryName`，不必再单独塞一个。
+            if let game = record.liveGame {
                 extras.append(contentsOf: game.allNames)
             }
             return GameLinker.matches(query: query, title: record.titleName, extras: extras)

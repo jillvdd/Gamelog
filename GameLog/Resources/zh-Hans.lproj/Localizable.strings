@@ -11,6 +11,7 @@
 "library.sortByScoreDesc" = "平均分（从高到低）";
 "library.sortByRecentEdit" = "最近编辑";
 "library.sortByValueDesc" = "价值最高";
+"library.showDemos" = "展示Demo/其他项目";
 "library.sort" = "排序";
 "library.gridView" = "网格视图";
 "library.squareGridView" = "方形网格";
@@ -384,6 +385,10 @@
 
 "game.status" = "状态";
 "game.statusHint" = "标记为「已通关」时可添加通关记录与评分。";
+"game.version.enable" = "游戏版本";
+"game.version.title" = "版本类型";
+"game.version.demo" = "试玩版";
+"game.version.other" = "其他";
 "status.backlog" = "想玩";
 "status.playing" = "在玩";
 "status.paused" = "搁置";
@@ -511,6 +516,7 @@
 "account.detail.relinkHint" = "重新登录会刷新本机保存的凭证，不会动已经同步下来的记录。";
 "account.detail.filter" = "筛选";
 "account.detail.filter.unmatched" = "待关联 %1$d";
+"account.detail.filter.demo" = "Demo %1$d";
 "account.detail.filter.ignored" = "已忽略 %1$d";
 "account.detail.filter.all" = "全部 %1$d";
 "account.detail.noRecords" = "这里还没有记录。先点上面的「立即同步」。";

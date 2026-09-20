@@ -61,15 +61,19 @@ enum LibrarySort: String, CaseIterable, Identifiable {
 
 enum LibraryQuery {
 
-    /// 库过滤：分组（双向关系直取）/平台/状态/搜索，各层可选。
-    static func filter(games: [Game], group: GameGroup?, platform: String?,
-                       status: GameStatus?, search: String) -> [Game] {
+    /// 库过滤：分组（双向关系直取）/平台/状态/搜索/Demo显隐，各层可选。
+    static func filter(games: [Game], group: GameGroup? = nil, platform: String? = nil,
+                       status: GameStatus? = nil, search: String = "",
+                       showDemos: Bool = true) -> [Game] {
         var result: [Game]
         if let group {
             // 分组视图直接以双向关系为准：关系变化（右键移出/加入）立即反映。
             result = group.games
         } else {
             result = games
+        }
+        if !showDemos {
+            result = result.filter { $0.version == nil }
         }
         if let platform {
             result = result.filter { $0.platformList.contains(platform) }
@@ -160,6 +164,7 @@ enum LibraryViewMode: String, CaseIterable, Identifiable {
 struct LibrarySortMenuItems: View {
     /// 持久化排序值（@AppStorage rawValue 字符串）。
     @Binding var sortRaw: String
+    @AppStorage(UserCustomization.libraryShowDemosKey) private var showDemos = true
 
     @Environment(\.appLanguageCode) private var language
 
@@ -177,6 +182,16 @@ struct LibrarySortMenuItems: View {
                 } else {
                     Text(verbatim: L10n.tr(option.labelKey, lang: language))
                 }
+            }
+        }
+        Divider()
+        Button {
+            showDemos.toggle()
+        } label: {
+            if showDemos {
+                Label(L10n.tr("library.showDemos", lang: language), systemImage: "checkmark")
+            } else {
+                Text(verbatim: L10n.tr("library.showDemos", lang: language))
             }
         }
     }

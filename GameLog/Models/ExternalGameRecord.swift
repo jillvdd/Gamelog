@@ -30,12 +30,25 @@ enum ExternalVersionType: String, CaseIterable, Identifiable, LabelKeyed {
     ///   而体验版默认不进游戏库 —— 一个正常游戏静默消失，且几乎不可能联想到原因。
     ///   分词只保留 `[a-z0-9]`，于是 `demo版` → `["demo"]`（仍命中），
     ///   `Demon's Souls` → `["demon","s","souls"]`（不命中）。
-    static func classifyVersion(title: String) -> ExternalVersionType {
+    /// 按标题名与成就事实判定版本类型。
+    /// 规则 1：成就/奖杯大于 0 绝不误判（《Trials Rising》、《The Turing Test》等即使带 Trial/Test 也 100% 算正式版）。
+    /// 规则 2：无成就时，匹配中/日/英试玩与测试版关键词。
+    /// 命中体验版/测试版关键词才判 demo，否则 `.full`；空标题留 `.unknown`。
+    static func classifyVersion(title: String, achievementTotal: Int? = nil, platform: String? = nil) -> ExternalVersionType {
         let lowered = title.lowercased()
         guard !lowered.isEmpty else { return .unknown }
 
-        let japaneseKeywords = ["体験版", "体験会", "試遊版", "試玩版", "试玩版", "体验版", "序章体验"]
-        if japaneseKeywords.contains(where: { lowered.contains($0) }) { return .demo }
+        // 规则 1：有成就系统的正式游戏绝对不是 Demo（杜绝标题含有 Trial/Test 的商业游戏被误杀）
+        if let total = achievementTotal, total > 0 {
+            return .full
+        }
+
+        // 规则 2：中/日文试玩版、体验版、公测、测试关键词（子串匹配）
+        let cjkKeywords = [
+            "体験版", "体験会", "試遊版", "試玩版", "试玩版", "體驗版", "体验版",
+            "試玩", "试玩", "先行体験版", "公測", "公测", "封測", "封测", "测试版", "測試版", "序章体验"
+        ]
+        if cjkKeywords.contains(where: { lowered.contains($0) }) { return .demo }
 
         // 拉丁词：只留 [a-z0-9]，其余（空格、撇号、假名、汉字…）一律当分隔符。
         var latin = ""
@@ -47,7 +60,12 @@ enum ExternalVersionType: String, CaseIterable, Identifiable, LabelKeyed {
         }
         // 前后补空格，好把「整词」判定写成子串判定。` demo ` 同时覆盖 `Demo Version`。
         let padded = " " + latin.split(separator: " ").joined(separator: " ") + " "
-        return (padded.contains(" demo ") || padded.contains(" trial version ")) ? .demo : .full
+        let latinPhrases = [
+            " demo ", " trial ", " trial version ", " beta ", " playtest ",
+            " network test ", " server test ", " prologue demo ", " prologue ",
+            " preview ", " insider "
+        ]
+        return latinPhrases.contains(where: { padded.contains($0) }) ? .demo : .full
     }
 }
 
@@ -617,4 +635,15 @@ extension ExternalGameRecord {
     ///
     /// 「清空该账号导入数据」会一次删掉几百条记录，而处置面板 / 列表可能还攥着旧数组。
     var isLive: Bool { modelContext != nil }
+
+    /// 当前关联的 Game（仅当其仍然在 context 中存活时返回；若关联条目已被删除落盘或脱离 context，则视为 nil）。
+    ///
+    /// ⚠️ **不要在界面与展示逻辑中直接读 `game`**：SwiftData 在关联对象被 `delete` + `save` 后，
+    /// 内存中现有记录对象的 `game` 关系指针可能仍指向已销毁模型（`game != nil` 但 `game.modelContext == nil`）。
+    /// 读死模型的任何外置/托管属性都会直接触发 `_assertionFailure`（SIGTRAP）。
+    /// 判据统一走 `Game.isLive`。
+    var liveGame: Game? {
+        guard let game, game.isLive else { return nil }
+        return game
+    }
 }

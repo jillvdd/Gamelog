@@ -52,10 +52,40 @@ struct GameBadge: View {
     @Environment(\.appLanguageCode) private var language
 
     var body: some View {
-        if game.isCompletedOrLongRunning {
+        if game.libraryScore != nil {
+            scoreBadge
+        } else if let version = game.version {
+            versionBadge(version)
+        } else if game.isCompletedOrLongRunning {
             scoreBadge
         } else {
             statusBadge
+        }
+    }
+
+    private func versionBadge(_ version: GameVersion) -> some View {
+        let text = version == .demo ? "Demo" : L10n.tr("game.version.other", lang: language)
+        let color: Color = version == .demo ? .orange : .indigo
+        switch style {
+        case .glass:
+            return AnyView(
+                Text(verbatim: text)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 8)
+                    .frame(height: 22)
+                    .glassCapsuleBadge(tint: color.opacity(0.55),
+                                       fallback: color.opacity(0.88))
+            )
+        case .plain:
+            return AnyView(
+                Text(verbatim: text)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(color.opacity(0.88), in: Capsule())
+            )
         }
     }
 

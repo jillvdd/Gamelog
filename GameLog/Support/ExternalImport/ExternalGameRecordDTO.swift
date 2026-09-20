@@ -101,7 +101,8 @@ struct ExternalGameRecordDTO: Equatable {
         self.titleName = titleName
         self.platform = platform
         self.platformRaw = platformRaw
-        self.versionType = versionType ?? ExternalVersionType.classifyVersion(title: titleName)
+        let achTotal = achievements?.total ?? trophies?.definedTotal
+        self.versionType = versionType ?? ExternalVersionType.classifyVersion(title: titleName, achievementTotal: achTotal, platform: platform)
         self.skipVerdict = skipVerdict
         self.firstPlayedAt = firstPlayedAt
         self.lastPlayedAt = lastPlayedAt
@@ -159,6 +160,13 @@ enum ExternalPlatformNormalizer {
         let aliases: [String: String] = [
             "Switch": "Nintendo Switch",
             "Switch 2": "Nintendo Switch 2",
+            // 任天堂硬件代号（Play Activity API 返回的 platform / deviceType）：
+            // HAC = Handheld Audio Console (Switch 1)
+            // BEE = Bumblebee / Beedle (Switch 2)
+            // WUP = Wii U Project (Wii U)
+            "BEE": "Nintendo Switch 2",
+            "HAC": "Nintendo Switch",
+            "WUP": "Wii U",
             "PlayStation 5": "PS5",
             "PlayStation 4": "PS4",
             "PlayStation 3": "PS3",

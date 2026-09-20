@@ -39,14 +39,22 @@ struct PlayActivityView: View {
 
     /// 来源账号展示名。nil / 空 = 不渲染「来源：」。
     var sourceName: String?
+    /// 来源侧原始标题。
+    var titleName: String?
+    /// 平台名称（如「Nintendo Switch」）。
+    var platformText: String?
     var firstPlayedAt: Date?
     var lastPlayedAt: Date?
     /// 小时数。**由调用点传 `ExternalGameRecord.displayHours`** —— 取整规则在模型上只有那一处。
     var hours: Int?
+    /// 自定义卡片宽度（nil 时使用 ExternalCardStyle 弹性上限）
+    var cardWidth: CGFloat? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: ExternalCardStyle.blockSpacing) {
             ExternalSourceHeader(brandName: AccountProvider.nintendo.brandName,
+                                 titleName: titleName,
+                                 subtitle: platformText,
                                  sourceName: sourceName)
             PlayActivityStatsRow(firstPlayedAt: firstPlayedAt,
                                  lastPlayedAt: lastPlayedAt,
@@ -55,7 +63,7 @@ struct PlayActivityView: View {
         .padding(ExternalCardStyle.contentPadding)
         // ⚠️ 宽度上限必须**在 `appPanelSurface()` 之前**：顺序反过来的话面板会先铺满整宽，
         // 再在满宽的面板上画一条窄内容 —— 看起来就是「这块面板左边挤了三个数字」。
-        .frame(maxWidth: ExternalCardStyle.maxWidth, alignment: .leading)
+        .frame(maxWidth: cardWidth ?? ExternalCardStyle.maxElasticWidth, alignment: .leading)
         .appPanelSurface()
     }
 }

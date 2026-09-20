@@ -11,6 +11,7 @@
 "library.sortByScoreDesc" = "平均スコア（高い順）";
 "library.sortByRecentEdit" = "最近編集した順";
 "library.sortByValueDesc" = "価値が高い順";
+"library.showDemos" = "体験版・その他を表示";
 "library.sort" = "並び替え";
 "library.gridView" = "グリッド表示";
 "library.squareGridView" = "正方形グリッド";
@@ -384,6 +385,10 @@
 
 "game.status" = "ステータス";
 "game.statusHint" = "「クリア済み」に設定すると、クリア記録とスコアを登録できます。";
+"game.version.enable" = "ゲームバージョン";
+"game.version.title" = "バージョン種別";
+"game.version.demo" = "体験版";
+"game.version.other" = "その他";
 "status.backlog" = "プレイ予定";
 "status.playing" = "プレイ中";
 "status.paused" = "中断";
@@ -510,6 +515,7 @@
 "account.detail.relinkHint" = "再ログインすると端末に保存された認証情報が更新されます。同期済みの記録はそのまま残ります。";
 "account.detail.filter" = "絞り込み";
 "account.detail.filter.unmatched" = "未関連 %1$d";
+"account.detail.filter.demo" = "体験版 %1$d";
 "account.detail.filter.ignored" = "取り込み対象外 %1$d";
 "account.detail.filter.all" = "すべて %1$d";
 "account.detail.noRecords" = "まだ記録がありません。上の「今すぐ同期」を押してください。";

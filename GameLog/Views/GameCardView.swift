@@ -573,7 +573,7 @@ struct GameWideCardView: View {
         #else
         let valueText = value
         #endif
-        return VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 0) {
             Text(verbatim: L10n.tr(titleKey, lang: language))
                 .font(.system(size: metaLabelFontSize, weight: .medium))
                 .foregroundStyle(.tertiary)

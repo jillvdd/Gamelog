@@ -619,6 +619,15 @@ do {
     let filtered = LibraryQuery.filter(games: pool, group: nil, platform: nil, status: nil, search: "zelda")
     check("LibraryQuery: 搜索过滤（大小写不敏感命中 2）", filtered.count == 2)
 
+    // 过滤：showDemos 开关（Demo 与 Other 隐藏/展示）
+    let qDemo = Game(name: "Demo Game", version: .demo)
+    let qOther = Game(name: "Tool App", version: .other)
+    let poolWithDemos = [q3, q2, q1, qDemo, qOther]
+    let withDemos = LibraryQuery.filter(games: poolWithDemos, showDemos: true)
+    let withoutDemos = LibraryQuery.filter(games: poolWithDemos, showDemos: false)
+    check("LibraryQuery: showDemos == true 包含 Demo 与 Other", withDemos.count == 5)
+    check("LibraryQuery: showDemos == false 过滤掉 Demo 与 Other", withoutDemos.count == 3 && !withoutDemos.contains { $0.version != nil })
+
     // 按名排序：大小写不敏感 + 并列以 createdAt 裁决（同刻创建→稳定序不跳动）。
     let byName = LibraryQuery.sorted(pool, by: .name, language: "zh-Hans")
     check("LibraryQuery: 按名排序（Mario 在前）", byName.first?.name == "Mario")
@@ -834,15 +843,30 @@ do {
     check("平台: 全部预设值都原样回到自己（归一化表无键冲突）",
           Presets.platforms.allSatisfy { ExternalPlatformNormalizer.canonical(fromRaw: $0) == $0 })
 
-    // ③ 体验版判定：拉丁词必须整词匹配（子串匹配会把 Demon's Souls 判成体验版）。
+    // ③ 体验版判定：拉丁词整词匹配、繁简体CJK关键词匹配、成就数保底判定。
     check("版本: 'Demon's Souls' 不是体验版", ExternalVersionType.classifyVersion(title: "Demon's Souls") == .full)
     check("版本: 'Demo' 是体验版", ExternalVersionType.classifyVersion(title: "Demo") == .demo)
     check("版本: 'Demo Version' 是体验版", ExternalVersionType.classifyVersion(title: "Demo Version") == .demo)
     check("版本: 'Trial Version' 是体验版", ExternalVersionType.classifyVersion(title: "Trial Version") == .demo)
     check("版本: 'Trials of Mana' 不是体验版", ExternalVersionType.classifyVersion(title: "Trials of Mana") == .full)
     check("版本: '体験版' 是体验版", ExternalVersionType.classifyVersion(title: "ゼルダの伝説 体験版") == .demo)
+    check("版本: '先行体験版' 是体验版", ExternalVersionType.classifyVersion(title: "モンスターハンターワイルズ 先行体験版") == .demo)
+    check("版本: 繁体'體驗版' 是体验版", ExternalVersionType.classifyVersion(title: "聖獸之王 體驗版") == .demo)
+    check("版本: 繁体'人中之龍 極３ 體驗版' 是体验版", ExternalVersionType.classifyVersion(title: "人中之龍 極３ 體驗版") == .demo)
+    check("版本: 简体'试玩版' 是体验版", ExternalVersionType.classifyVersion(title: "黑神话：悟空 试玩版") == .demo)
+    check("版本: '公测' 是体验版", ExternalVersionType.classifyVersion(title: "卡拉彼丘 终极公测") == .demo)
+    check("版本: '测试版' 是体验版", ExternalVersionType.classifyVersion(title: "燕云十六声 测试版") == .demo)
+    check("版本: 拉丁词'Beta' 是体验版", ExternalVersionType.classifyVersion(title: "Destiny 2 - Open Beta") == .demo)
+    check("版本: 拉丁词'Server Test' 是体验版", ExternalVersionType.classifyVersion(title: "Blue Protocol Server Test") == .demo)
     check("版本: 'demo版'（拉丁词紧贴汉字）是体验版", ExternalVersionType.classifyVersion(title: "demo版") == .demo)
     check("版本: 空标题留 unknown（不猜）", ExternalVersionType.classifyVersion(title: "") == .unknown)
+    // 规则 1：成就数 > 0 保护商业正价游戏
+    check("版本: 标题含 Trial 但有成就数 > 0 判为 full",
+          ExternalVersionType.classifyVersion(title: "Trials Rising", achievementTotal: 50) == .full)
+    check("版本: 标题含 Demo 但有成就数 > 0 判为 full",
+          ExternalVersionType.classifyVersion(title: "The Stanley Parable: Demo Game", achievementTotal: 10) == .full)
+    check("版本: 标题含 Demo 且成就数为 0 判为 demo",
+          ExternalVersionType.classifyVersion(title: "Metroid Dread Demo", achievementTotal: 0) == .demo)
 
     // ④ DTO：负数当「没有这个数」，不让脏值落库。
     let negativeDTO = ExternalGameRecordDTO(titleId: "T", titleName: "X", platform: "PS5",
@@ -2016,19 +2040,30 @@ do {
           && Set(tsushimaRecords.compactMap { $0.game?.persistentModelID }).count == 1
           && Set(tsushimaRecords.compactMap { $0.titleId }).count == 2)
 
-    // 体验版：入库留档，但不进游戏库。
+    // 体验版：入库建库（Game.version == .demo），且不自动并进正片。
     let roundDemo = try await coordinator.importRecords(
         [mkDTO("T-DEMO", "Metroid Dread 体験版")],
         intoAccount: nintendoA.localId, sourceLocale: "ja-JP")
-    check("导入: 体验版只记录不建库，也不并进正片",
-          roundDemo.createdRecords == 1 && roundDemo.excludedByVersion == 1
-          && roundDemo.createdGames == 0 && allRecords().first { $0.titleId == "T-DEMO" }?.game == nil)
+    let demoRecord = allRecords().first { $0.titleId == "T-DEMO" }
+    check("导入: 体验版建库并标记 game.version = .demo",
+          roundDemo.createdRecords == 1
+          && roundDemo.createdGames == 1
+          && demoRecord?.game?.version == .demo)
+
+    let roundMetroidFull = try await coordinator.importRecords(
+        [mkDTO("T-FULL", "Metroid Dread")],
+        intoAccount: nintendoA.localId, sourceLocale: "en-GB")
+    check("导入: 正式版与体验版不合并，独立建库（version == nil）",
+          roundMetroidFull.createdGames == 1
+          && allRecords().first { $0.titleId == "T-FULL" }?.game?.version == nil
+          && allRecords().first { $0.titleId == "T-FULL" }?.game?.persistentModelID != demoRecord?.game?.persistentModelID)
 
     let roundDemon = try await coordinator.importRecords(
         [mkDTO("T-DEMON", "Demon's Souls")],
         intoAccount: nintendoA.localId, sourceLocale: "en-GB")
     check("导入: Demon's Souls 不被误判成体验版（含 demo 子串但整词不匹配）",
-          roundDemon.excludedByVersion == 0 && roundDemon.createdGames == 1)
+          roundDemon.excludedByVersion == 0 && roundDemon.createdGames == 1
+          && allRecords().first { $0.titleId == "T-DEMON" }?.game?.version == nil)
 
     // 语言槽 + 首次游玩时间缺失 + 时长缺失。
     _ = try await coordinator.importRecords(
@@ -2779,6 +2814,22 @@ do {
           !doomed.isLive)
     check("删除守卫: 同一刻 isDeleted 已经是 false —— 拿它写守卫等于没写",
           !doomed.isDeleted)
+
+    // ⑭ 关联守卫：已删除落盘的 Game 不得通过 liveGame 暴露
+    let doomedRecordContext = ModelContext(importContainer)
+    let boundGame = Game(name: "Doomed Game", nameZh: "毁灭游戏")
+    let boundRecord = ExternalGameRecord(provider: .xbox, externalAccountId: "x1", titleId: "t1",
+                                         titleName: "Doomed Record", platform: "Xbox One")
+    boundRecord.game = boundGame
+    doomedRecordContext.insert(boundGame)
+    doomedRecordContext.insert(boundRecord)
+    try? doomedRecordContext.save()
+    check("关系守卫: 绑定的有效游戏 liveGame 非空",
+          boundRecord.liveGame?.persistentModelID == boundGame.persistentModelID)
+    doomedRecordContext.delete(boundGame)
+    try? doomedRecordContext.save()
+    check("关系守卫: 游戏被删除落盘后 liveGame 返回 nil（防 SIGTRAP）",
+          boundRecord.liveGame == nil)
 }
 
 // --- 19. 奖杯层（PSN）：平台映射 / 宽松解码 / 合并规则 / 语言阶梯 ---
