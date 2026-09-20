@@ -896,6 +896,7 @@ struct SharePanelView: View {
             selectedIDs.removeAll()
         } else {
             selectedGroupID = nil
+            groupTitle = ""  // 清空旧标题，防止换选分组时带入上一个分组的自定义标题
         }
     }
 
