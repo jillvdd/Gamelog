@@ -33,9 +33,26 @@ struct HomeCarousel: View {
     @State private var spotlightID: PersistentIdentifier?
     /// 我的最爱页「置顶」的随机最爱（每次进入首页轮换一款；其余最爱在下方列表）。同上存 ID。
     @State private var featuredFavoriteID: PersistentIdentifier?
-    /// 内容缩放因子：卡片宽/720 设计基准（钳制 0.85–2.0）。窗口缩放时经背景 GeometryReader
+    /// 布局缩放因子：卡片宽/720 设计基准（钳制 0.85–2.0）。窗口缩放时经背景 GeometryReader
     /// 逐帧更新——内容字号/尺寸随卡片等比放大收缩，避免宽窗口下内容缩在角落（§45 用户要求）。
-    @State private var contentUnit: CGFloat = 1
+    @State private var layoutUnit: CGFloat = 1
+    /// 系统「字体大小」(Dynamic Type) 档（§80）。**默认档以下恒为 1.0 → 乘 1.0 逐位不变，
+    /// 观感像素级守恒**；只增不减（小字档不缩字），上限 1.25（横向宽度不随字体变，
+    /// 封顶过高会把 `lineLimit(1)` 行推成省略号）。macOS 26 之前无系统文字大小设置，恒 1.0。
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    private var dynScale: CGFloat {
+        #if os(macOS)
+        if #unavailable(macOS 26) { return 1 }
+        #endif
+        let size = dynamicTypeSize
+        if size < .xLarge { return 1 }
+        if size == .xLarge { return 1.08 }
+        if size == .xxLarge { return 1.15 }
+        if size == .xxxLarge { return 1.2 }
+        return 1.25  // accessibility1…5 封顶（AX 顶档相对 body 是 3 倍，全放进来必破版）
+    }
+    /// 内容缩放 = 布局因子 × 字体因子。全文件 45 处消费点仍读这个名字。
+    private var contentUnit: CGFloat { layoutUnit * dynScale }
     /// 随机游戏底图偏好（设置页「个性化」）：auto=横图优先（landscape→hero）、
     /// hero=仅背景图、landscape=仅横向封面（2026-09-05 用户拍板：mac 横向封面全幅
     /// 打底在 2.8:1 卡片里上下裁切影响观感，给选择权）。
@@ -80,11 +97,11 @@ struct HomeCarousel: View {
                 Color.clear
                     .onAppear {
                         pageWidth = proxy.size.width
-                        contentUnit = Self.clampedUnit(proxy.size.width)
+                        layoutUnit = Self.clampedUnit(proxy.size.width)
                     }
                     .onChange(of: proxy.size.width) { _, w in
                         pageWidth = w
-                        contentUnit = Self.clampedUnit(w)
+                        layoutUnit = Self.clampedUnit(w)
                     }
             }
         )
@@ -119,7 +136,9 @@ struct HomeCarousel: View {
     /// 解析到比内容列更宽的容器，卡片钻到悬浮侧边栏下面，§46 用户实测三点问题）——
     /// 只信外层实测值：纯算术定尺寸，图片/容器都改变不了卡片盒子。
     @State private var pageWidth: CGFloat = 0
-    private var pageHeight: CGFloat { pageWidth / aspectRatio }
+    /// 卡片盒高 = 基准高 × 字体因子：盒与盒内内容同源等比，任意字体档下的适配关系互同比。
+    /// （版式判据不吃这一缩放，见 `usesCompactStatTiles`。）
+    private var pageHeight: CGFloat { pageWidth / aspectRatio * dynScale }
 
     // MARK: - 随机对象解析（ID → Game，已删自愈）
 
@@ -154,7 +173,7 @@ struct HomeCarousel: View {
         return fresh.flatMap { id in favorites.first { $0.persistentModelID == id } }
     }
 
-    /// 设计基准宽（contentUnit = 卡片宽 / 此值）。
+    /// 设计基准宽（layoutUnit = 卡片宽 / 此值）。
     private static let referenceWidth: CGFloat = 720
 
     /// 内容缩放因子：钳制在 0.85–2.0，窗口再宽也不至于字号失控。
@@ -1009,7 +1028,7 @@ struct HomeCarousel: View {
                     Rectangle()
                         .fill(Color.semantic(.quaternarySystemFill))
                     Image(systemName: "gamecontroller")
-                        .font(.system(size: 26))
+                        .font(.system(size: 26 * dynScale))
                         .foregroundStyle(.tertiary)
                 }
             }
@@ -1054,7 +1073,10 @@ struct HomeCarousel: View {
     /// 卡片会被撑破（圆角被裁，见 carouselCard 注释）——改**单行四列**（实测 ~80pt，宽裕）；
     /// 卡片够高（iPad / macOS / 宽窗）保持 2×2 观感不变。阈值 260pt：iPhone 全系（≈163–200pt）
     /// 走紧凑，iPad 竖 339 / 横 367、macOS 最窄窗 ~285 都走 2×2。
-    private var usesCompactStatTiles: Bool { pageHeight < 260 }
+    /// §80：判据必须读**未缩放**基准高（盒与内容同乘 dynScale，放得下与否是同比关系、
+    /// 与字体档无关；若拿缩放后高度比 260 定值，大字档会把 iPhone 误判成「够高」换 2×2，
+    /// 恰好把 §51 修掉的撑破裁圆角 bug 放回来）。
+    private var usesCompactStatTiles: Bool { pageWidth / aspectRatio < 260 }
 
     /// 四个统计瓦片（版式按卡片高度自适应，见 usesCompactStatTiles）。
     private func statTiles(_ items: [(value: String, label: String)]) -> some View {
