@@ -2185,6 +2185,7 @@ do {
     // 旧显示层只有「方 / 非方」两档，而 320×176 的横图落在"非方"那一档 → 裁切 →
     // 竖版格子里只剩中间一条（用户原话「被放大然后裁切了」）。新判据问的是
     // 「这张图放进**这个比例的框**会不会被裁」—— 下面把改造前后的每一档都钉住。
+    // （2026-09-22 定稿：留白档的空档保持旧版底色留白显示，仅封面槽位不描边。）
     if let sqImg = AppImage(data: squarePNG),
        let portImg = AppImage(data: portraitPNG),
        let landImg = AppImage(data: png(width: 320, height: 176)) {   // 真库实测的 PS3/Vita 尺寸

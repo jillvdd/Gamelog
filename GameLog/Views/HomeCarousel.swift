@@ -994,7 +994,7 @@ struct HomeCarousel: View {
         }
         .frame(width: Self.posterSize.width * contentUnit, height: Self.posterSize.height * contentUnit)
         .clipShape(RoundedRectangle(cornerRadius: 10 * contentUnit))
-        .overlay(RoundedRectangle(cornerRadius: 10 * contentUnit).strokeBorder(.quaternary, lineWidth: 1))
+        // 「去掉线框」（2026-09-22）：封面槽位不描边，显示逻辑与旧版一致。
         .shadow(color: .black.opacity(0.10), radius: 6, y: 2)
     }
 
@@ -1034,7 +1034,7 @@ struct HomeCarousel: View {
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(.quaternary, lineWidth: 0.5))
+        // 「去掉线框」（2026-09-22）：封面槽位不描边。
     }
 
     // MARK: - 卡片骨架

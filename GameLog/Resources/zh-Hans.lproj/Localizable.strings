@@ -653,3 +653,29 @@
 "stats.gamesUnit" = "款";
 "stats.showAllPlatforms" = "展开全部平台 (%d)";
 "stats.showLessPlatforms" = "收起";
+
+/* 分享升级（梯1~3）：统计摘要卡 / 封面取色主题 / 水印显示 / 九宫格 / 出图语言 / 大图护栏 */
+"share.mode.stats" = "统计摘要";
+"share.mode.stats.hint" = "将把整个库的统计汇总成一张摘要卡分享，无需勾选游戏。";
+"share.theme.coverTint" = "封面取色";
+"share.theme.short.cover" = "取色";
+"share.section.watermark" = "水印显示";
+"share.watermark.full" = "文字＋头像";
+"share.watermark.textOnly" = "仅文字";
+"share.watermark.avatarOnly" = "仅头像";
+"share.watermark.hidden" = "不显示";
+"share.watermark.text" = "水印文字";
+"share.watermark.text.hint" = "留空则使用默认（用户名＋游戏簿）。";
+"share.downscaleWarning" = "已勾选 %d 款，单图将被自动压缩以保证出图，画面可能偏软；可分批或用九宫格。";
+"share.grid9.action" = "九宫格多图";
+"share.grid9.save" = "九宫格存入相册";
+"share.grid9.done" = "已生成 %d 张方图";
+"share.language" = "出图语言";
+"share.language.follow" = "跟随 App";
+"share.stats.gameTotal" = "游戏总数";
+"share.stats.cleared" = "通关数";
+"share.stats.playtimeHours" = "总时长（小时）";
+"share.stats.statusDist" = "状态分布";
+"share.stats.topScores" = "高分榜";
+"share.stats.platinum" = "白金奖杯";
+"share.stats.gamerscore" = "微软点数";

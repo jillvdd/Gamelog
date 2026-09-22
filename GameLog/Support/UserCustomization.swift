@@ -38,6 +38,20 @@ enum UserCustomization {
     static let shareOverviewStatsKey = "share.overviewStats"
     /// 游戏格子字段池（总览格与分组卡格共用，同上格式）。
     static let shareTileFieldsKey = "share.tileFields"
+    /// 分享卡水印显示方式（`ShareWatermarkStyle` 原始值；缺失 = full）。
+    static let shareWatermarkStyleKey = "share.watermarkStyle"
+    /// 水印文字自定义（空 = 回退「用户名+游戏簿」默认拼接）。
+    static let shareWatermarkTextKey = "share.watermarkText"
+    /// 分享面板上次使用偏好（重开面板记忆上次选择，梯1.2）。
+    static let shareLastSizeKey = "share.lastSize"
+    static let shareLastThemeKey = "share.lastTheme"
+    static let shareLastFormatKey = "share.lastFormat"
+    static let shareLastSortKey = "share.lastSort"
+    /// 出图语言：跟随 app 开关 + 独立语言码（梯3.11）。
+    static let shareLanguageFollowKey = "share.languageFollow"
+    static let shareLanguageKey = "share.language"
+    /// 分享标题（总览/分组卡头）字数上限——独立于用户名 20 字上限。
+    static let shareTitleMaxLength = 30
     /// 侧边栏「状态」区展开（默认 true=展开，跨会话记忆）。
     static let sidebarStatusExpandedKey = "customization.sidebar.statusExpanded"
     /// 侧边栏「平台」区展开（默认 true=展开，跨会话记忆）。
@@ -95,6 +109,11 @@ enum UserCustomization {
     /// UI 绑定（onChange 实时截断显示）直接用；持久化路径走 `setUsername`（截断+落库一体）。
     static func truncateUsername(_ raw: String) -> String {
         String(Array(raw).prefix(usernameMaxLength))
+    }
+
+    /// 分享标题截断（总览/分组卡头，30 字上限）。
+    static func truncateShareTitle(_ raw: String) -> String {
+        String(Array(raw).prefix(shareTitleMaxLength))
     }
 
     /// 用户名的**安全写入**唯一入口：截断 + 落 UserDefaults（空串 = 移除）。

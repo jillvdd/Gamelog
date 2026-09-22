@@ -652,3 +652,29 @@
 "stats.gamesUnit" = "本";
 "stats.showAllPlatforms" = "すべてのプラットフォームを表示 (%d)";
 "stats.showLessPlatforms" = "折りたたむ";
+
+/* シェア強化（ティア1〜3）：統計サマリーカード / カバー採色テーマ / 透かし / 9枚分割 / 出力言語 / 大容量ガード */
+"share.mode.stats" = "統計サマリー";
+"share.mode.stats.hint" = "ライブラリ全体を1枚のサマリーカードにまとめてシェアします。ゲームの選択は不要です。";
+"share.theme.coverTint" = "カバー採色";
+"share.theme.short.cover" = "採色";
+"share.section.watermark" = "透かし表示";
+"share.watermark.full" = "文字＋アバター";
+"share.watermark.textOnly" = "文字のみ";
+"share.watermark.avatarOnly" = "アバターのみ";
+"share.watermark.hidden" = "表示しない";
+"share.watermark.text" = "ウォーターマーク文字";
+"share.watermark.text.hint" = "空欄の場合は既定（ユーザー名＋ゲーム簿）を使用します。";
+"share.downscaleWarning" = "%d 本選択中：1枚に収めるため自動圧縮され、画質が甘くなることがあります。分割または9枚シェアをご利用ください。";
+"share.grid9.action" = "9枚分割画像";
+"share.grid9.save" = "9枚をアルバムに保存";
+"share.grid9.done" = "%d 枚生成しました";
+"share.language" = "出力言語";
+"share.language.follow" = "アプリに追従";
+"share.stats.gameTotal" = "ゲーム総数";
+"share.stats.cleared" = "クリア数";
+"share.stats.playtimeHours" = "累計時間（時間）";
+"share.stats.statusDist" = "状態分布";
+"share.stats.topScores" = "高得点ランキング";
+"share.stats.platinum" = "プラチナトロフィー";
+"share.stats.gamerscore" = "ゲーマースコア";

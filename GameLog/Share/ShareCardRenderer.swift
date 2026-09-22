@@ -24,6 +24,11 @@ enum ShareCardRenderer {
         case jpeg(quality: CGFloat)
     }
 
+    /// 实际生效的输出倍率（预览降采样与超限自动缩小后的结果）——面板据此提示大选择降质。
+    static func effectiveScale(canvas: CGSize, scale: CGFloat) -> CGFloat {
+        min(max(scale, 0.05), maxBitmapDimension / max(canvas.width, canvas.height))
+    }
+
     // MARK: - 兼容入口（测试 / 既有调用）
 
     static func renderPNG(content: ShareCardContent, language: String) -> Data? {
@@ -41,14 +46,17 @@ enum ShareCardRenderer {
         scale: CGFloat = 1,
         format: OutputFormat = .png
     ) -> Data? {
-        let canvas = content.canvasSize
-        let clamped = min(max(scale, 0.05), maxBitmapDimension / max(canvas.width, canvas.height))
-
         let view = ShareCardView(content: content, theme: theme)
             .environment(\.appLanguageCode, language)
-            .frame(width: canvas.width, height: canvas.height)
+        return renderView(view, canvas: content.canvasSize, scale: scale, format: format)
+    }
 
-        let renderer = ImageRenderer(content: view)
+    /// 通用出口：任意已定义尺寸的视图 → 位图 → 编码（九宫格方图补齐等定制构型复用）。
+    private static func renderView<V: View>(
+        _ view: V, canvas: CGSize, scale: CGFloat, format: OutputFormat
+    ) -> Data? {
+        let clamped = min(max(scale, 0.05), maxBitmapDimension / max(canvas.width, canvas.height))
+        let renderer = ImageRenderer(content: view.frame(width: canvas.width, height: canvas.height))
         renderer.scale = clamped
         renderer.proposedSize = .init(width: canvas.width, height: canvas.height)
         #if os(macOS)
@@ -58,6 +66,47 @@ enum ShareCardRenderer {
         guard let uiImage = renderer.uiImage else { return nil }
         return encode(uiImage, format: format)
         #endif
+    }
+
+    // MARK: - 朋友圈九宫格（≤9 张 1:1 方图，按选择顺序连续分块）
+
+    /// 把游戏按顺序均分成 ≤9 块（块间数量差 ≤1）。纯函数，便于测试断言。
+    static func grid9Chunks(games: [Game]) -> [[Game]] {
+        let n = games.count
+        guard n > 0 else { return [] }
+        let chunks = min(n, 9)
+        let base = n / chunks
+        let extra = n % chunks
+        var out: [[Game]] = []
+        var start = 0
+        for i in 0..<chunks {
+            let size = base + (i < extra ? 1 : 0)
+            out.append(Array(games[start..<start + size]))
+            start += size
+        }
+        return out
+    }
+
+    /// 渲染九宫格多图（每张严格 1:1 方图：总览卡高度不足时用主题底色补齐，
+    /// 保证朋友圈九宫格每张同尺寸；标题自动带 i/9 序号）。
+    static func renderGrid9Data(
+        games: [Game], title: String, language: String, theme: ShareTheme,
+        format: OutputFormat = .jpeg(quality: 0.9)
+    ) -> [Data] {
+        let chunks = grid9Chunks(games: games)
+        return chunks.indices.compactMap { i in
+            let chunkTitle = chunks.count > 1 ? "\(title) \(i + 1)/\(chunks.count)" : title
+            let content = ShareCardContent.overview(chunks[i], title: chunkTitle, size: .square)
+            let base = content.canvasSize
+            let side = max(base.width, base.height)
+            let view = ZStack(alignment: .top) {
+                theme.background
+                ShareCardView(content: content, theme: theme)
+            }
+            .frame(width: side, height: side)
+            .environment(\.appLanguageCode, language)
+            return renderView(view, canvas: CGSize(width: side, height: side), scale: 1, format: format)
+        }
     }
 
     // MARK: - 编码

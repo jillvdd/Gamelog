@@ -7,10 +7,11 @@ import AppKit
 import Photos
 #endif
 
-/// 分享面板左栏模式：按游戏 / 按分组。
+/// 分享面板左栏模式：按游戏 / 按分组 / 全库统计卡。
 private enum ShareMode: String, CaseIterable {
     case games
     case groups
+    case stats
 }
 
 /// 导出格式：默认 JPEG（照片类内容体积小一个量级），PNG 备选无损。
@@ -57,20 +58,25 @@ struct SharePanelView: View {
 
     @State private var mode: ShareMode = .games
     @State private var compactTab: CompactShareTab = .preview
-    @State private var selectedIDs: Set<PersistentIdentifier> = []
+    /// 真实点击顺序的选择数组（梯1.3：`.selection` 排序按此顺序出图，不再是入库序）。
+    @State private var selectionOrder: [PersistentIdentifier] = []
     @State private var selectedGroupID: PersistentIdentifier?
     @State private var searchText = ""
     @State private var platformFilter: String? = nil
-    @State private var sortOption: ShareSortOption = .selection
-    @State private var size: ShareSize = .phone
-    @State private var themeMode: ShareThemeMode = .brandDark
+    // 梯1.2：画幅/主题/格式/排序跨会话记忆上次使用。
+    @AppStorage(UserCustomization.shareLastSizeKey) private var size: ShareSize = .phone
+    @AppStorage(UserCustomization.shareLastThemeKey) private var themeMode: ShareThemeMode = .brandDark
+    @AppStorage(UserCustomization.shareLastFormatKey) private var exportFormat: ShareExportFormat = .jpeg
+    @AppStorage(UserCustomization.shareLastSortKey) private var sortOption: ShareSortOption = .selection
+    // 梯3.11：出图语言与 app 语言解耦（默认跟随）。
+    @AppStorage(UserCustomization.shareLanguageFollowKey) private var languageFollow = true
+    @AppStorage(UserCustomization.shareLanguageKey) private var languageOverride = ""
     @State private var overviewTitle = ""
     @State private var groupTitle = ""
     @State private var renderedData: Data?
     @State private var shareURL: URL?
     @State private var renderTask: Task<Void, Never>?
     @State private var saveMessage: String?
-    @State private var exportFormat: ShareExportFormat = .jpeg
     @State private var showingStyleEditor = false
     /// 统计要素配置变更代际：编辑器保存后 +1 触发分组卡重渲染。
     @State private var statsRevision = 0
@@ -112,8 +118,9 @@ struct SharePanelView: View {
     }
 
     private var selectedGames: [Game] {
-        let raw = liveGames.filter { selectedIDs.contains($0.persistentModelID) }
-        return sortOption.sort(games: raw, language: language)
+        let byID = Dictionary(liveGames.map { ($0.persistentModelID, $0) }, uniquingKeysWith: { first, _ in first })
+        let raw = selectionOrder.compactMap { byID[$0] }
+        return sortOption.sort(games: raw, language: renderLanguage)
     }
 
     private var selectedGroup: GameGroup? {
@@ -124,9 +131,58 @@ struct SharePanelView: View {
     private var isMulti: Bool { selectedGames.count > 1 }
     private var isSingleShare: Bool { preselected.count == 1 && mode == .games }
 
+    /// 出图语言：跟随模式用 app 语言，否则用独立选择（梯3.11）。
+    private var renderLanguage: String {
+        languageFollow || languageOverride.isEmpty ? language : languageOverride
+    }
+
+    /// 主题求值：封面取色主题按当前内容封面派生（梯2.8）。
+    private var gamesForTheme: [Game] {
+        switch mode {
+        case .games: return selectedGames
+        case .groups: return selectedGroup?.games ?? []
+        case .stats: return Array(liveGames.prefix(4))
+        }
+    }
+
+    private var resolvedTheme: ShareTheme { themeMode.resolvedTheme(for: gamesForTheme) }
+
+    /// 统计摘要卡内容（梯3.10，全部走 LibraryStats 同源口径）。
+    private var statsContent: ShareStatsContent {
+        let pool = liveGames
+        var statusCounts: [GameStatus: Int] = [:]
+        for game in pool { statusCounts[game.statusValue, default: 0] += 1 }
+        let statusRows = GameStatus.allCases.compactMap { status -> ShareStatsContent.StatusRow? in
+            guard let count = statusCounts[status], count > 0 else { return nil }
+            return ShareStatsContent.StatusRow(status: status, count: count)
+        }
+        let topGames = pool.compactMap { game -> ShareStatsContent.TopGame? in
+            guard let score = game.libraryScore else { return nil }
+            return ShareStatsContent.TopGame(name: game.displayName(for: renderLanguage), score: score)
+        }
+        .sorted { $0.score > $1.score }
+        .prefix(3)
+        let achievements = LibraryStats.unifiedAchievements(pool)
+        let collector = LibraryStats.collectorTotals(pool.flatMap(\.copies), language: renderLanguage)
+        return ShareStatsContent(
+            title: defaultOverviewTitle(),
+            totalGames: pool.count,
+            clearedGames: LibraryStats.clearedGameCount(pool),
+            totalPlaytime: LibraryStats.totalPlaytimeHours(pool),
+            averageScore: LibraryStats.averageScore(pool),
+            statusRows: statusRows,
+            topGames: Array(topGames),
+            platinumCount: achievements.platinumCount,
+            xboxGamerscore: achievements.xboxGamerscore,
+            spentTotal: collector.totalSpent,
+            estimateTotal: collector.totalEstimate
+        )
+    }
+
     /// 当前预览对应的内容；无有效选择则 nil。
     private var currentContent: ShareCardContent? {
-        if mode == .games {
+        switch mode {
+        case .games:
             let selected = selectedGames
             guard !selected.isEmpty else { return nil }
             if selected.count == 1 {
@@ -136,26 +192,36 @@ struct SharePanelView: View {
                 ? defaultOverviewTitle()
                 : overviewTitle
             return .overview(selected, title: title, size: size)
-        } else {
+        case .groups:
             guard let group = selectedGroup else { return nil }
             let title = groupTitle.trimmingCharacters(in: .whitespaces).isEmpty ? group.name : groupTitle
             return .group(group, title: title, size: size)
+        case .stats:
+            return .stats(statsContent, size: size)
         }
     }
 
-    /// 分组标题绑定：写入时截断到用户名上限。
+    /// 大选择护栏（梯1.4）：超限自动降倍率时明确提示，不再无声出糊图。
+    private var downscaleWarning: String? {
+        guard mode == .games, selectedGames.count > 9, let content = currentContent else { return nil }
+        let eff = ShareCardRenderer.effectiveScale(canvas: content.canvasSize, scale: 1)
+        guard eff < 0.9 else { return nil }
+        return L10n.tr("share.downscaleWarning", [selectedGames.count], lang: language)
+    }
+
+    /// 分组标题绑定：写入时截断到分享标题上限。
     private var groupTitleBinding: Binding<String> {
         Binding(
             get: { groupTitle },
-            set: { groupTitle = UserCustomization.truncateUsername($0) }
+            set: { groupTitle = UserCustomization.truncateShareTitle($0) }
         )
     }
 
-    /// 总览标题绑定：写入时截断到用户名上限。
+    /// 总览标题绑定：写入时截断到分享标题上限。
     private var overviewTitleBinding: Binding<String> {
         Binding(
             get: { overviewTitle },
-            set: { overviewTitle = UserCustomization.truncateUsername($0) }
+            set: { overviewTitle = UserCustomization.truncateShareTitle($0) }
         )
     }
 
@@ -169,17 +235,22 @@ struct SharePanelView: View {
         }
         .onAppear(perform: setup)
         .onChange(of: mode) { _, _ in scheduleRerender() }
-        .onChange(of: selectedIDs) { _, _ in scheduleRerender() }
+        .onChange(of: selectionOrder) { _, _ in
+            scheduleRerender()
+        }
         .onChange(of: selectedGroupID) { _, _ in scheduleRerender() }
         .onChange(of: size) { _, _ in scheduleRerender() }
         .onChange(of: themeMode) { _, _ in scheduleRerender() }
         .onChange(of: sortOption) { _, _ in scheduleRerender() }
         .onChange(of: overviewTitle) { _, _ in scheduleRerender() }
         .onChange(of: groupTitle) { _, _ in scheduleRerender() }
+        .onChange(of: language) { _, _ in scheduleRerender() }
+        .onChange(of: languageFollow) { _, _ in scheduleRerender() }
+        .onChange(of: languageOverride) { _, _ in scheduleRerender() }
         .onChange(of: games) { _, newGames in
-            if selectedIDs.isEmpty && CommandLine.arguments.contains("-ShareSelectTop") {
+            if selectionOrder.isEmpty && CommandLine.arguments.contains("-ShareSelectTop") {
                 let top = Array(newGames.filter(\.isLive).prefix(6))
-                selectedIDs = Set(top.map(\.persistentModelID))
+                selectionOrder = top.map(\.persistentModelID)
             }
         }
         .onChange(of: exportFormat) { _, _ in scheduleRerender() }
@@ -220,7 +291,7 @@ struct SharePanelView: View {
 
     @ViewBuilder
     private var compactShareBody: some View {
-        if isSingleShare {
+        if isSingleShare || mode == .stats {
             compactSingleLayout
         } else {
             compactOverviewLayout
@@ -231,8 +302,16 @@ struct SharePanelView: View {
     private var compactSingleLayout: some View {
         VStack(spacing: 0) {
             HStack {
-                if let game = preselected.first {
+                if mode == .stats {
+                    Text(verbatim: L10n.tr("share.mode.stats", lang: language))
+                        .font(.headline)
+                        .lineLimit(1)
+                } else if !preselected.isEmpty, let game = preselected.first {
                     Text(verbatim: game.displayName(for: language))
+                        .font(.headline)
+                        .lineLimit(1)
+                } else if mode == .groups {
+                    LText("share.byGroups")
                         .font(.headline)
                         .lineLimit(1)
                 } else {
@@ -240,6 +319,11 @@ struct SharePanelView: View {
                         .font(.headline)
                 }
                 Spacer()
+                if preselected.isEmpty {
+                    // 从库面板进入（统计/分组单卡流）：保留模式切换胶囊可切回。
+                    modeSegment
+                        .frame(width: 196)
+                }
                 closeButton
             }
             .padding(.horizontal, 20)
@@ -266,6 +350,12 @@ struct SharePanelView: View {
                 #else
                 compactActionButtons
                 #endif
+
+                if let downscaleWarning {
+                    Text(verbatim: downscaleWarning)
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
 
                 if let saveMessage {
                     Text(verbatim: saveMessage)
@@ -318,7 +408,7 @@ struct SharePanelView: View {
     }
 
     private var overviewSelectTabTitle: String {
-        let count = mode == .groups ? (selectedGroup != nil ? 1 : 0) : selectedIDs.count
+        let count = mode == .groups ? (selectedGroup != nil ? 1 : 0) : selectionOrder.count
         if count == 0 {
             return L10n.tr("share.tab.select", lang: language)
         } else {
@@ -373,6 +463,12 @@ struct SharePanelView: View {
                 compactActionButtons
                 #endif
 
+                if let downscaleWarning {
+                    Text(verbatim: downscaleWarning)
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+
                 if let saveMessage {
                     Text(verbatim: saveMessage)
                         .font(.caption)
@@ -393,7 +489,7 @@ struct SharePanelView: View {
                 return L10n.tr("share.noneSelectedGroup", lang: language)
             }
         } else {
-            return L10n.tr("share.selectedCountLink", [selectedIDs.count], lang: language)
+            return L10n.tr("share.selectedCountLink", [selectionOrder.count], lang: language)
         }
     }
 
@@ -462,7 +558,7 @@ struct SharePanelView: View {
                 return L10n.tr("share.noneSelectedGroup", lang: language)
             }
         } else {
-            return L10n.tr("share.selectedCount", [selectedIDs.count], lang: language)
+            return L10n.tr("share.selectedCount", [selectionOrder.count], lang: language)
         }
     }
 
@@ -504,15 +600,28 @@ struct SharePanelView: View {
 
     private var themePillToggle: some View {
         Button {
-            themeMode = (themeMode == .brandDark ? .editorialLight : .brandDark)
+            let all = ShareThemeMode.allCases
+            themeMode = all[(all.firstIndex(of: themeMode)! + 1) % all.count]
             triggerSelectionHaptic()
         } label: {
-            HStack(spacing: 4) {
-                Image(systemName: themeMode == .brandDark ? "moon.stars.fill" : "sun.max.fill")
-                    .font(.system(size: 11))
-                    .foregroundStyle(themeMode == .brandDark ? Color.orange : Color.yellow)
-                Text(verbatim: themeShortTitle(themeMode))
-                    .font(.system(size: 11, weight: .medium))
+            // 占位隐藏的最宽候选：胶囊宽度恒定，点选后不带动同排按钮位移（2026-09-21 用户反馈）。
+            ZStack {
+                ForEach(ShareThemeMode.allCases) { t in
+                    HStack(spacing: 4) {
+                        Image(systemName: themeIcon(t))
+                            .font(.system(size: 11))
+                        Text(verbatim: themeShortTitle(t))
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .hidden()
+                }
+                HStack(spacing: 4) {
+                    Image(systemName: themeIcon(themeMode))
+                        .font(.system(size: 11))
+                        .foregroundStyle(themeIconColor(themeMode))
+                    Text(verbatim: themeShortTitle(themeMode))
+                        .font(.system(size: 11, weight: .medium))
+                }
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 5)
@@ -521,10 +630,27 @@ struct SharePanelView: View {
         .buttonStyle(.plain)
     }
 
+    private func themeIcon(_ t: ShareThemeMode) -> String {
+        switch t {
+        case .brandDark: return "moon.stars.fill"
+        case .editorialLight: return "sun.max.fill"
+        case .coverTint: return "paintpalette.fill"
+        }
+    }
+
+    private func themeIconColor(_ t: ShareThemeMode) -> Color {
+        switch t {
+        case .brandDark: return Color.orange
+        case .editorialLight: return Color.yellow
+        case .coverTint: return Color.pink
+        }
+    }
+
     private func themeShortTitle(_ t: ShareThemeMode) -> String {
         switch t {
         case .brandDark: return L10n.tr("share.theme.short.dark", lang: language)
         case .editorialLight: return L10n.tr("share.theme.short.light", lang: language)
+        case .coverTint: return L10n.tr("share.theme.short.cover", lang: language)
         }
     }
 
@@ -538,6 +664,14 @@ struct SharePanelView: View {
                     }
                 }
             }
+            Section(L10n.tr("share.language", lang: language)) {
+                Picker(L10n.tr("share.language", lang: language), selection: shareLanguageSelection) {
+                    Text(verbatim: L10n.tr("share.language.follow", lang: language)).tag("")
+                    ForEach(AppLanguage.allCases) { lang in
+                        Text(verbatim: lang.displayName).tag(lang.localeCode)
+                    }
+                }
+            }
             Section {
                 Button {
                     showingStyleEditor = true
@@ -545,14 +679,42 @@ struct SharePanelView: View {
                     Label(L10n.tr("share.styleSettings", lang: language), systemImage: "slider.horizontal.3")
                 }
             }
+            if showGrid9Action {
+                Section {
+                    Button {
+                        exportGrid9()
+                    } label: {
+                        Label(L10n.tr("share.grid9.action", lang: language), systemImage: "square.grid.3x3.fill")
+                    }
+                    #if !os(macOS)
+                    Button {
+                        saveGrid9ToAlbum()
+                    } label: {
+                        Label(L10n.tr("share.grid9.save", lang: language), systemImage: "arrow.down.to.line")
+                    }
+                    #endif
+                }
+            }
         } label: {
-            HStack(spacing: 3) {
-                Image(systemName: "gearshape")
-                    .font(.system(size: 11))
-                Text(verbatim: exportFormat == .jpeg ? "JPEG" : "PNG")
-                    .font(.system(size: 11, weight: .medium))
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 8))
+            // 占位隐藏 JPEG/PNG 两态：切格式时胶囊宽度恒定（同 themePillToggle 的纪律）。
+            ZStack {
+                HStack(spacing: 3) {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 11))
+                    Text(verbatim: "JPEG")
+                        .font(.system(size: 11, weight: .medium))
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 8))
+                }
+                .hidden()
+                HStack(spacing: 3) {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 11))
+                    Text(verbatim: exportFormat == .jpeg ? "JPEG" : "PNG")
+                        .font(.system(size: 11, weight: .medium))
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 8))
+                }
             }
             .foregroundStyle(.secondary)
             .padding(.horizontal, 8)
@@ -659,11 +821,13 @@ struct SharePanelView: View {
         VStack(spacing: 0) {
             modeSegment
                 .padding(10)
-            searchField
-                .padding([.horizontal, .bottom], 10)
-            if mode == .games {
-                filterChips
-                listToolbar
+            if mode != .stats {
+                searchField
+                    .padding([.horizontal, .bottom], 10)
+                if mode == .games {
+                    filterChips
+                    listToolbar
+                }
             }
             gameGroupList
         }
@@ -671,7 +835,13 @@ struct SharePanelView: View {
 
     private var modeSegment: some View {
         SegmentSlider(
-            titles: ShareMode.allCases.map { L10n.tr($0 == .games ? "share.byGames" : "share.byGroups", lang: language) },
+            titles: ShareMode.allCases.map { mode in
+                switch mode {
+                case .games: return L10n.tr("share.byGames", lang: language)
+                case .groups: return L10n.tr("share.byGroups", lang: language)
+                case .stats: return L10n.tr("share.mode.stats", lang: language)
+                }
+            },
             selection: Binding(
                 get: { ShareMode.allCases.firstIndex(of: mode) ?? 0 },
                 set: {
@@ -768,7 +938,7 @@ struct SharePanelView: View {
                     .font(.system(size: 11))
             }
             .buttonStyle(.borderless)
-            .disabled(selectedIDs.isEmpty)
+            .disabled(selectionOrder.isEmpty)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 4)
@@ -794,14 +964,30 @@ struct SharePanelView: View {
 
     private var gameGroupList: some View {
         List {
-            if mode == .games {
+            if mode == .stats {
+                HStack {
+                    Spacer()
+                    VStack(spacing: 10) {
+                        Image(systemName: "chart.bar.doc.horizontal")
+                            .font(.system(size: 34))
+                            .foregroundStyle(.secondary)
+                        Text(verbatim: L10n.tr("share.mode.stats.hint", lang: language))
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(.top, 60)
+                    Spacer()
+                }
+                .listRowSeparator(.hidden)
+            } else if mode == .games {
                 ForEach(filteredGames) { game in
                     Button {
                         toggle(game)
                     } label: {
                         HStack(spacing: 8) {
-                            Image(systemName: selectedIDs.contains(game.persistentModelID) ? "checkmark.square.fill" : "square")
-                                .foregroundStyle(selectedIDs.contains(game.persistentModelID) ? Color.accentColor : Color.secondary)
+                            Image(systemName: selectionOrder.contains(game.persistentModelID) ? "checkmark.square.fill" : "square")
+                                .foregroundStyle(selectionOrder.contains(game.persistentModelID) ? Color.accentColor : Color.secondary)
                             coverThumb(game)
                             Text(verbatim: game.displayName(for: language))
                                 .lineLimit(1)
@@ -865,10 +1051,10 @@ struct SharePanelView: View {
 
     private func toggle(_ game: Game) {
         triggerSelectionHaptic()
-        if selectedIDs.contains(game.persistentModelID) {
-            selectedIDs.remove(game.persistentModelID)
+        if let idx = selectionOrder.firstIndex(of: game.persistentModelID) {
+            selectionOrder.remove(at: idx)
         } else {
-            selectedIDs.insert(game.persistentModelID)
+            selectionOrder.append(game.persistentModelID)
         }
     }
 
@@ -878,22 +1064,23 @@ struct SharePanelView: View {
             selectedGroupID = nil
         } else {
             selectedGroupID = group.persistentModelID
-            groupTitle = group.name
+            groupTitle = UserCustomization.truncateShareTitle(group.name)
         }
     }
 
     private func selectAllFiltered() {
         triggerSelectionHaptic()
         if mode == .games {
-            let ids = filteredGames.map(\.persistentModelID)
-            selectedIDs.formUnion(ids)
+            for game in filteredGames where !selectionOrder.contains(game.persistentModelID) {
+                selectionOrder.append(game.persistentModelID)
+            }
         }
     }
 
     private func deselectAll() {
         triggerSelectionHaptic()
         if mode == .games {
-            selectedIDs.removeAll()
+            selectionOrder.removeAll()
         } else {
             selectedGroupID = nil
             groupTitle = ""  // 清空旧标题，防止换选分组时带入上一个分组的自定义标题
@@ -967,6 +1154,7 @@ struct SharePanelView: View {
                 sizePicker
                 themePicker
                 formatPicker
+                languageMenuButton
                 styleSettingsButton
                 Spacer(minLength: 0)
             }
@@ -977,7 +1165,22 @@ struct SharePanelView: View {
                     BorderedTextField(text: overviewTitleBinding, placeholder: L10n.tr("share.overviewTitle", lang: language))
                 }
                 Spacer(minLength: 0)
+                if showGrid9Action {
+                    Button {
+                        exportGrid9()
+                    } label: {
+                        Text(verbatim: L10n.tr("share.grid9.action", lang: language))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
+                    }
+                    .appStandardButton()
+                }
                 exportButtons
+            }
+            if let downscaleWarning {
+                Text(verbatim: downscaleWarning)
+                    .font(.caption)
+                    .foregroundStyle(.orange)
             }
             if let saveMessage {
                 Text(verbatim: saveMessage)
@@ -989,6 +1192,63 @@ struct SharePanelView: View {
         .padding(.vertical, 10)
     }
 
+    private var languageMenuButton: some View {
+        Menu {
+            Picker(L10n.tr("share.language", lang: language), selection: shareLanguageSelection) {
+                Text(verbatim: L10n.tr("share.language.follow", lang: language)).tag("")
+                ForEach(AppLanguage.allCases) { lang in
+                    Text(verbatim: lang.displayName).tag(lang.localeCode)
+                }
+            }
+        } label: {
+            ZStack {
+                ForEach([L10n.tr("share.language.follow", lang: language)] + AppLanguage.allCases.map(\.displayName), id: \.self) { label in
+                    HStack(spacing: 4) {
+                        Image(systemName: "globe")
+                            .font(.system(size: 11))
+                        Text(verbatim: label)
+                            .font(.system(size: 12, weight: .medium))
+                    }
+                    .hidden()
+                }
+                HStack(spacing: 4) {
+                    Image(systemName: "globe")
+                        .font(.system(size: 11))
+                    Text(verbatim: renderLanguageLabel)
+                        .font(.system(size: 12, weight: .medium))
+                        .lineLimit(1)
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Capsule().fill(Color.semantic(.quaternarySystemFill)))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var renderLanguageLabel: String {
+        if languageFollow || languageOverride.isEmpty {
+            return L10n.tr("share.language.follow", lang: language)
+        }
+        return AppLanguage(localeCode: languageOverride).displayName
+    }
+
+    /// 出图语言选择绑定：空串 = 跟随 app 语言。
+    private var shareLanguageSelection: Binding<String> {
+        Binding(
+            get: { languageFollow ? "" : languageOverride },
+            set: { newValue in
+                if newValue.isEmpty {
+                    languageFollow = true
+                    languageOverride = ""
+                } else {
+                    languageFollow = false
+                    languageOverride = newValue
+                }
+            }
+        )
+    }
+
     private var sizePicker: some View {
         Menu {
             Picker(L10n.tr("share.size", lang: language), selection: $size) {
@@ -997,12 +1257,24 @@ struct SharePanelView: View {
                 }
             }
         } label: {
-            HStack(spacing: 4) {
-                Image(systemName: sizeIcon(size))
-                    .font(.system(size: 11))
-                Text(verbatim: sizeTitle(size))
-                    .font(.system(size: 12, weight: .medium))
-                    .lineLimit(1)
+            // 候选最宽占位：点选后胶囊宽度恒定，同排控件不位移。
+            ZStack {
+                ForEach(ShareSize.allCases) { s in
+                    HStack(spacing: 4) {
+                        Image(systemName: sizeIcon(s))
+                            .font(.system(size: 11))
+                        Text(verbatim: sizeTitle(s))
+                            .font(.system(size: 12, weight: .medium))
+                    }
+                    .hidden()
+                }
+                HStack(spacing: 4) {
+                    Image(systemName: sizeIcon(size))
+                        .font(.system(size: 11))
+                    Text(verbatim: sizeTitle(size))
+                        .font(.system(size: 12, weight: .medium))
+                        .lineLimit(1)
+                }
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
@@ -1019,13 +1291,24 @@ struct SharePanelView: View {
                 }
             }
         } label: {
-            HStack(spacing: 4) {
-                Image(systemName: themeMode == .brandDark ? "moon.stars.fill" : "sun.max.fill")
-                    .font(.system(size: 11))
-                    .foregroundStyle(themeMode == .brandDark ? Color.orange : Color.yellow)
-                Text(verbatim: themeTitle(themeMode))
-                    .font(.system(size: 12, weight: .medium))
-                    .lineLimit(1)
+            ZStack {
+                ForEach(ShareThemeMode.allCases) { t in
+                    HStack(spacing: 4) {
+                        Image(systemName: themeIcon(t))
+                            .font(.system(size: 11))
+                        Text(verbatim: themeTitle(t))
+                            .font(.system(size: 12, weight: .medium))
+                    }
+                    .hidden()
+                }
+                HStack(spacing: 4) {
+                    Image(systemName: themeIcon(themeMode))
+                        .font(.system(size: 11))
+                        .foregroundStyle(themeIconColor(themeMode))
+                    Text(verbatim: themeTitle(themeMode))
+                        .font(.system(size: 12, weight: .medium))
+                        .lineLimit(1)
+                }
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
@@ -1043,11 +1326,17 @@ struct SharePanelView: View {
                 }
             }
         } label: {
-            Text(verbatim: L10n.tr(exportFormat == .jpeg ? "share.format.jpeg" : "share.format.png", lang: language))
-                .font(.system(size: 12, weight: .medium))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(Capsule().fill(Color.semantic(.quaternarySystemFill)))
+            ZStack {
+                Text(verbatim: L10n.tr("share.format.jpeg", lang: language))
+                    .hidden()
+                Text(verbatim: L10n.tr("share.format.png", lang: language))
+                    .hidden()
+                Text(verbatim: L10n.tr(exportFormat == .jpeg ? "share.format.jpeg" : "share.format.png", lang: language))
+            }
+            .font(.system(size: 12, weight: .medium))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Capsule().fill(Color.semantic(.quaternarySystemFill)))
         }
         .buttonStyle(.plain)
     }
@@ -1121,6 +1410,7 @@ struct SharePanelView: View {
         switch t {
         case .brandDark: return L10n.tr("share.theme.brandDark", lang: language)
         case .editorialLight: return L10n.tr("share.theme.editorialLight", lang: language)
+        case .coverTint: return L10n.tr("share.theme.coverTint", lang: language)
         }
     }
 
@@ -1150,10 +1440,10 @@ struct SharePanelView: View {
 
     private func setup() {
         if !preselected.isEmpty {
-            selectedIDs = Set(preselected.map(\.persistentModelID))
+            selectionOrder = preselected.map(\.persistentModelID)
         } else if CommandLine.arguments.contains("-ShareSelectTop") {
             let topGames = Array(liveGames.prefix(6))
-            selectedIDs = Set(topGames.map(\.persistentModelID))
+            selectionOrder = topGames.map(\.persistentModelID)
         }
         if let idx = CommandLine.arguments.firstIndex(of: "-ShareSize"), idx + 1 < CommandLine.arguments.count {
             let val = CommandLine.arguments[idx + 1]
@@ -1176,9 +1466,9 @@ struct SharePanelView: View {
         Task { @MainActor in
             for _ in 0..<15 {
                 if !liveGames.isEmpty {
-                    if CommandLine.arguments.contains("-ShareSelectTop") && selectedIDs.isEmpty {
+                    if CommandLine.arguments.contains("-ShareSelectTop") && selectionOrder.isEmpty {
                         let topGames = Array(liveGames.prefix(6))
-                        selectedIDs = Set(topGames.map(\.persistentModelID))
+                        selectionOrder = topGames.map(\.persistentModelID)
                         scheduleRerender()
                     }
                     break
@@ -1211,7 +1501,7 @@ struct SharePanelView: View {
         }
         NSLog("GameLog: rerenderPreview starting render for %d games, size: %@, theme: %@", selectedGames.count, size.rawValue, themeMode.rawValue)
         if let data = ShareCardRenderer.renderData(
-            content: content, language: language, theme: themeMode.theme,
+            content: content, language: renderLanguage, theme: resolvedTheme,
             scale: ShareCardRenderer.previewScale, format: exportFormat.rendererFormat
         ) {
             NSLog("GameLog: rerenderPreview success, bytes: %d", data.count)
@@ -1225,7 +1515,7 @@ struct SharePanelView: View {
     private func renderFullData() -> Data? {
         guard let content = currentContent else { return nil }
         return ShareCardRenderer.renderData(
-            content: content, language: language, theme: themeMode.theme, scale: 1, format: exportFormat.rendererFormat
+            content: content, language: renderLanguage, theme: resolvedTheme, scale: 1, format: exportFormat.rendererFormat
         )
     }
 
@@ -1234,7 +1524,7 @@ struct SharePanelView: View {
         if mode == .groups, let group = selectedGroup {
             raw = group.name
         } else if selectedGames.count == 1, let first = selectedGames.first {
-            raw = first.displayName(for: language)
+            raw = first.displayName(for: renderLanguage)
         } else {
             raw = "overview"
         }
@@ -1260,6 +1550,87 @@ struct SharePanelView: View {
         renderedData = nil
         shareURL = nil
     }
+
+    // MARK: - 朋友圈九宫格（梯3.9）
+
+    /// 九宫格可用：按游戏模式且勾选 ≥2（1 张就是普通单卡，无需多图流程）。
+    private var showGrid9Action: Bool { mode == .games && selectedGames.count >= 2 }
+
+    /// 渲染 ≤9 张方图并落临时文件：iOS 弹系统分享面板（多选一次全部带出），
+    /// macOS 无程序化分享锚点，改为在访达中选中这批文件 + 完成提示。
+    private func exportGrid9() {
+        let trimmed = overviewTitle.trimmingCharacters(in: .whitespaces)
+        let title = trimmed.isEmpty ? defaultOverviewTitle() : trimmed
+        let datas = ShareCardRenderer.renderGrid9Data(
+            games: selectedGames, title: title, language: renderLanguage,
+            theme: resolvedTheme, format: exportFormat.rendererFormat
+        )
+        let urls = writeGrid9Files(datas)
+        guard !urls.isEmpty else {
+            saveMessage = L10n.tr("share.saveFailed", lang: language)
+            return
+        }
+        #if os(macOS)
+        NSWorkspace.shared.activateFileViewerSelecting(urls)
+        saveMessage = L10n.tr("share.grid9.done", [urls.count], lang: language)
+        #else
+        presentShareSheet(urls: urls, sourceRect: shareButtonRect)
+        #endif
+    }
+
+    private func writeGrid9Files(_ datas: [Data]) -> [URL] {
+        guard !datas.isEmpty else { return [] }
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("GameLog-grid9-\(UUID().uuidString.prefix(6))", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let ext = exportFormat.fileExtension
+        var urls: [URL] = []
+        for (i, data) in datas.enumerated() {
+            let url = dir.appendingPathComponent("GameLog-9grid-\(i + 1).\(ext)")
+            if (try? data.write(to: url)) != nil { urls.append(url) }
+        }
+        return urls
+    }
+
+    #if !os(macOS)
+    /// 九宫格整批存相册（朋友圈场景先存再发最常见）。
+    private func saveGrid9ToAlbum() {
+        let trimmed = overviewTitle.trimmingCharacters(in: .whitespaces)
+        let title = trimmed.isEmpty ? defaultOverviewTitle() : trimmed
+        let datas = ShareCardRenderer.renderGrid9Data(
+            games: selectedGames, title: title, language: renderLanguage,
+            theme: resolvedTheme, format: exportFormat.rendererFormat
+        )
+        let images = datas.compactMap { UIImage(data: $0) }
+        guard !images.isEmpty else {
+            saveMessage = L10n.tr("share.saveFailed", lang: language)
+            return
+        }
+        PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+            DispatchQueue.main.async {
+                switch status {
+                case .authorized, .limited:
+                    PHPhotoLibrary.shared().performChanges {
+                        for image in images {
+                            PHAssetChangeRequest.creationRequestForAsset(from: image)
+                        }
+                    } completionHandler: { success, _ in
+                        DispatchQueue.main.async {
+                            if success {
+                                triggerSuccessHaptic()
+                                saveMessage = L10n.tr("share.grid9.done", [images.count], lang: language)
+                            } else {
+                                saveMessage = L10n.tr("share.saveFailed", lang: language)
+                            }
+                        }
+                    }
+                default:
+                    saveMessage = L10n.tr("share.photoPermissionDenied", lang: language)
+                }
+            }
+        }
+    }
+    #endif
 
     private func saveImage() {
         #if os(macOS)
@@ -1305,7 +1676,7 @@ struct SharePanelView: View {
     #endif
 }
 
-// MARK: - 分享样式设置（三分区：总览头部汇总 / 游戏格子字段 / 分组统计要素）
+// MARK: - 分享样式设置（四分区：总览头部汇总 / 游戏格子字段 / 分组统计要素 / 水印显示方式）
 
 /// 要素池条目协议：供通用配置区渲染（Toggle + 上移/下移）。
 protocol ShareConfigItem: Hashable, CaseIterable, Identifiable, RawRepresentable where RawValue == String, ID == String {}
@@ -1351,6 +1722,20 @@ private struct ConfigSectionView<T: ShareConfigItem>: View {
                     }
                     .buttonStyle(.borderless)
                     .disabled(index == items.count - 1)
+                } else {
+                    // 占位：与启用行等宽，开关启停时位置不跳动
+                    Button {} label: {
+                        Image(systemName: "chevron.up")
+                    }
+                    .buttonStyle(.borderless)
+                    .disabled(true)
+                    .opacity(0)
+                    Button {} label: {
+                        Image(systemName: "chevron.down")
+                    }
+                    .buttonStyle(.borderless)
+                    .disabled(true)
+                    .opacity(0)
                 }
             }
         }
@@ -1371,12 +1756,24 @@ private struct ShareStyleConfigurator: View {
     @State private var overviewStats: [OverviewHeaderStat]
     @State private var tileFields: [GameTileField]
     @State private var groupStats: [GroupStatItem]
+    @State private var watermarkStyle: ShareWatermarkStyle
+    @State private var watermarkText: String
+    @AppStorage(UserCustomization.usernameKey) private var username = ""
+
+    /// 输入框 prompt：与 `BrandWatermark` 默认拼接逻辑同源的预览文案。
+    private var defaultWatermarkText: String {
+        let name = username.trimmingCharacters(in: .whitespaces)
+        if name.isEmpty { return L10n.tr("app.menu", lang: language) }
+        return L10n.tr("share.brandUser", [name], lang: language)
+    }
 
     init(onSave: @escaping () -> Void) {
         self.onSave = onSave
         _overviewStats = State(initialValue: ShareOverviewStatsConfig.load())
         _tileFields = State(initialValue: ShareTileFieldsConfig.load())
         _groupStats = State(initialValue: ShareGroupStatsConfig.load())
+        _watermarkStyle = State(initialValue: ShareWatermarkStyle.current)
+        _watermarkText = State(initialValue: UserDefaults.standard.string(forKey: UserCustomization.shareWatermarkTextKey) ?? "")
     }
 
     var body: some View {
@@ -1391,6 +1788,25 @@ private struct ShareStyleConfigurator: View {
                 Section(L10n.tr("share.section.group", lang: language)) {
                     ConfigSectionView(label: { Self.groupLabel($0, language: language) }, items: $groupStats)
                 }
+                Section {
+                    TextField(text: $watermarkText, prompt: Text(verbatim: defaultWatermarkText)) {
+                        Text(verbatim: L10n.tr("share.watermark.text", lang: language))
+                    }
+                    .onChange(of: watermarkText) { _, new in
+                        watermarkText = UserCustomization.truncateShareTitle(new)
+                    }
+                    Picker(L10n.tr("share.section.watermark", lang: language), selection: $watermarkStyle) {
+                        ForEach(ShareWatermarkStyle.allCases) { style in
+                            Text(verbatim: Self.watermarkLabel(style, language: language)).tag(style)
+                        }
+                    }
+                    .pickerStyle(.inline)
+                    .labelsHidden()
+                } header: {
+                    Text(verbatim: L10n.tr("share.section.watermark", lang: language))
+                } footer: {
+                    Text(verbatim: L10n.tr("share.watermark.text.hint", lang: language))
+                }
             }
             .navigationTitle(L10n.tr("share.styleSettings", lang: language))
             .toolbar {
@@ -1399,6 +1815,11 @@ private struct ShareStyleConfigurator: View {
                         ShareOverviewStatsConfig.save(overviewStats)
                         ShareTileFieldsConfig.save(tileFields)
                         ShareGroupStatsConfig.save(groupStats)
+                        ShareWatermarkStyle.save(watermarkStyle)
+                        UserDefaults.standard.set(
+                            watermarkText.trimmingCharacters(in: .whitespaces),
+                            forKey: UserCustomization.shareWatermarkTextKey
+                        )
                         onSave()
                         dismiss()
                     }
@@ -1442,6 +1863,15 @@ private struct ShareStyleConfigurator: View {
         case .completionCount: return L10n.tr("group.completionCount", lang: language)
         case .topGame: return L10n.tr("share.stat.topGame", lang: language)
         case .collectionValue: return L10n.tr("share.stat.collectionValue", lang: language)
+        }
+    }
+
+    private static func watermarkLabel(_ style: ShareWatermarkStyle, language: String) -> String {
+        switch style {
+        case .full: return L10n.tr("share.watermark.full", lang: language)
+        case .textOnly: return L10n.tr("share.watermark.textOnly", lang: language)
+        case .avatarOnly: return L10n.tr("share.watermark.avatarOnly", lang: language)
+        case .hidden: return L10n.tr("share.watermark.hidden", lang: language)
         }
     }
 }

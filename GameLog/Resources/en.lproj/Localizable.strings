@@ -652,3 +652,29 @@
 "stats.gamesUnit" = "games";
 "stats.showAllPlatforms" = "Show All Platforms (%d)";
 "stats.showLessPlatforms" = "Show Less";
+
+/* Share upgrades (tiers 1-3): stats summary card / cover-tint theme / watermark / 9-grid / card language / downscale guard */
+"share.mode.stats" = "Stats Summary";
+"share.mode.stats.hint" = "Shares one summary card built from your whole library — no need to pick games.";
+"share.theme.coverTint" = "Cover Tint";
+"share.theme.short.cover" = "Tint";
+"share.section.watermark" = "Watermark";
+"share.watermark.full" = "Text + Avatar";
+"share.watermark.textOnly" = "Text Only";
+"share.watermark.avatarOnly" = "Avatar Only";
+"share.watermark.hidden" = "Hidden";
+"share.watermark.text" = "Watermark Text";
+"share.watermark.text.hint" = "Leave empty to use the default (username + game log).";
+"share.downscaleWarning" = "%d games selected — the single image will be auto-compressed to fit, so detail may soften. Split the selection or use the 9-grid export.";
+"share.grid9.action" = "9-Grid Images";
+"share.grid9.save" = "Save 9-Grid to Album";
+"share.grid9.done" = "%d square images ready";
+"share.language" = "Card Language";
+"share.language.follow" = "Follow App";
+"share.stats.gameTotal" = "Total Games";
+"share.stats.cleared" = "Cleared";
+"share.stats.playtimeHours" = "Playtime (h)";
+"share.stats.statusDist" = "Status Breakdown";
+"share.stats.topScores" = "Top Scores";
+"share.stats.platinum" = "Platinum Trophies";
+"share.stats.gamerscore" = "Gamerscore";

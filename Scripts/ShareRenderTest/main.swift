@@ -291,6 +291,183 @@ func run() -> Int {
           ShareTileFieldsConfig.load() == [.status, .releaseYear])
     UserDefaults.standard.removeObject(forKey: UserCustomization.shareTileFieldsKey)
 
+    // MARK: - 梯1.2 偏好持久化：RawRepresentable 枚举走 @AppStorage(String) 往返
+
+    UserDefaults.standard.set(ShareSize.desktop.rawValue, forKey: UserCustomization.shareLastSizeKey)
+    check("上次画幅持久化往返",
+          UserDefaults.standard.string(forKey: UserCustomization.shareLastSizeKey) == ShareSize.desktop.rawValue
+              && ShareSize(rawValue: ShareSize.desktop.rawValue) == .desktop)
+    UserDefaults.standard.removeObject(forKey: UserCustomization.shareLastSizeKey)
+
+    // MARK: - 梯1.4 effectiveScale：超限自动缩倍率
+
+    check("effectiveScale 4000px 画布不缩", ShareCardRenderer.effectiveScale(canvas: CGSize(width: 4000, height: 4000), scale: 1) == 1)
+    check("effectiveScale 20000px 画布缩到 0.6",
+          abs(ShareCardRenderer.effectiveScale(canvas: CGSize(width: 20000, height: 20000), scale: 1) - 0.6) < 0.001)
+    check("effectiveScale 预览倍率不被抬高",
+          ShareCardRenderer.effectiveScale(canvas: CGSize(width: 1080, height: 1920), scale: 0.5) == 0.5)
+
+    // MARK: - 梯2.5 水印显示方式：存储往返
+
+    check("水印默认 full", ShareWatermarkStyle.current == .full)
+    ShareWatermarkStyle.save(.textOnly)
+    check("水印保存后读回 textOnly", ShareWatermarkStyle.current == .textOnly)
+    check("textOnly 显示文字不显头像",
+          ShareWatermarkStyle.textOnly.showsText && !ShareWatermarkStyle.textOnly.showsAvatar)
+    check("hidden 两者都不显示", !ShareWatermarkStyle.hidden.showsText && !ShareWatermarkStyle.hidden.showsAvatar)
+    UserDefaults.standard.removeObject(forKey: UserCustomization.shareWatermarkStyleKey)
+    check("清除后回退 full", ShareWatermarkStyle.current == .full)
+
+    // MARK: - 梯2.8 封面取色主题
+
+    let tintTheme = ShareTheme.coverTint(from: [game])
+    let brandTheme = ShareTheme.brand
+    check("取色主题为暗底", tintTheme.isDark)
+    // 无封面回退：coverTint(from: []) 不应崩溃且仍为暗底（等价 brand 路径）。
+    check("无封面取色回退不崩", ShareTheme.coverTint(from: []).isDark)
+    // 渲染一张取色卡并导出：蓝色封面应派生出明显非品牌暖底的背景（肉眼/像素双验）。
+    if let png = ShareCardRenderer.renderData(content: .single(game, size: .phone), language: language, theme: tintTheme),
+       NSImage(data: png) != nil {
+        check("封面取色主题渲染成功", true)
+        try? png.write(to: URL(fileURLWithPath: "/tmp/gamelog_share_covertint.png"))
+    } else {
+        check("封面取色主题渲染成功", false)
+    }
+    check("取色主题与品牌底不同", tintTheme.background != brandTheme.background || tintTheme.accent != brandTheme.accent)
+
+    // MARK: - 梯2.6 浅色主题轨道色：分组卡（含分数条）雪岭纯白导出
+
+    if let png = ShareCardRenderer.renderData(content: .group(group, title: "JRPG", size: .phone),
+                                              language: language, theme: .editorialLight),
+       NSImage(data: png) != nil {
+        check("浅色分组卡渲染成功", true)
+        try? png.write(to: URL(fileURLWithPath: "/tmp/gamelog_share_group_light.png"))
+    } else {
+        check("浅色分组卡渲染成功", false)
+    }
+
+    // MARK: - 梯3.9 九宫格分块纯函数 + 多图渲染
+
+    let gridPool = Array(repeating: game, count: 20)
+    let chunks = ShareCardRenderer.grid9Chunks(games: gridPool)
+    check("九宫格 20 款切 9 块", chunks.count == 9)
+    check("九宫格 20 款总量守恒", chunks.reduce(0) { $0 + $1.count } == 20)
+    check("九宫格 20 款块间差 ≤1",
+          (chunks.map(\.count).max() ?? 0) - (chunks.map(\.count).min() ?? 0) <= 1)
+    check("九宫格 5 款切 5 块", ShareCardRenderer.grid9Chunks(games: Array(repeating: game, count: 5)).count == 5)
+    check("九宫格 0 款空块", ShareCardRenderer.grid9Chunks(games: []).isEmpty)
+    let gridDatas = ShareCardRenderer.renderGrid9Data(games: [game, plain, third, gameB, gameC],
+                                                      title: "合集", language: language, theme: .brand,
+                                                      format: .png)
+    check("九宫格 5 款出 5 图", gridDatas.count == 5)
+    if let first = gridDatas.first, let s = pngSize(first) {
+        check("九宫格单图 1200x1200（实际 \(s.width)x\(s.height)）", s.width == 1200 && s.height == 1200)
+        try? first.write(to: URL(fileURLWithPath: "/tmp/gamelog_share_grid9_1.png"))
+    } else {
+        check("九宫格单图尺寸可解析", false)
+    }
+
+    // MARK: - 梯3.10 统计摘要卡：四画幅渲染高宽与 statsSize 一致
+
+    let stats = ShareStatsContent(
+        title: "我的游戏档案",
+        totalGames: 128, clearedGames: 42, totalPlaytime: 3210.5, averageScore: 8.4,
+        statusRows: GameStatus.allCases.prefix(7).map { ShareStatsContent.StatusRow(status: $0, count: 20) },
+        topGames: [ShareStatsContent.TopGame(name: "异度神剑3", score: 9.3),
+                   ShareStatsContent.TopGame(name: "游戏B", score: 8.1)],
+        platinumCount: 17, xboxGamerscore: 28450,
+        spentTotal: 12345.6, estimateTotal: 23456.7)
+    for sz in ShareSize.allCases {
+        if let png = ShareCardRenderer.renderPNG(content: .stats(stats, size: sz), language: language),
+           let s = pngSize(png) {
+            let expected = ShareCardLayout.statsSize(content: stats, size: sz)
+            check("统计卡 \(sz.rawValue) 尺寸 \(Int(expected.width))x\(Int(expected.height))（实际 \(s.width)x\(s.height)）",
+                  abs(Double(s.width) - expected.width) <= 1 && abs(Double(s.height) - expected.height) <= 1)
+            try? png.write(to: URL(fileURLWithPath: "/tmp/gamelog_share_stats_\(sz.rawValue).png"))
+        } else {
+            check("统计卡 \(sz.rawValue) 渲染成功", false)
+        }
+    }
+    // 空数据（全新库）也要能出图不崩
+    let emptyStats = ShareStatsContent(title: "t", totalGames: 0, clearedGames: 0, totalPlaytime: 0,
+                                       averageScore: nil, statusRows: [], topGames: [],
+                                       platinumCount: 0, xboxGamerscore: 0, spentTotal: nil, estimateTotal: nil)
+    if let png = ShareCardRenderer.renderPNG(content: .stats(emptyStats, size: .phone), language: language) {
+        check("统计卡空库渲染成功", !png.isEmpty)
+        try? png.write(to: URL(fileURLWithPath: "/tmp/gamelog_share_stats_empty.png"))
+    } else {
+        check("统计卡空库渲染成功", false)
+    }
+
+    // MARK: - §82-1 水印文字自定义（样式设置可编辑）
+
+    UserDefaults.standard.set("jillの遊び帳", forKey: UserCustomization.shareWatermarkTextKey)
+    if let png = ShareCardRenderer.renderPNG(content: .stats(stats, size: .square), language: language) {
+        check("水印文字自定义卡渲染成功", !png.isEmpty)
+        try? png.write(to: URL(fileURLWithPath: "/tmp/gamelog_share_watermarktext.png"))
+    } else {
+        check("水印文字自定义卡渲染成功", false)
+    }
+    // 总览卡右上角水印是 OverviewCard 独立实现，同样必须吃到覆盖文字
+    if let png = ShareCardRenderer.renderPNG(content: .overview([game, plain], title: "水印总览", size: .phone), language: language) {
+        check("总览卡水印自定义渲染成功", !png.isEmpty)
+        try? png.write(to: URL(fileURLWithPath: "/tmp/gamelog_share_watermarktext_overview.png"))
+    } else {
+        check("总览卡水印自定义渲染成功", false)
+    }
+    // 清空回退默认拼接（用户名 + 游戏簿）
+    UserDefaults.standard.set("", forKey: UserCustomization.shareWatermarkTextKey)
+    if let png = ShareCardRenderer.renderPNG(content: .stats(stats, size: .square), language: language) {
+        check("水印文字清空回退默认渲染成功", !png.isEmpty)
+        try? png.write(to: URL(fileURLWithPath: "/tmp/gamelog_share_watermarkdefault.png"))
+    } else {
+        check("水印文字清空回退默认渲染成功", false)
+    }
+
+    // MARK: - §82-3 宽封面不露底色框：letterboxes 判据 + 模糊铺底出图
+
+    // 16:9 横图（1.778 > 2:3 框 × 1.15 容差 = 0.767）→ 该走「完整展示 + 模糊铺底」档
+    let wide = NSImage(size: NSSize(width: 960, height: 540))
+    wide.lockFocus()
+    NSColor.systemRed.setFill()
+    NSRect(x: 0, y: 0, width: 960, height: 540).fill()
+    NSColor.white.setFill()
+    NSBezierPath(ovalIn: NSRect(x: 380, y: 170, width: 200, height: 200)).fill()
+    wide.unlockFocus()
+    guard let wideData = wide.tiffRepresentation else { print("FAIL: wide no tiff"); return 1 }
+    let wideGame = Game(name: "横版封面测试", coverData: wideData)
+    context.insert(wideGame)
+    try? context.save()
+
+    check("横图进 2:3 框判定为留白档", wideGame.coverImage?.letterboxes(inBoxAspect: 2.0 / 3.0) == true)
+    check("竖图进 2:3 框判定为裁切档", game.coverImage?.letterboxes(inBoxAspect: 2.0 / 3.0) == false)
+
+    // §83「去掉框」：单卡海报框必须与封面同比例（2:3 源 → 海报清晰区宽高比 ≈ 2:3，
+    // 框内不得出现比封面更大的留缝框）。导出供像素级复核。
+    if let png = ShareCardRenderer.renderPNG(content: .single(wideGame, size: .phone), language: language) {
+        check("横封面单卡渲染成功（去框导出）", !png.isEmpty)
+        try? png.write(to: URL(fileURLWithPath: "/tmp/gamelog_share_widecover_single.png"))
+    } else {
+        check("横封面单卡渲染成功（去框导出）", false)
+    }
+
+    if let png = ShareCardRenderer.renderPNG(
+        content: .overview([game, wideGame, third], title: "宽图框测试", size: .phone), language: language) {
+        check("含横封面总览卡渲染成功", !png.isEmpty)
+        try? png.write(to: URL(fileURLWithPath: "/tmp/gamelog_share_widecover.png"))
+    } else {
+        check("含横封面总览卡渲染成功", false)
+    }
+    let wideGrid = ShareCardRenderer.renderGrid9Data(games: [game, wideGame], title: "宽图九宫",
+                                                     language: language, theme: .brand, format: .png)
+    check("宽图九宫格出 2 图", wideGrid.count == 2)
+    if let first = wideGrid.first, let s = pngSize(first) {
+        check("宽图九宫格仍精确 1200x1200（实际 \(s.width)x\(s.height)）", s.width == 1200 && s.height == 1200)
+        try? first.write(to: URL(fileURLWithPath: "/tmp/gamelog_share_widecover_grid9.png"))
+    } else {
+        check("宽图九宫格渲染成功", false)
+    }
+
     return failures == 0 ? 0 : 1
 }
 
