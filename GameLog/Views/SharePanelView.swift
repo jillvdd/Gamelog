@@ -227,6 +227,46 @@ struct SharePanelView: View {
     }
 
     var body: some View {
+        panelWithRerenderTriggers
+            .sheet(isPresented: $showingStyleEditor) {
+                ShareStyleConfigurator { statsRevision += 1 }
+            }
+            .onDisappear { renderTask?.cancel() }
+        #if !os(macOS)
+            .onPreferenceChange(ShareButtonRectKey.self) { shareButtonRect = $0 }
+        #endif
+    }
+
+    // 拆开只为给类型检查减负：整条链 18 个修饰符一起推会超时（§85 加第 18 个就压垮了）。
+    // 修饰符顺序与拆分前逐字一致。
+    private var panelWithRerenderTriggers: some View {
+        panel
+            .onAppear(perform: setup)
+            .onChange(of: mode) { _, _ in scheduleRerender() }
+            .onChange(of: selectionOrder) { _, _ in
+                scheduleRerender()
+            }
+            .onChange(of: selectedGroupID) { _, _ in scheduleRerender() }
+            .onChange(of: size) { _, _ in scheduleRerender() }
+            .onChange(of: themeMode) { _, _ in scheduleRerender() }
+            .onChange(of: sortOption) { _, _ in scheduleRerender() }
+            .onChange(of: overviewTitle) { _, _ in scheduleRerender() }
+            .onChange(of: groupTitle) { _, _ in scheduleRerender() }
+            .onChange(of: language) { _, _ in scheduleRerender() }
+            .onChange(of: languageFollow) { _, _ in scheduleRerender() }
+            .onChange(of: languageOverride) { _, _ in scheduleRerender() }
+            .onChange(of: games) { _, newGames in
+                if selectionOrder.isEmpty && CommandLine.arguments.contains("-ShareSelectTop") {
+                    let top = Array(newGames.filter(\.isLive).prefix(6))
+                    selectionOrder = top.map(\.persistentModelID)
+                }
+            }
+            .onChange(of: exportFormat) { _, _ in scheduleRerender() }
+            .onChange(of: exportQuality) { _, _ in scheduleRerender() }
+            .onChange(of: statsRevision) { _, _ in scheduleRerender() }
+    }
+
+    private var panel: some View {
         Group {
             if isRegularScreen {
                 regularSplitLayout
@@ -234,36 +274,6 @@ struct SharePanelView: View {
                 compactShareBody
             }
         }
-        .onAppear(perform: setup)
-        .onChange(of: mode) { _, _ in scheduleRerender() }
-        .onChange(of: selectionOrder) { _, _ in
-            scheduleRerender()
-        }
-        .onChange(of: selectedGroupID) { _, _ in scheduleRerender() }
-        .onChange(of: size) { _, _ in scheduleRerender() }
-        .onChange(of: themeMode) { _, _ in scheduleRerender() }
-        .onChange(of: sortOption) { _, _ in scheduleRerender() }
-        .onChange(of: overviewTitle) { _, _ in scheduleRerender() }
-        .onChange(of: groupTitle) { _, _ in scheduleRerender() }
-        .onChange(of: language) { _, _ in scheduleRerender() }
-        .onChange(of: languageFollow) { _, _ in scheduleRerender() }
-        .onChange(of: languageOverride) { _, _ in scheduleRerender() }
-        .onChange(of: games) { _, newGames in
-            if selectionOrder.isEmpty && CommandLine.arguments.contains("-ShareSelectTop") {
-                let top = Array(newGames.filter(\.isLive).prefix(6))
-                selectionOrder = top.map(\.persistentModelID)
-            }
-        }
-        .onChange(of: exportFormat) { _, _ in scheduleRerender() }
-        .onChange(of: exportQuality) { _, _ in scheduleRerender() }
-        .onChange(of: statsRevision) { _, _ in scheduleRerender() }
-        .sheet(isPresented: $showingStyleEditor) {
-            ShareStyleConfigurator { statsRevision += 1 }
-        }
-        .onDisappear { renderTask?.cancel() }
-        #if !os(macOS)
-        .onPreferenceChange(ShareButtonRectKey.self) { shareButtonRect = $0 }
-        #endif
     }
 
 
