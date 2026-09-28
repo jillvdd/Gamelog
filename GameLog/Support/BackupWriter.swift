@@ -20,19 +20,26 @@ actor BackupWriter {
     ///   username / avatarBase64 / iconBase64 / bannerTitle / bannerSubtitle / bannerBackgroundBase64
     /// - groups 数组一次编码（体量小）；games **逐个**编码写盘（单游戏峰值 ~几十 MB）
     /// - 头像/图标/横幅背景 PNG 由调用方传入（后台读文件），base64 后写盘
+    /// - `atomic` = 先写同目录临时件再换名。**macOS NSSavePanel 选定的路径只有目标文件
+    ///    本身有沙盒授权，同目录新建临时件会被拒**，该场景必须传 false 直写目标。
     func writeStreamingBackup(to url: URL,
                               username: String?,
                               avatarPNG: Data?,
                               iconPNG: Data?,
                               bannerTitle: String? = nil,
                               bannerSubtitle: String? = nil,
-                              bannerBackgroundPNG: Data? = nil) throws -> Int {
+                              bannerBackgroundPNG: Data? = nil,
+                              atomic: Bool = true) async throws -> Int {
+        // 上一轮若中途抛错，故障物化的封面还挂在本上下文对象图里；开头回滚一次清账
+        // （只读用途的上下文，无未提交改动可丢）。
+        modelContext.rollback()
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
 
         // 先写临时文件、成功后原子换名：中途被杀只留孤儿临时件，目标文件（旧备份）完好。
-        let tmpURL = url.deletingLastPathComponent()
-            .appendingPathComponent(".autobackup-tmp-\(UUID().uuidString).json")
+        let tmpURL = atomic
+            ? url.deletingLastPathComponent().appendingPathComponent(".autobackup-tmp-\(UUID().uuidString).json")
+            : url
         FileManager.default.createFile(atPath: tmpURL.path, contents: nil)
         let fh = try FileHandle(forWritingTo: tmpURL)
         var closed = false
@@ -69,8 +76,16 @@ actor BackupWriter {
             if index > 0 { try write(Data(",".utf8)) }
             // 字段映射唯一入口 = GameDTO(from:)（与 BackupManager.encode 同一构造器，永不漂移）。
             try write(try encoder.encode(GameDTO(from: game)))
+            // 每 24 款让路一次：编码要逐款 fault 外置封面（每款数百 KB 磁盘读），
+            // 一口气跑几千款会把共享连接池/页缓存吃满 —— 主线程任何一次查询都被饿死
+            // （2026-09-24 iOS 实机：启动备份与首帧全库 fetch 对撞 → 0x8BADF00D 看门狗）。
+            // 4ms/24 款的节流对总时长影响 <2%，但让 SQLite 事务与磁盘 I/O 有插空窗口。
+            if index % 24 == 23 { try? await Task.sleep(nanoseconds: 4_000_000) }
         }
         try write(Data("]".utf8))
+        // 游戏对象全部编完即回滚：故障物化的封面（整库可达数百 MB）不再长期挂在
+        // 写器上下文里（否则 4150 款的图常驻到下一次写盘）。
+        modelContext.rollback()
 
         // 自定义项（与 BackupManager.encode 同字段名；缺省 = null）
         try write(Data(",\"username\":".utf8))
@@ -88,6 +103,7 @@ actor BackupWriter {
         try write(Data("}".utf8))
 
         closeFH()
+        guard atomic else { return total }
         // 同目录 rename：同卷原子。旧目标文件保持完好直到这一刻。
         if FileManager.default.fileExists(atPath: url.path) {
             try FileManager.default.removeItem(at: url)

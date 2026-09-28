@@ -86,6 +86,7 @@
 "card.released" = "Released %@";
 "common.save" = "Save";
 "common.cancel" = "Cancel";
+"common.ok" = "OK";
 "common.edit" = "Edit";
 "common.delete" = "Delete";
 "common.custom" = "Custom…";
@@ -205,6 +206,9 @@
 "backup.importFailed" = "Import failed: Invalid or corrupted backup file.";
 "backup.importConfirm" = "Importing will replace all current data. Continue?";
 "backup.share" = "Share Backup…";
+"backup.exporting" = "Exporting backup…";
+"backup.importReadFailed" = "Import failed: The file can\u2019t be read. Check that it hasn\u2019t moved and that access is allowed.";
+"backup.importDecodeFailed" = "Import failed: Couldn\u2019t parse the backup (file too large for available memory, or corrupted).";
 "validation.nameRequired" = "Enter a title in at least one language";
 "validation.reviewTitleRequired" = "Review title is required";
 "validation.scoreRequired" = "Score at least one dimension";
@@ -225,6 +229,7 @@
 "share.format" = "Export Format";
 "share.format.jpeg" = "JPEG (high quality)";
 "share.format.png" = "PNG (lossless)";
+"share.quality" = "Export Resolution";
 "share.statsConfigure" = "Stats Elements…";
 "share.statsEditorTitle" = "Group Card Stats Elements";
 "share.styleSettings" = "Style Settings…";
@@ -415,6 +420,7 @@
 "backup.nowDone" = "Backup Saved";
 "backup.nowFailed" = "Backup failed: Check available disk space.";
 "backup.importing" = "Importing Backup…";
+"backup.importingHint" = "Don’t quit the app — large backups may take a few minutes.";
 "backup.noBackupYet" = "No Backup Yet";
 "settings.storage" = "Storage & Cache";
 "settings.cacheSize" = "Cache Size: %@";

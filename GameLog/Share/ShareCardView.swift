@@ -20,6 +20,25 @@ enum ShareSize: String, CaseIterable, Identifiable {
     }
 }
 
+/// 导出画质档：`ShareSize.pixels` 是布局画布（点数，恒定不变 → 排版零变化），
+/// 本枚举只决定 `ImageRenderer.scale` 输出像素倍率。
+/// fhd=×1（桌面恰好 1920×1080 FHD），uhd=×2（桌面 3840×2160、手机 2160×3840 UHD）。
+/// 提升倍率仅放大位图、点制布局逐像素等比放大，字号/间距相对关系不变。
+enum ShareQuality: String, CaseIterable, Identifiable {
+    case fhd
+    case uhd
+
+    var id: String { rawValue }
+
+    /// 输出像素倍率（相对 ShareSize.pixels 基准画布）。
+    var scale: CGFloat {
+        switch self {
+        case .fhd: return 1
+        case .uhd: return 2
+        }
+    }
+}
+
 /// 总览图排序选项。
 enum ShareSortOption: String, CaseIterable, Identifiable {
     case selection

@@ -84,60 +84,45 @@ enum KeychainStore {
         ]
     }
 
-    /// 定位一条目。
+    /// 定位一条目（2026-09-23 起仅用于旧条目探测/迁移；常规读写走 bundleQuery）。
     private static func query(owner: String, kind: String) -> [String: Any] {
         var q = baseQuery
         q[kSecAttrAccount as String] = "\(owner).\(kind)"
         return q
     }
 
-    // MARK: - 增 / 改
+    // MARK: - 单条目 bundle（每账号一条 Keychain 条目）
+    //
+    // 历史上每个 (owner, kind) 各占一条目。macOS 侧本应用是 adhoc/本地签名，钥匙串 ACL
+    // 绑定 cdhash —— 每次更新重装，旧条目首次读取都会重新弹密码确认，PSN 一类双凭证账号
+    // 就是两次。合并为每账号一条（payload = {kind: value} 的 JSON）后弹窗减半再减半；
+    // 旧散条目在首次触达该 owner 时自动迁入 bundle 并删除（迁移读取本身会各弹一次，
+    // 属一次性成本，迁完即绝）。
+    //
+    // ⚠️ 对外 API 签名（set/get/has/delete/deleteAll，owner+kind 两字符串）保持不变，
+    // 门面层与 KeychainSelftest 无需感知本改造。
+    private static let bundleLock = NSLock()
 
-    /// 写入（已存在则覆盖）。
-    ///
-    /// 先 `SecItemAdd`，撞 `errSecDuplicateItem` 再转 `SecItemUpdate` ——
-    /// 比「先查再写」少一次往返，也没有查与写之间的竞态。
-    static func set(_ value: String, owner: String, kind: String) throws {
-        guard let data = value.data(using: .utf8) else { throw KeychainError.invalidPayload }
-
-        var addQuery = query(owner: owner, kind: kind)
-        addQuery[kSecValueData as String] = data
-        addQuery[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
-
-        let status = SecItemAdd(addQuery as CFDictionary, nil)
-        switch status {
-        case errSecSuccess:
-            return
-        case errSecDuplicateItem:
-            // 已存在：只改数据。可访问性在 add 时定死，update 改不了（也不需要改）。
-            let attributes: [String: Any] = [kSecValueData as String: data]
-            let updateStatus = SecItemUpdate(query(owner: owner, kind: kind) as CFDictionary,
-                                             attributes as CFDictionary)
-            guard updateStatus == errSecSuccess else {
-                throw KeychainError.unexpectedStatus(updateStatus)
-            }
-        default:
-            throw KeychainError.unexpectedStatus(status)
-        }
+    private static func bundleQuery(owner: String) -> [String: Any] {
+        var q = baseQuery
+        q[kSecAttrAccount as String] = owner
+        return q
     }
 
-    // MARK: - 读
-
-    /// 读取；不存在返回 nil（**不抛错** —— 「没绑定」是正常状态，不是错误）。
-    static func get(owner: String, kind: String) throws -> String? {
-        var q = query(owner: owner, kind: kind)
+    /// 读 bundle；不存在返回 nil。
+    private static func readBundle(owner: String) throws -> [String: String]? {
+        var q = bundleQuery(owner: owner)
         q[kSecReturnData as String] = true
         q[kSecMatchLimit as String] = kSecMatchLimitOne
-
         var item: CFTypeRef?
         let status = SecItemCopyMatching(q as CFDictionary, &item)
-
         switch status {
         case errSecSuccess:
-            guard let data = item as? Data, let value = String(data: data, encoding: .utf8) else {
+            guard let data = item as? Data,
+                  let map = try? JSONDecoder().decode([String: String].self, from: data) else {
                 throw KeychainError.invalidPayload
             }
-            return value
+            return map
         case errSecItemNotFound:
             return nil
         default:
@@ -145,11 +130,95 @@ enum KeychainStore {
         }
     }
 
+    /// 写 bundle（新增或整体覆盖）。可访问性只在 add 时定死，update 改不了也不需要改。
+    private static func writeBundle(_ map: [String: String], owner: String) throws {
+        guard let data = try? JSONEncoder().encode(map) else { throw KeychainError.invalidPayload }
+        var add = bundleQuery(owner: owner)
+        add[kSecValueData as String] = data
+        add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        let status = SecItemAdd(add as CFDictionary, nil)
+        guard status == errSecDuplicateItem else {
+            guard status == errSecSuccess else { throw KeychainError.unexpectedStatus(status) }
+            return
+        }
+        let updateStatus = SecItemUpdate(bundleQuery(owner: owner) as CFDictionary,
+                                         [kSecValueData as String: data] as CFDictionary)
+        guard updateStatus == errSecSuccess else {
+            throw KeychainError.unexpectedStatus(updateStatus)
+        }
+    }
+
+    /// 旧 (owner, kind) 散条目 → bundle，并逐条删除。返回 nil = 无任何旧条目。
+    /// 按 `ExternalCredentialKind` 全量逐个探测（该枚举本就定义于本文件）：macOS 传统文件
+    /// 钥匙串不支持 `kSecMatchLimitAll` 连数据枚举（实测返回不了条目），逐 kind 精确查询才可靠。
+    private static func migrateLegacy(owner: String) -> [String: String]? {
+        var bundle: [String: String] = [:]
+        for kind in ExternalCredentialKind.allCases.map(\.rawValue) {
+            var q = query(owner: owner, kind: kind)
+            q[kSecReturnData as String] = true
+            q[kSecMatchLimit as String] = kSecMatchLimitOne
+            var item: CFTypeRef?
+            guard SecItemCopyMatching(q as CFDictionary, &item) == errSecSuccess,
+                  let data = item as? Data,
+                  let value = String(data: data, encoding: .utf8) else { continue }
+            bundle[kind] = value
+            // 直删旧散条目（不经 delete()——它走 bundle 路径，会递归回本函数）。
+            SecItemDelete(query(owner: owner, kind: kind) as CFDictionary)
+        }
+        return bundle.isEmpty ? nil : bundle
+    }
+
+    /// bundle 读-改-写临界区（`change` 返回是否有实际变更；无变更不落盘）。
+    /// 清空全部 kind 时连条目一起删，不留空 JSON。
+    private static func mutateBundle(owner: String, _ change: (inout [String: String]) -> Bool) throws -> Bool {
+        bundleLock.lock()
+        defer { bundleLock.unlock() }
+        var bundle = try readBundle(owner: owner) ?? [:]
+        if bundle.isEmpty, let legacy = migrateLegacy(owner: owner) {
+            bundle = legacy
+        }
+        guard change(&bundle) else { return false }
+        if bundle.isEmpty {
+            SecItemDelete(bundleQuery(owner: owner) as CFDictionary)
+        } else {
+            try writeBundle(bundle, owner: owner)
+        }
+        return true
+    }
+
+    // MARK: - 增 / 改
+
+    /// 写入（已存在则覆盖）。
+    static func set(_ value: String, owner: String, kind: String) throws {
+        _ = try mutateBundle(owner: owner) { $0[kind] = value; return true }
+    }
+
+    // MARK: - 读
+
+    /// 读取；不存在返回 nil（**不抛错** —— 「没绑定」是正常状态，不是错误）。
+    static func get(owner: String, kind: String) throws -> String? {
+        bundleLock.lock()
+        defer { bundleLock.unlock() }
+        if let bundle = try readBundle(owner: owner) { return bundle[kind] }
+        if let legacy = migrateLegacy(owner: owner) {
+            try writeBundle(legacy, owner: owner)
+            return legacy[kind]
+        }
+        return nil
+    }
+
     /// 是否存在（不解码内容，用于「凭证是否还在」的状态判定）。
     static func has(owner: String, kind: String) -> Bool {
-        var q = query(owner: owner, kind: kind)
+        var q = bundleQuery(owner: owner)
         q[kSecMatchLimit as String] = kSecMatchLimitOne
-        return SecItemCopyMatching(q as CFDictionary, nil) == errSecSuccess
+        if SecItemCopyMatching(q as CFDictionary, nil) == errSecSuccess {
+            // bundle 在，但要看具体 kind；bundle 存在时以解码内容为准。
+            return ((try? get(owner: owner, kind: kind)) ?? nil) != nil
+        }
+        // bundle 不在：旧散条目可能还在（尚未迁移），按旧格式探测。
+        var legacy = query(owner: owner, kind: kind)
+        legacy[kSecMatchLimit as String] = kSecMatchLimitOne
+        return SecItemCopyMatching(legacy as CFDictionary, nil) == errSecSuccess
     }
 
     // MARK: - 删
@@ -157,23 +226,30 @@ enum KeychainStore {
     /// 删除单个；不存在返回 false（幂等，不抛错）。
     @discardableResult
     static func delete(owner: String, kind: String) throws -> Bool {
-        let status = SecItemDelete(query(owner: owner, kind: kind) as CFDictionary)
-        switch status {
-        case errSecSuccess:
+        // 先按 bundle 删；bundle 不存在时兜底直删旧散条目（幂等）。
+        let touched = try mutateBundle(owner: owner) { bundle in
+            guard bundle[kind] != nil else { return false }
+            bundle[kind] = nil
             return true
-        case errSecItemNotFound:
-            return false
-        default:
-            throw KeychainError.unexpectedStatus(status)
         }
+        if touched { return true }
+        let status = SecItemDelete(query(owner: owner, kind: kind) as CFDictionary)
+        return status == errSecSuccess
     }
 
-    /// 删除某 owner 下的全部 kind —— **解绑时必须调用**。
-    /// 逐个 kind 删而非按 service 批量删：Keychain 不支持前缀匹配，
-    /// 而 kind 是有限枚举，遍历比引入查询更可预测。
+    /// 删除某 owner 下的全部凭证 —— **解绑时必须调用**。
+    /// bundle 化后是单条目整体删除；旧散条目一并探测清理，防迁移前解绑留孤儿。
     static func deleteAll(owner: String, kinds: [String]) throws {
+        _ = try mutateBundle(owner: owner) { bundle in
+            let had = !bundle.isEmpty
+            bundle.removeAll()
+            return had
+        }
         for kind in kinds {
-            try delete(owner: owner, kind: kind)
+            let status = SecItemDelete(query(owner: owner, kind: kind) as CFDictionary)
+            guard status == errSecSuccess || status == errSecItemNotFound else {
+                throw KeychainError.unexpectedStatus(status)
+            }
         }
     }
 }

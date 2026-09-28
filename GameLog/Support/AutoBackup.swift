@@ -72,6 +72,24 @@ final class AutoBackup: ObservableObject {
     private var didSaveObserver: NSObjectProtocol?
     private var lifecycleObserver: NSObjectProtocol?
 
+    // MARK: - 启动写闸门（防 scene-create 看门狗，2026-09-24）
+    //
+    // iOS 的 scene-create 看门狗只给 10 秒墙钟。真机大库（数千款 + 外置封面）首帧
+    // 要在主队列 SQLQueue 上跑完整 @Query fetch；若在它旁边并发启动备份重活
+    // （1.1GB pre 快照拷贝 + 全库逐款读图编码写盘），SQLite 连接池与磁盘带宽被吃满，
+    // 主线程 fetch 直接超预算 → 0x8BADF00D 被 FrontBoard 杀掉（beta 3.5 实机复现，
+    // 崩溃日志两份 SQLQueue 全库 fetch 并发）。所以启动期的一切整库级重活都排在
+    // 「开屏淡出（首帧已提交）+ 2 秒宽限」之后统一放行，另有 15 秒兜底。
+    //
+    /// 闸门已开（首帧就绪 + 宽限，或兜底超时）。
+    private var writeGateOpen = false
+    /// 版本升级待拷贝的 pre- 快照旧版本号（闸门开启时消费；nil = 无）。
+    private var pendingSnapshotVersion: String?
+    /// 闸门开启时要执行的排队回调。
+    private var gateCallbacks: [@MainActor () -> Void] = []
+    private var firstFrameObserver: NSObjectProtocol?
+    private var gateFallbackTask: Task<Void, Never>?
+
     private init() {}
 
     static var isEnabled: Bool {
@@ -149,6 +167,78 @@ final class AutoBackup: ObservableObject {
             }
         }
         #endif
+
+        armWriteGate()
+    }
+
+    // MARK: - 写闸门实现（见 `writeGateOpen` 的注释）
+
+    /// 挂首帧广播监听 + 15 秒兜底；闸门开启时先冲启动备份（setup 必在
+    /// performStartupCheck 之前调用，冲账读到的是其置好的状态）。
+    private func armWriteGate() {
+        guard !writeGateOpen else { return }
+        // 先排入默认冲账回调：闸门开启时执行版本快照拷贝 + 滚动备份写盘。
+        gateCallbacks.append { [weak self] in
+            self?.flushLaunchBackupIfNeeded()
+        }
+        firstFrameObserver = NotificationCenter.default.addObserver(
+            forName: .gameLogFirstFrameReady, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated {
+                guard let self, !self.writeGateOpen, self.firstFrameObserver != nil else { return }
+                self.firstFrameObserver = nil
+                // 再留 2 秒：淡出动画 + 卡片封面首轮物化，让主队列彻底缓过劲。
+                Task { @MainActor [weak self] in
+                    try? await Task.sleep(nanoseconds: 2_000_000_000)
+                    self?.openWriteGate()
+                }
+            }
+        }
+        gateFallbackTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 15_000_000_000)
+            guard !Task.isCancelled else { return }
+            self?.openWriteGate()
+        }
+    }
+
+    private func openWriteGate() {
+        guard !writeGateOpen else { return }
+        writeGateOpen = true
+        gateFallbackTask?.cancel()
+        gateFallbackTask = nil
+        firstFrameObserver.map { NotificationCenter.default.removeObserver($0) }
+        firstFrameObserver = nil
+        let callbacks = gateCallbacks
+        gateCallbacks.removeAll()
+        for callback in callbacks { callback() }
+    }
+
+    /// 闸门开启后的启动备份冲账：先补版本升级 pre- 快照拷贝（大文件，后台做），
+    /// 再修剪旧快照、写滚动备份。逻辑与原 performStartupCheck 内联版一致，
+    /// 只是整体推迟到首帧之后。
+    private func flushLaunchBackupIfNeeded() {
+        guard Self.isEnabled else { return }
+        let snapshotVersion = pendingSnapshotVersion
+        pendingSnapshotVersion = nil
+        guard needsWrite || Self.pendingFlag else { return }
+        let url = Self.backupFileURL
+        let dir = Self.backupDir
+        Task.detached(priority: .utility) { [weak self] in
+            if let snapshotVersion, FileManager.default.fileExists(atPath: url.path) {
+                let dst = dir.appendingPathComponent("GameLog-autobackup-pre-\(snapshotVersion).json")
+                try? FileManager.default.removeItem(at: dst)
+                try? FileManager.default.copyItem(at: url, to: dst)
+            }
+            await MainActor.run { [weak self] in
+                self?.trimPreVersionFilesOnVersionChange(changed: snapshotVersion != nil)
+                self?.performWrite()
+            }
+        }
+    }
+
+    /// 把重活排到写闸门之后；闸门已开则立即执行。
+    fileprivate func afterWriteGate(_ work: @escaping @MainActor () -> Void) {
+        if writeGateOpen { work() } else { gateCallbacks.append(work) }
     }
 
     // MARK: - 触发
@@ -217,6 +307,8 @@ final class AutoBackup: ObservableObject {
     /// 后台流式写滚动备份。completion 回主线程；ok = 是否成功写盘。
     private func performWrite(completion: ((Bool) -> Void)? = nil) {
         guard Self.isEnabled else { completion?(false); return }
+        // 启动写闸门未开：只记账，闸门开启时统一冲账（防 scene-create 看门狗，见 writeGateOpen）。
+        guard writeGateOpen else { needsWrite = true; completion?(false); return }
         // 整库替换期间抑制：didSave 监听（object:nil）会被后台导入 save 触发，
         // 此时写盘会编码半替换库；解锁后统一入口会补写一次（2026-09-08）。
         guard !isImporting else { completion?(false); return }
@@ -280,33 +372,20 @@ final class AutoBackup: ObservableObject {
         didStartupCheck = true
 
         // 1. 版本升级保护：先把「上次会话留下的滚动备份」（升级前数据）复制为 pre-<旧版本> 快照。
-        //    大文件拷贝挪后台（771MB 要数秒，不能在主线程）；启动备份在拷贝完成后执行，
-        //    保证「先快照旧内容、再覆盖滚动文件」的顺序（顺序反了 pre 快照会变成新内容）。
+        //    2026-09-24：这里只置账，不立刻动手 —— 整库级重活（1.1GB 拷贝 + 全库读图编码写盘）
+        //    一律等写闸门（首帧提交 + 宽限）开启后由 `flushLaunchBackupIfNeeded` 冲账，
+        //    保证「先快照旧内容、再覆盖滚动文件」的顺序不变（两者在同一条后台链上）。
         let lastVersion = UserDefaults.standard.string(forKey: Self.lastVersionKey)
         let versionChanged = lastVersion != currentVersion
         UserDefaults.standard.set(currentVersion, forKey: Self.lastVersionKey)
         if Self.isEnabled, versionChanged || Self.pendingFlag {
-            let pendingVersion = lastVersion
-            let url = Self.backupFileURL
-            let dir = Self.backupDir
+            if versionChanged { pendingSnapshotVersion = lastVersion }
             needsWrite = true
-            Task.detached(priority: .utility) { [weak self] in
-                if versionChanged, let pendingVersion {
-                    if FileManager.default.fileExists(atPath: url.path) {
-                        let dst = dir.appendingPathComponent("GameLog-autobackup-pre-\(pendingVersion).json")
-                        try? FileManager.default.removeItem(at: dst)
-                        try? FileManager.default.copyItem(at: url, to: dst)
-                    }
-                }
-                await MainActor.run { [weak self] in
-                    self?.trimPreVersionFilesOnVersionChange(changed: versionChanged)
-                    self?.performWrite()
-                }
-            }
         }
 
         // 2. 空库检测：库为空 + 备份里有数据 → 弹窗询问是否恢复（取消保留空库，不强行恢复）。
-        //    库空判定用 fetchLimit=1 的轻量探测；备份游戏数统计（流式扫全文件）也挪后台。
+        //    库空判定用 fetchLimit=1 的轻量探测；备份游戏数统计要流式扫完整个大文件
+        //    （可达 GB 级），同样排到写闸门之后再跑（2026-09-24 防看门狗对撞）。
         var desc = FetchDescriptor<Game>()
         desc.fetchLimit = 1
         let hasGames = ((try? context.fetch(desc))?.isEmpty == false)
@@ -315,11 +394,14 @@ final class AutoBackup: ObservableObject {
         let hasGroups = ((try? context.fetch(gdesc))?.isEmpty == false)
         if !hasGames && !hasGroups {
             let url = Self.backupFileURL
-            Task.detached(priority: .utility) { [weak self] in
-                let count = BackupWriter.countGames(at: url)
-                await MainActor.run { [weak self] in
-                    guard let self, self.emptyRestoreInfo == nil, count > 0 else { return }
-                    self.emptyRestoreInfo = EmptyRestoreInfo(gameCount: count)
+            afterWriteGate { [weak self] in
+                guard let self else { return }
+                Task.detached(priority: .utility) { [weak self] in
+                    let count = BackupWriter.countGames(at: url)
+                    await MainActor.run { [weak self] in
+                        guard let self, self.emptyRestoreInfo == nil, count > 0 else { return }
+                        self.emptyRestoreInfo = EmptyRestoreInfo(gameCount: count)
+                    }
                 }
             }
         }
@@ -390,7 +472,7 @@ final class AutoBackup: ObservableObject {
             try await importer.applyDTO(dto) { done, total in
                 guard total > 0 else { return }
                 let frac = 0.05 + 0.85 * Double(done) / Double(total)
-                Task { @MainActor in onProgress(frac) }
+                Task { @MainActor in self.importProgress = frac; onProgress(frac) }
             }
             return (dto.username, dto.avatarBase64, dto.iconBase64,
                     dto.bannerTitle, dto.bannerSubtitle, dto.bannerBackgroundBase64)
@@ -422,14 +504,149 @@ final class AutoBackup: ObservableObject {
         scheduleWrite()
     }
 
-    /// 从自动备份恢复：走统一入口 importBackup（快照→后台重建→定制回写→广播→补备份）。
-    /// 快照失败/解码失败/ save 失败一律 throw，调用方回填 restoreFailed。
+    /// 从自动备份恢复：走流式统一入口 `importBackup(fromFile:)`（自动备份文件在本 App 沙盒内，
+    /// 无需安全作用域）。文件不存在直接抛 `backupUnreadable`，其余（快照→流式重建→定制回写→
+    /// 广播→补备份）与手动导入完全同路 —— GB 级自动备份也不再整文件 decode，不再撑爆内存。
     func restoreFromAutoBackup(context: ModelContext,
                                onProgress: @escaping @MainActor (Double) -> Void = { _ in }) async throws {
-        guard let data = try? Data(contentsOf: Self.backupFileURL) else {
+        guard FileManager.default.fileExists(atPath: Self.backupFileURL.path) else {
             throw ImportError.backupUnreadable
         }
-        try await importBackup(data, into: context, onProgress: onProgress)
+        try await importBackup(fromFile: Self.backupFileURL, into: context,
+                               requestAccess: false, onProgress: onProgress)
+    }
+
+    /// 从用户文件导入（设置页「导入备份」与 AirDrop/打开方式两入口共用）：**流式**整库替换。
+    ///
+    /// 定序：上锁 → 恢复前快照（兼作回滚锚点）→ 后台字节扫描 + 逐游戏增量落库 →
+    /// 主线程定制回写 → 清缓存 → 广播整库替换 → 补一次自动备份 → 解锁。
+    /// 全程峰值内存与备份体积无关，GB 级备份也能在 iOS 上导完（bulk `decode(Data(整文件))`
+    /// 是 jetsam/OOM 根因，文件入口已全部改走此路径）。
+    ///
+    /// 失败分类：读盘/扫描/header 阶段 DB 尚未动，直接抛（`importFailMessageForUser` 出文案）；
+    /// `applyStreaming` 清库后抛 `replacementFailed` → 从快照尽力回滚后再抛原错。
+    ///
+    /// - Parameter requestAccess: 用户选择/AirDrop 打开的文件传 true（安全作用域）；
+    ///   App 沙盒内的自动备份文件传 false。
+    func importBackup(fromFile url: URL, into context: ModelContext, requestAccess: Bool,
+                      onProgress: @escaping @MainActor (Double) -> Void = { _ in }) async throws {
+        // 重入保护：导入锁定期二次调用直接抛错（调用方回填 importFailed）。
+        guard !isImporting else { throw ImportError.alreadyImporting }
+        isImporting = true
+        importProgress = 0
+        defer {
+            isImporting = false
+            importProgress = nil
+        }
+
+        // 进度上报合流：同刷 @Published importProgress（全屏遮罩读它）与调用方 onProgress。
+        let report: @MainActor (Double) -> Void = { frac in
+            self.importProgress = frac
+            onProgress(frac)
+        }
+
+        // 1. 恢复前快照（throw 即中断；同时是流式替换失败的回滚锚点）。
+        report(0.02)
+        let snapshotURL = try await writeSnapshot(context: context)
+
+        // 2. 流式扫描 + 逐游戏增量落库（DB 已落盘成功后才回写定制）。
+        let customization: BackupCustomization
+        do {
+            customization = try await streamingReplace(url: url, requestAccess: requestAccess,
+                                                        into: context, report: report)
+        } catch {
+            // 仅在确认「已开始清库后失败」（半替换）时回滚；扫描/header 失败 DB 未动，不回滚。
+            if case ImportError.replacementFailed = error, let snapshotURL {
+                await rollbackToSnapshot(snapshotURL, into: context, report: report)
+            }
+            throw error
+        }
+
+        // 3. 主线程定制回写（DB 已落盘成功后才写文件/UserDefaults；写序不变量在内）。
+        report(0.93)
+        try UserCustomization.applyCustomization(
+            username: customization.username,
+            avatarBase64: customization.avatarBase64,
+            iconBase64: customization.iconBase64,
+            bannerTitle: customization.bannerTitle,
+            bannerSubtitle: customization.bannerSubtitle,
+            bannerBackgroundBase64: customization.bannerBackgroundBase64
+        )
+
+        // 4. 主线程清解码缓存（key 含 persistentModelID，旧 ID 旧图不再命中）。
+        ImageDecodeCache.bump()
+
+        // 5. 主线程广播整库替换（观察者在主线程重置导航，防后台 post 跑错线程）。
+        report(0.97)
+        NotificationCenter.default.post(name: UserCustomization.libraryReplacedNotification, object: nil)
+
+        // 6. 先解锁再补一次自动备份：performWrite 被 isImporting 守卫拦住，
+        // 必须解锁后才调；defer 的二次清零幂等无害。
+        report(1.0)
+        isImporting = false
+        importProgress = nil
+        scheduleWrite()
+    }
+
+    /// 流式替换核心：后台扫描（1MB 窗口恒定内存）→ 读 header（groups + 定制）→
+    /// `BackupImporter.applyStreaming` 逐游戏读盘落库。安全作用域在各同步读闭包内 start/stop
+    /// （不跨 await）。进度分两段：扫描 0.05→0.45（按字节）、增量落库 0.45→0.92（按游戏数）。
+    /// 成功返回定制六字段（调用方主线程回写）；失败按 `ImportError` / `DecodingError` 抛。
+    private func streamingReplace(url: URL, requestAccess: Bool, into context: ModelContext,
+                                  report: @escaping @MainActor (Double) -> Void) async throws -> BackupCustomization {
+        let container = context.container
+
+        // 阶段 1：后台扫描 + header（同一安全作用域块内，均为同步 FileHandle 读）。
+        let (scan, header): (BackupScanResult, BackupHeaderData) = try await Task.detached(priority: .utility) {
+            let didStart = requestAccess ? url.startAccessingSecurityScopedResource() : false
+            defer { if didStart { url.stopAccessingSecurityScopedResource() } }
+            let fileSize = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
+            let scan = try StreamingBackupReader.scan(url: url) { doneBytes in
+                guard fileSize > 0 else { return }
+                let frac = min(0.45, 0.05 + 0.40 * Double(doneBytes) / Double(fileSize))
+                Task { @MainActor in report(frac) }
+            }
+            // games 键缺失 = 非备份文件（与 bulk decode 同口径报 DecodingError，走「解码失败」文案）。
+            guard scan.hasGamesKey else {
+                throw DecodingError.dataCorrupted(.init(codingPath: [],
+                      debugDescription: "GameLog backup: missing games"))
+            }
+            let header = try StreamingBackupReader.header(of: scan, url: url)
+            return (scan, header)
+        }.value
+
+        // 阶段 2：后台逐游戏增量落库（applyStreaming 自带安全作用域 + replacementFailed 包装）。
+        report(0.45)
+        let importer = BackupImporter(modelContainer: container)
+        try await importer.applyStreaming(url: url, requestAccess: requestAccess,
+                                          scan: scan, groups: header.groups) { done, total in
+            let frac = min(0.92, 0.45 + 0.47 * Double(done) / Double(max(1, total)))
+            Task { @MainActor in report(frac) }
+        }
+        return header.customization
+    }
+
+    /// 半替换后的尽力回滚：从快照再跑一次流式替换，把库整体恢复回替换前状态。
+    /// 吞掉回滚自身异常（主错误已在抛出的路上，回滚失败只能记日志），结束一律清缓存 + 广播，
+    /// 让界面反映回滚后的库 —— 无论回滚成功与否都不能停留在半替换态。
+    private func rollbackToSnapshot(_ snapshotURL: URL, into context: ModelContext,
+                                    report: @escaping @MainActor (Double) -> Void) async {
+        do {
+            let customization = try await streamingReplace(url: snapshotURL, requestAccess: false,
+                                                           into: context, report: report)
+            try? UserCustomization.applyCustomization(
+                username: customization.username,
+                avatarBase64: customization.avatarBase64,
+                iconBase64: customization.iconBase64,
+                bannerTitle: customization.bannerTitle,
+                bannerSubtitle: customization.bannerSubtitle,
+                bannerBackgroundBase64: customization.bannerBackgroundBase64
+            )
+        } catch {
+            NSLog("GameLog import rollback failed: \(error)")
+        }
+        ImageDecodeCache.bump()
+        NotificationCenter.default.post(name: UserCustomization.libraryReplacedNotification, object: nil)
     }
 
     /// 恢复/导入前快照：把当前数据写为带时间戳的文件（不参与滚动覆盖）。
@@ -437,8 +654,10 @@ final class AutoBackup: ObservableObject {
     /// 编码与写盘在 ModelActor 后台执行；`await` 返回 = 原子换名完成 = 快照已落盘，
     /// 调用方在 await 之后才能替换，顺序由编译器保证（2026-09-08 去 semaphore 化，
     /// 旧 DispatchSemaphore 同步等待阻塞主线程）。
-    /// 空库无可快照视为成功；失败时 throw（调用方统一中断，不再有"快照失败仍继续替换"）。
-    func writeSnapshot(context: ModelContext) async throws {
+    /// 空库无可快照视为成功（返回 nil）；失败时 throw（调用方统一中断，不再有"快照失败仍继续替换"）。
+    /// 返回快照 URL 供流式导入的**失败回滚锚点**用（半替换状态可从它整库恢复）。
+    @discardableResult
+    func writeSnapshot(context: ModelContext) async throws -> URL? {
         let container = context.container
         var desc = FetchDescriptor<Game>()
         desc.fetchLimit = 1
@@ -446,7 +665,7 @@ final class AutoBackup: ObservableObject {
         var gdesc = FetchDescriptor<GameGroup>()
         gdesc.fetchLimit = 1
         let hasGroups = ((try? context.fetch(gdesc))?.isEmpty == false)
-        guard hasGames || hasGroups else { return }
+        guard hasGames || hasGroups else { return nil }
 
         let writer = writer ?? BackupWriter(modelContainer: container)
         let url = Self.backupDir.appendingPathComponent("GameLog-autobackup-snapshot-\(Self.snapshotTimestamp()).json")
@@ -463,6 +682,7 @@ final class AutoBackup: ObservableObject {
         )
         guard bytes >= 0 else { throw SnapshotError.writeFailed }
         Self.trimSnapshotFilesStatic(keep: 10)
+        return url
     }
 
     /// trimSnapshotFiles 的静态包装（后台 Task 闭包内用）。
@@ -549,6 +769,23 @@ enum ImportError: Error {
     case alreadyImporting
     /// 自动备份文件读不出（不存在/权限/损坏到连 Data 都读不出）。
     case backupUnreadable
+    /// 读盘阶段失败（权限/磁盘/内存分配）。与解码/落库失败分开报，定位「无效或已损坏」误报。
+    case readFailed(underlying: String)
+    /// 流式替换**已开始清库**后的失败（DB 可能半替换，须从快照回滚）。
+    /// 扫描/头字段阶段的失败不裹这层 —— 那时 DB 尚未动过，回滚是纯浪费。
+    case replacementFailed(underlying: String)
+}
+
+/// 导入错误 → 用户可读文案（设置页导入与 AirDrop/打开方式导入两入口共用，防口径漂移）。
+func importFailMessageForUser(_ error: Error, lang: String) -> String {
+    switch error {
+    case ImportError.readFailed:
+        return L10n.tr("backup.importReadFailed", lang: lang)
+    case is DecodingError:
+        return L10n.tr("backup.importDecodeFailed", lang: lang)
+    default:
+        return L10n.tr("backup.importFailed", lang: lang)
+    }
 }
 
 /// 整库替换锁定态环境键：根容器在导入锁定时置 true，下层 LibraryView 据此
@@ -605,11 +842,19 @@ struct AutoBackupContainer<Content: View>: View {
                     .ignoresSafeArea()
                     .allowsHitTesting(true)
                     .overlay {
-                        VStack(spacing: 16) {
+                        VStack(spacing: 12) {
                             ProgressView(value: frac)
                                 .frame(width: 220)
                             LText("backup.importing")
                                 .foregroundStyle(.white)
+                                .font(.headline)
+                            Text("\(Int((frac * 100).rounded()))%")
+                                .foregroundStyle(.white.opacity(0.85))
+                                .font(.subheadline.monospacedDigit())
+                            LText("backup.importingHint")
+                                .foregroundStyle(.white.opacity(0.7))
+                                .font(.footnote)
+                                .multilineTextAlignment(.center)
                         }
                         .padding(28)
                         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))

@@ -50,7 +50,7 @@
 //     GameLog/Support/ExternalImport/AccountCredentialStore.swift \
 //     GameLog/Support/KeychainStore.swift \
 //     GameLog/Support/ScoreMath.swift GameLog/Support/ExportImport.swift GameLog/Support/Game+Backup.swift \
-//     GameLog/Support/BackupWriter.swift GameLog/Support/ImageDecodeCache.swift \
+//     GameLog/Support/BackupWriter.swift GameLog/Support/StreamingBackupReader.swift GameLog/Support/ImageDecodeCache.swift \
 //     GameLog/Support/LibraryStats.swift GameLog/Support/LibraryQuery.swift \
 //     GameLog/Support/UserCustomization.swift GameLog/Support/PlatformImage.swift \
 //     GameLog/Support/EnumPickerRow.swift GameLog/Support/L10n.swift GameLog/Support/AppLanguage.swift \
@@ -59,6 +59,10 @@
 import AppKit
 import Foundation
 import SwiftData
+
+// 测试环境占位：真实 `ImportError` 宿主是 AutoBackup.swift（带 SwiftUI/Combine 依赖，不进本冒烟
+// 编译单元），此处仅补 `StreamingBackupReader` 引用的 `.backupUnreadable`，让被测试代码原样编译。
+enum ImportError: Error { case backupUnreadable }
 
 var failures = 0
 func check(_ name: String, _ cond: Bool) {
@@ -540,6 +544,147 @@ do {
           && m.completions[0].date == s.completions[0].date)
     check("备份双路径: createdAt/updatedAt 一致", m.createdAt == s.createdAt && m.updatedAt == s.updatedAt)
     try? FileManager.default.removeItem(at: tmpURL)
+}
+
+// MARK: - 流式备份读取器（扫描/区间解码 = bulk 解码；增量落库；非法分类）
+
+do {
+    // 专用探针容器（内存库）：只放本段游戏，绝不动共享 `context`，避免污染后续断言。
+    guard let probeContainer = try? ModelContainer(for: schema,
+          configurations: [ModelConfiguration(isStoredInMemoryOnly: true)]) else {
+        check("流式读取: 建探针容器", false)
+        exit(1)
+    }
+    let pctx = ModelContext(probeContainer)
+
+    // 含转义/反斜杠/换行/emoji/CJK 的极端文本，压扫描器的字符串边界处理。
+    let tricky = "带\"引号\"、反斜杠\\、换行\n和 emoji 🎮 以及中文 の 本文"
+    let pg1 = Game(name: "流式探针 A", aliases: ["FA", "探针🎮", "含\"引号\"别名"],
+                   releaseDate: Date(timeIntervalSince1970: 1_600_000_111),
+                   coverData: Data("probe-cover-A".utf8),
+                   reviewTitle: "标题\\转义", reviewBody: tricky)
+    pg1.isFavorite = true
+    let pg1c = Completion(platform: "PC", date: Date(timeIntervalSince1970: 1_700_000_222),
+                          degree: "主线🎮通关", playtime: 12.5, notes: tricky,
+                          scoreGameplay: 8, scoreDesign: 7, scoreStory: 9,
+                          scoreArt: 6, scoreMusic: 5, scorePerformance: 10)
+    pg1c.game = pg1
+    let pg2 = Game(name: "流式探针 B", aliases: [],
+                   releaseDate: Date(timeIntervalSince1970: 1_600_000_333),
+                   reviewTitle: "b", reviewBody: "b")
+    let pg2Group = GameGroup(name: "探针分组")
+    pctx.insert(pg1); pctx.insert(pg1c); pctx.insert(pg2); pctx.insert(pg2Group)
+    pg1.groups = [pg2Group]
+    try pctx.save()
+
+    let tmpDir = URL(fileURLWithPath: NSTemporaryDirectory())
+    let prettyURL = tmpDir.appendingPathComponent("datasmoke-pretty.json")
+    let compactURL = tmpDir.appendingPathComponent("datasmoke-compact.json")
+    // pretty：手动导出路径（BackupManager.encode，prettyPrinted + sortedKeys）。
+    let prettyData = try BackupManager.encode(games: [pg1, pg2], groups: [pg2Group])
+    try prettyData.write(to: prettyURL)
+    // compact：自动备份路径（BackupWriter 流式写盘）。
+    let writer = BackupWriter(modelContainer: probeContainer)
+    let compactBytes = try await writer.writeStreamingBackup(to: compactURL, username: "小明",
+        avatarPNG: nil, iconPNG: nil, bannerTitle: "我的库", bannerSubtitle: nil,
+        bannerBackgroundPNG: nil)
+    check("流式读取: compact 写出非空", compactBytes > 0)
+
+    let iso = StreamingBackupReader.decoder()
+
+    // 逐字节区间解码 == bulk 整树解码（两种导出格式都要过）。
+    func parity(_ label: String, _ url: URL) throws {
+        let scan = try StreamingBackupReader.scan(url: url)
+        check("\(label): scan 有 games 键", scan.hasGamesKey)
+        check("\(label): scan 命中 2 款游戏", scan.gameRanges.count == 2)
+        check("\(label): scan 顶层字段区间齐",
+              scan.versionRange != nil && scan.exportedAtRange != nil && scan.groupsRange != nil)
+        let bulk = try BackupManager.decode(Data(contentsOf: url))
+        let decoder = StreamingBackupReader.decoder()
+        let fh = try FileHandle(forReadingFrom: url)
+        defer { try? fh.close() }
+        var streamed: [GameDTO] = []
+        for r in scan.gameRanges { streamed.append(try StreamingBackupReader.game(from: fh, decoder: decoder, range: r)) }
+        func same(_ a: GameDTO, _ b: GameDTO) -> Bool {
+            a.name == b.name && a.aliases == b.aliases && a.coverBase64 == b.coverBase64
+                && a.reviewBody == b.reviewBody && a.reviewTitle == b.reviewTitle
+                && a.isFavorite == b.isFavorite && a.releaseDate == b.releaseDate
+                && a.createdAt == b.createdAt && a.updatedAt == b.updatedAt
+                && a.completions.count == b.completions.count
+                && a.completions.first?.notes == b.completions.first?.notes
+                && a.completions.first?.date == b.completions.first?.date
+                && a.completions.first?.scorePerformance == b.completions.first?.scorePerformance
+                && a.groupNames == b.groupNames
+        }
+        // 按名字对齐比较（两路径都应含同名游戏）。
+        for n in ["流式探针 A", "流式探针 B"] {
+            if let s = streamed.first(where: { $0.name == n }),
+               let b = bulk.games.first(where: { $0.name == n }) {
+                check("\(label): \(n) 区间解码 == bulk 解码", same(s, b))
+            } else {
+                check("\(label): \(n) 两路径都解码出", false)
+            }
+        }
+        check("\(label): 转义正文完整往返", streamed.first(where: { $0.name == "流式探针 A" })?.reviewBody == tricky)
+    }
+    try parity("流式/pretty", prettyURL)
+    try parity("流式/compact", compactURL)
+
+    // header 解出 groups + 定制六字段（定制仅 pretty 路径手写了 username/banner？→ 只有 compact 带）。
+    let compactScan = try StreamingBackupReader.scan(url: compactURL)
+    let header = try StreamingBackupReader.header(of: compactScan, url: compactURL)
+    check("流式/header: groups 解出", header.groups.contains { $0.name == "探针分组" })
+    check("流式/header: username 定制解出", header.customization.username == "小明")
+    check("流式/header: bannerTitle 解出", header.customization.bannerTitle == "我的库")
+    _ = iso
+
+    // 增量落库（beginReplace batching + applyGame 逐款 + finish save）结果 == bulk apply 结果。
+    guard let tgtStreaming = try? ModelContainer(for: schema,
+          configurations: [ModelConfiguration(isStoredInMemoryOnly: true)]),
+          let tgtBulk = try? ModelContainer(for: schema,
+          configurations: [ModelConfiguration(isStoredInMemoryOnly: true)]) else {
+        check("流式/落库: 建目标容器", false); exit(1)
+    }
+    let sctx = ModelContext(tgtStreaming)
+    let session = try BackupManager.beginReplace(groups: header.groups, into: sctx, batching: true)
+    let sScan = try StreamingBackupReader.scan(url: prettyURL)
+    let sfh = try FileHandle(forReadingFrom: prettyURL)
+    for r in sScan.gameRanges { try session.applyGame(try StreamingBackupReader.game(from: sfh, decoder: iso, range: r)) }
+    try sfh.close()
+    try session.finish(save: true)
+    let bctx = ModelContext(tgtBulk)
+    try BackupManager.decodeAndReplace(prettyData, into: bctx)
+    try bctx.save()
+    let sg = ((try? sctx.fetch(FetchDescriptor<Game>())) ?? []).sorted { $0.name < $1.name }
+    let bg = ((try? bctx.fetch(FetchDescriptor<Game>())) ?? []).sorted { $0.name < $1.name }
+    check("流式/落库: 游戏数一致", sg.count == bg.count && sg.count == 2)
+    check("流式/落库: 名称集一致", sg.map(\.name) == bg.map(\.name))
+    check("流式/落库: 极端正文一致",
+          sg.first(where: { $0.name == "流式探针 A" })?.reviewBody == tricky)
+    check("流式/落库: 分组关系一致",
+          sg.first(where: { $0.name == "流式探针 A" })?.groups.map(\.name) == ["探针分组"])
+    check("流式/落库: 记录数一致",
+          ((try? sctx.fetch(FetchDescriptor<Completion>()))?.count) == 1)
+
+    // 非法输入分类：缺 games 键 / 截断 / 容器不配平。
+    let noGames = tmpDir.appendingPathComponent("datasmoke-nogames.json")
+    try "{\"version\":1,\"exportedAt\":\"2026-01-01T00:00:00Z\",\"groups\":[]}"
+        .data(using: .utf8)!.write(to: noGames)
+    let ngScan = try StreamingBackupReader.scan(url: noGames)
+    check("流式/非法: 缺 games 键 → hasGamesKey=false", !ngScan.hasGamesKey)
+
+    let truncated = tmpDir.appendingPathComponent("datasmoke-trunc.json")
+    try prettyData.prefix(prettyData.count / 2).write(to: truncated)
+    var truncThrewDecoding = false
+    do { _ = try StreamingBackupReader.scan(url: truncated) }
+    catch is DecodingError { truncThrewDecoding = true }
+    catch { }
+    check("流式/非法: 截断文件 → DecodingError", truncThrewDecoding)
+
+    try? FileManager.default.removeItem(at: prettyURL)
+    try? FileManager.default.removeItem(at: compactURL)
+    try? FileManager.default.removeItem(at: noGames)
+    try? FileManager.default.removeItem(at: truncated)
 }
 
 // MARK: - LibraryStats（平台聚合 / 收藏汇总 / 瓦片）

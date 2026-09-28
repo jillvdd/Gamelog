@@ -46,6 +46,7 @@ enum UserCustomization {
     static let shareLastSizeKey = "share.lastSize"
     static let shareLastThemeKey = "share.lastTheme"
     static let shareLastFormatKey = "share.lastFormat"
+    static let shareLastQualityKey = "share.lastQuality"
     static let shareLastSortKey = "share.lastSort"
     /// 出图语言：跟随 app 开关 + 独立语言码（梯3.11）。
     static let shareLanguageFollowKey = "share.languageFollow"

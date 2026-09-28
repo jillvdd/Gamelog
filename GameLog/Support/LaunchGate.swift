@@ -1,5 +1,13 @@
 import SwiftUI
 
+extension Notification.Name {
+    /// 开屏淡出、主界面已接管（首帧已提交）时广播。
+    /// 自动备份的启动重活（整库快照拷贝/流式写盘/空库扫描）全部等这条再排队 ——
+    /// scene-create 看门狗只有 10 秒，启动即开写会在真机大库上把主线程首帧拉爆
+    /// （2026-09-24 iOS beta 3.5 实机 0x8BADF00D）。
+    static let gameLogFirstFrameReady = Notification.Name("GameLog.firstFrameReady")
+}
+
 /// 双平台开屏界面：窗口/启动立即显示品牌页（图标 + app 名 + 细进度条），
 /// 底层主界面同时构建（数据加载在后台进行），就绪后淡出开屏。
 ///
@@ -49,6 +57,10 @@ struct LaunchGate<Content: View>: View {
                 splashOpacity = 0
                 isReady = true
             }
+            // 淡出动画排队的同一轮 runloop 之后广播（保持幂等：兜底分支再发也无害，
+            // 消费方以「首次到达」为准）。
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            NotificationCenter.default.post(name: .gameLogFirstFrameReady, object: nil)
             // 兜底：极端情况下动画被系统冻结时强制放行。
             try? await Task.sleep(nanoseconds: UInt64(maximumSplash * 1_000_000_000))
             if !isReady { isReady = true; splashOpacity = 0 }

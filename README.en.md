@@ -18,7 +18,7 @@
   <img src="https://img.shields.io/badge/Platform-macOS%2014.0%2B%20%7C%20iOS%2018.0%2B-blue?style=flat-square" alt="Platform" />
   <img src="https://img.shields.io/badge/Swift-5.10%20%2F%206.0-orange?style=flat-square" alt="Swift" />
   <img src="https://img.shields.io/badge/SwiftUI-SwiftData-purple?style=flat-square" alt="SwiftUI + SwiftData" />
-  <img src="https://img.shields.io/badge/Version-beta%203.4-amber?style=flat-square" alt="Version" />
+  <img src="https://img.shields.io/badge/Version-beta%203.5-amber?style=flat-square" alt="Version" />
   <img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="License" />
 </p>
 
@@ -106,10 +106,10 @@
 ### 1. Installation
 
 #### macOS
-- Download `GameLog-beta-3.4.dmg` from the Releases page, open it, and drag `GameLog.app` to your `Applications` folder.
+- Download `GameLog-beta-3.5.dmg` from the Releases page, open it, and drag `GameLog.app` to your `Applications` folder.
 
 #### iOS / iPadOS (Unsigned IPA)
-- Grab `GameLog-beta-3.4.ipa` from the `dist/` directory.
+- Grab `GameLog-beta-3.5.ipa` from the `dist/` directory.
 - Re-sign and install using your preferred method (TrollStore, eSign, AltStore, SideStore, etc.).
 
 ### 2. Quick Demo Dataset
@@ -130,7 +130,8 @@ The repository includes a curated demo backup file: [GameLog-demo-backup.json](G
 
 | Version | Highlights |
 |---|---|
-| **beta 3.4** (current) | Group share card title carry-over bug fix; stable build baseline. |
+| **beta 3.5** (current) | Share card export resolution raised to FHD/UHD dual tiers (per canvas, layout unchanged); iOS launch screen now uses a small icon. |
+| **beta 3.4** | Group share card title carry-over bug fix; stable build baseline. |
 | **beta 3.3** | Modern statistics dashboard (Fitness-style Bento + Swift Charts + Rankings); Share system fully rebuilt across all three platforms (dual themes / four aspect ratios / iPhone clean flow / iPad-macOS split workspace). |
 | **beta 3.2** | Dedicated Link Settings page (macOS ⌘⇧, + iOS tab); iOS startup & 1GB+ import OOM fix; full three-language copy rewrite. |
 | **beta 3.1** | External account sync (Nintendo / PlayStation / Xbox); three source cards; game record collapsible section. |

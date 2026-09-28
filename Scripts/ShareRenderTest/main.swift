@@ -123,6 +123,34 @@ func run() -> Int {
         check("单卡横版渲染成功", false)
     }
 
+    // FHD/UHD 画质档：ShareSize.pixels 是布局基准点数，scale 只放大输出位图、排版零变化。
+    check("FHD 倍率 1", ShareQuality.fhd.scale == 1)
+    check("UHD 倍率 2", ShareQuality.uhd.scale == 2)
+    // UHD 竖版手机 = 2160x3840，横版桌面 = 3840x2160（真 4K）——布局比例与 FHD 完全一致。
+    if let png = ShareCardRenderer.renderData(content: .single(game, size: .phone), language: language, scale: ShareQuality.uhd.scale),
+       let size = pngSize(png) {
+        check("UHD 单卡竖版 2160x3840（实际 \(size.width)x\(size.height)）", size.width == 2160 && size.height == 3840)
+        try? png.write(to: URL(fileURLWithPath: "/tmp/gamelog_share_phone_uhd.png"))
+    } else {
+        check("UHD 单卡竖版渲染成功", false)
+    }
+    if let png = ShareCardRenderer.renderData(content: .single(game, size: .desktop), language: language, scale: ShareQuality.uhd.scale),
+       let size = pngSize(png) {
+        check("UHD 单卡横版 3840x2160（实际 \(size.width)x\(size.height)）", size.width == 3840 && size.height == 2160)
+        try? png.write(to: URL(fileURLWithPath: "/tmp/gamelog_share_desktop_uhd.png"))
+    } else {
+        check("UHD 单卡横版渲染成功", false)
+    }
+    // 九宫格同样吃画质档：UHD 方图 2400x2400。
+    let gridUhd = ShareCardRenderer.renderGrid9Data(games: [game, plain], title: "合集",
+                                                    language: language, theme: .brand,
+                                                    scale: ShareQuality.uhd.scale, format: .png)
+    if let first = gridUhd.first, let s = pngSize(first) {
+        check("UHD 九宫格单图 2400x2400（实际 \(s.width)x\(s.height)）", s.width == 2400 && s.height == 2400)
+    } else {
+        check("UHD 九宫格渲染成功", false)
+    }
+
     // 单卡方版 (1:1)
     if let png = ShareCardRenderer.renderData(content: .single(game, size: .square), language: language),
        let size = pngSize(png) {

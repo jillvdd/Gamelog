@@ -21,4 +21,35 @@ actor BackupImporter {
         try BackupManager.apply(dto, into: modelContext, onProgress: onProgress)
         try modelContext.save()
     }
+
+    /// 流式整库替换：按扫描区间逐游戏读盘 → 解码 → 增量落库（每 25 款 save 一次）。
+    /// 峰值内存 = 单款游戏 JSON + 当前批次对象，与备份总体积无关 —— GB 级备份在
+    /// iOS 上也能导完（bulk 路径 `decode(Data(整文件))` 是内存爆炸根因，已弃用于文件入口）。
+    /// 安全作用域在本同步调用内 start/stop（不跨 await，满足线程与生命周期约束）。
+    /// 替换开始（clear 已执行）后的任何失败统一包装为 `ImportError.replacementFailed`，
+    /// 调用方据此决定「库可能半替换 → 从快照回滚」；扫描/头字段失败不裹（DB 未动）。
+    func applyStreaming(url: URL, requestAccess: Bool, scan: BackupScanResult,
+                        groups: [GroupDTO],
+                        onProgress: @escaping @Sendable (Int, Int) -> Void) throws {
+        let didStart = requestAccess ? url.startAccessingSecurityScopedResource() : false
+        defer { if didStart { url.stopAccessingSecurityScopedResource() } }
+        let total = max(1, scan.gameRanges.count)
+        do {
+            let session = try BackupManager.beginReplace(groups: groups, into: modelContext, batching: true)
+            // 在 beginReplace（已清库）之后打开：读盘失败经外层 catch 归为 replacementFailed → 触发回滚。
+            let fh = try FileHandle(forReadingFrom: url)
+            defer { try? fh.close() }
+            let decoder = StreamingBackupReader.decoder()
+            for (index, range) in scan.gameRanges.enumerated() {
+                let dto = try StreamingBackupReader.game(from: fh, decoder: decoder, range: range)
+                try session.applyGame(dto)
+                onProgress(index + 1, total)
+            }
+            try session.finish(save: true)
+        } catch let error as ImportError {
+            throw error
+        } catch {
+            throw ImportError.replacementFailed(underlying: String(describing: error))
+        }
+    }
 }

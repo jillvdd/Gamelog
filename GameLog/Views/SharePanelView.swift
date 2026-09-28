@@ -67,6 +67,7 @@ struct SharePanelView: View {
     @AppStorage(UserCustomization.shareLastSizeKey) private var size: ShareSize = .phone
     @AppStorage(UserCustomization.shareLastThemeKey) private var themeMode: ShareThemeMode = .brandDark
     @AppStorage(UserCustomization.shareLastFormatKey) private var exportFormat: ShareExportFormat = .jpeg
+    @AppStorage(UserCustomization.shareLastQualityKey) private var exportQuality: ShareQuality = .uhd
     @AppStorage(UserCustomization.shareLastSortKey) private var sortOption: ShareSortOption = .selection
     // 梯3.11：出图语言与 app 语言解耦（默认跟随）。
     @AppStorage(UserCustomization.shareLanguageFollowKey) private var languageFollow = true
@@ -204,8 +205,8 @@ struct SharePanelView: View {
     /// 大选择护栏（梯1.4）：超限自动降倍率时明确提示，不再无声出糊图。
     private var downscaleWarning: String? {
         guard mode == .games, selectedGames.count > 9, let content = currentContent else { return nil }
-        let eff = ShareCardRenderer.effectiveScale(canvas: content.canvasSize, scale: 1)
-        guard eff < 0.9 else { return nil }
+        let eff = ShareCardRenderer.effectiveScale(canvas: content.canvasSize, scale: exportQuality.scale)
+        guard eff < 0.9 * exportQuality.scale else { return nil }
         return L10n.tr("share.downscaleWarning", [selectedGames.count], lang: language)
     }
 
@@ -254,6 +255,7 @@ struct SharePanelView: View {
             }
         }
         .onChange(of: exportFormat) { _, _ in scheduleRerender() }
+        .onChange(of: exportQuality) { _, _ in scheduleRerender() }
         .onChange(of: statsRevision) { _, _ in scheduleRerender() }
         .sheet(isPresented: $showingStyleEditor) {
             ShareStyleConfigurator { statsRevision += 1 }
@@ -662,6 +664,12 @@ struct SharePanelView: View {
                         Text(verbatim: L10n.tr(f == .jpeg ? "share.format.jpeg" : "share.format.png", lang: language))
                             .tag(f)
                     }
+                }
+            }
+            Section(L10n.tr("share.quality", lang: language)) {
+                Picker(L10n.tr("share.quality", lang: language), selection: $exportQuality) {
+                    Text(verbatim: "FHD").tag(ShareQuality.fhd)
+                    Text(verbatim: "UHD").tag(ShareQuality.uhd)
                 }
             }
             Section(L10n.tr("share.language", lang: language)) {
@@ -1325,6 +1333,10 @@ struct SharePanelView: View {
                         .tag(f)
                 }
             }
+            Picker(L10n.tr("share.quality", lang: language), selection: $exportQuality) {
+                Text(verbatim: "FHD").tag(ShareQuality.fhd)
+                Text(verbatim: "UHD").tag(ShareQuality.uhd)
+            }
         } label: {
             ZStack {
                 Text(verbatim: L10n.tr("share.format.jpeg", lang: language))
@@ -1500,9 +1512,11 @@ struct SharePanelView: View {
             return
         }
         NSLog("GameLog: rerenderPreview starting render for %d games, size: %@, theme: %@", selectedGames.count, size.rawValue, themeMode.rawValue)
+        // 单一高分辨率出图同时供预览显示与分享文件（超采样位图在预览框内由系统降采样，
+        // 排版与全尺寸一致）；旧版分享的是 0.5 预览小图，故手机上发出去发糊。
         if let data = ShareCardRenderer.renderData(
             content: content, language: renderLanguage, theme: resolvedTheme,
-            scale: ShareCardRenderer.previewScale, format: exportFormat.rendererFormat
+            scale: exportQuality.scale, format: exportFormat.rendererFormat
         ) {
             NSLog("GameLog: rerenderPreview success, bytes: %d", data.count)
             applyRendered(data)
@@ -1515,7 +1529,7 @@ struct SharePanelView: View {
     private func renderFullData() -> Data? {
         guard let content = currentContent else { return nil }
         return ShareCardRenderer.renderData(
-            content: content, language: renderLanguage, theme: resolvedTheme, scale: 1, format: exportFormat.rendererFormat
+            content: content, language: renderLanguage, theme: resolvedTheme, scale: exportQuality.scale, format: exportFormat.rendererFormat
         )
     }
 
@@ -1563,7 +1577,7 @@ struct SharePanelView: View {
         let title = trimmed.isEmpty ? defaultOverviewTitle() : trimmed
         let datas = ShareCardRenderer.renderGrid9Data(
             games: selectedGames, title: title, language: renderLanguage,
-            theme: resolvedTheme, format: exportFormat.rendererFormat
+            theme: resolvedTheme, scale: exportQuality.scale, format: exportFormat.rendererFormat
         )
         let urls = writeGrid9Files(datas)
         guard !urls.isEmpty else {
@@ -1599,7 +1613,7 @@ struct SharePanelView: View {
         let title = trimmed.isEmpty ? defaultOverviewTitle() : trimmed
         let datas = ShareCardRenderer.renderGrid9Data(
             games: selectedGames, title: title, language: renderLanguage,
-            theme: resolvedTheme, format: exportFormat.rendererFormat
+            theme: resolvedTheme, scale: exportQuality.scale, format: exportFormat.rendererFormat
         )
         let images = datas.compactMap { UIImage(data: $0) }
         guard !images.isEmpty else {

@@ -106,6 +106,14 @@ struct HomeCarousel: View {
             }
         )
         .onAppear {
+            #if DEBUG
+            // 临时走查钩子：-debugCarouselPage N 直接跳页（simctl 无手势，截图验证用）。
+            if let i = ProcessInfo.processInfo.arguments.firstIndex(of: "-debugCarouselPage"),
+               i + 1 < ProcessInfo.processInfo.arguments.count,
+               let p = Int(ProcessInfo.processInfo.arguments[i + 1]), (0..<5).contains(p) {
+                page = p
+            }
+            #endif
             if spotlight == nil {
                 spotlightID = Self.randomSpotlightID(games: liveGames, avoiding: nil)
             }
@@ -789,18 +797,19 @@ struct HomeCarousel: View {
     }
 
     /// iOS 单行小评分胶囊：「平均分 ★数字」一行排布（紧凑，放标题上方）。
+    /// `scale` >1 仅 iPad 聚光灯回退版用（随标题同档放大）。
     @ViewBuilder
-    private func spotlightScoreInline(_ game: Game) -> some View {
+    private func spotlightScoreInline(_ game: Game, scale: CGFloat = 1) -> some View {
         if let score = game.libraryScore {
             HStack(spacing: 5 * contentUnit) {
                 Text(verbatim: L10n.tr("group.avgScore", lang: language))
-                    .font(.system(size: 11 * contentUnit, weight: .medium))
+                    .font(.system(size: 11 * contentUnit * scale, weight: .medium))
                     .foregroundStyle(.white.opacity(0.85))
                 Image(systemName: "star.fill")
-                    .font(.system(size: 11 * contentUnit))
+                    .font(.system(size: 11 * contentUnit * scale))
                     .foregroundStyle(BrandPalette.accent)
                 Text(verbatim: GameCardView.formatScore(score))
-                    .font(.system(size: 13 * contentUnit, weight: .bold))
+                    .font(.system(size: 13 * contentUnit * scale, weight: .bold))
                     .monospacedDigit()
             }
             .foregroundStyle(.white)
@@ -837,23 +846,30 @@ struct HomeCarousel: View {
 
     /// 竖版回退版（仅 2:3 封面或无图）：左=网格同款 2:3 封面（完整不裁剪），右=文字信息。
     /// iOS 同样走紧凑口径：评分小胶囊在标题上方、平台图标并入标题右侧（与全幅版一致）。
+    /// iPad（2026-09-22 用户要求）：无横图/背景图时封面与标题放大——封面按卡高吃满、
+    /// 文字 ×1.4；iPhone/macOS `spotlightPadLayout` 恒 false，版式逐像素不变。
+    @ViewBuilder
     private func spotlightPortraitFallback(_ game: Game) -> some View {
+        let boost = spotlightPadLayout
+        let tScale: CGFloat = boost ? 1.4 : 1
+        let innerH = max(pageHeight - 32 * contentUnit, 150)
+        let posterBox: CGSize? = boost ? CGSize(width: innerH * Self.posterAspect, height: innerH) : nil
         Button(action: { onSelect(game) }) {
-            HStack(spacing: 16 * contentUnit) {
-                posterCover(game)
-                VStack(alignment: .leading, spacing: 6 * contentUnit) {
+            HStack(spacing: (boost ? 28 : 16) * contentUnit) {
+                posterCover(game, box: posterBox)
+                VStack(alignment: .leading, spacing: (boost ? 10 : 6) * contentUnit) {
                     #if os(iOS)
-                    spotlightScoreInline(game)
+                    spotlightScoreInline(game, scale: tScale)
                     #endif
                     // iOS 平台图标与标题中轴对齐（详情页 nameRow 口径）；macOS 保持基线对齐版式。
                     #if os(iOS)
                     HStack(alignment: .center, spacing: 8 * contentUnit) {
                         Text(verbatim: game.displayName(for: language))
-                            .font(.system(size: 20 * contentUnit, weight: .bold))
+                            .font(.system(size: 20 * contentUnit * tScale, weight: .bold))
                             .lineLimit(2)
                             .multilineTextAlignment(.leading)
                         if !game.platformList.isEmpty {
-                            GamePlatformIcons(platforms: game.platformList, maxCount: 4, iconSize: 13 * contentUnit)
+                            GamePlatformIcons(platforms: game.platformList, maxCount: 4, iconSize: 13 * contentUnit * tScale)
                         }
                     }
                     #else
@@ -867,32 +883,33 @@ struct HomeCarousel: View {
                         GamePlatformIcons(platforms: game.platformList, maxCount: 4, iconSize: 13 * contentUnit)
                     }
                     #endif
-                    Spacer(minLength: 4 * contentUnit)
+                    // iPad 放大版式：文字块聚拢垂直居中，不再用 Spacer 顶/底拉伸。
+                    if !boost { Spacer(minLength: 4 * contentUnit) }
                     // 评价标题（随机游戏的重点展示对象）。
                     HStack(alignment: .firstTextBaseline, spacing: 5 * contentUnit) {
                         Image(systemName: "text.quote")
-                            .font(.system(size: 12 * contentUnit))
+                            .font(.system(size: 12 * contentUnit * tScale))
                             .foregroundStyle(BrandPalette.accent)
                         if game.reviewTitle.isEmpty {
                             Text(verbatim: L10n.tr("home.spotlightNoReview", lang: language))
-                                .font(.system(size: 15 * contentUnit))
+                                .font(.system(size: 15 * contentUnit * tScale))
                                 .foregroundStyle(.tertiary)
                         } else {
                             Text(verbatim: game.reviewTitle)
-                                .font(.system(size: 15 * contentUnit, weight: .medium))
+                                .font(.system(size: 15 * contentUnit * tScale, weight: .medium))
                                 .foregroundStyle(.secondary)
                                 .lineLimit(2)
                                 .multilineTextAlignment(.leading)
                         }
                     }
                 }
-                Spacer(minLength: 0)
+                if !boost { Spacer(minLength: 0) }
             }
             .padding(16 * contentUnit)
             .contentShape(Rectangle())
         }
         .buttonStyle(PressFeedbackButtonStyle())
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: boost ? .center : .leading)
         .background(Self.cardShape.fill(Color.semantic(.controlBackground)))
         .overlay(Self.cardShape.strokeBorder(.quaternary, lineWidth: 0.5))
         .clipShape(Self.cardShape)
@@ -969,10 +986,13 @@ struct HomeCarousel: View {
     private static var rowThumbAspect: CGFloat { rowThumbSize.width / rowThumbSize.height }
 
     /// 网格同款 2:3 封面（竖版填满裁切；比这个框宽的图完整展示、上下留空；无图占位）。
-    /// 宽 110 基准随卡片缩放。
+    /// 宽 110 基准随卡片缩放。`box` 传入时改用该框（iPad 聚光灯回退版放大封面用），
+    /// 判据与 `frame` 仍共用同一个数。
     @ViewBuilder
-    private func posterCover(_ game: Game) -> some View {
-        let letterboxed = game.coverImage?.letterboxes(inBoxAspect: Self.posterAspect) ?? false
+    private func posterCover(_ game: Game, box: CGSize? = nil) -> some View {
+        let boxSize = box ?? CGSize(width: Self.posterSize.width * contentUnit,
+                                    height: Self.posterSize.height * contentUnit)
+        let letterboxed = game.coverImage?.letterboxes(inBoxAspect: boxSize.width / boxSize.height) ?? false
         Group {
             if let image = game.coverImage {
                 Image(appImage: image)
@@ -992,10 +1012,20 @@ struct HomeCarousel: View {
                 }
             }
         }
-        .frame(width: Self.posterSize.width * contentUnit, height: Self.posterSize.height * contentUnit)
+        .frame(width: boxSize.width, height: boxSize.height)
         .clipShape(RoundedRectangle(cornerRadius: 10 * contentUnit))
         // 「去掉线框」（2026-09-22）：封面槽位不描边，显示逻辑与旧版一致。
         .shadow(color: .black.opacity(0.10), radius: 6, y: 2)
+    }
+
+    /// 聚光灯回退版式的 iPad 放大开关（见 `spotlightPortraitFallback`）。
+    /// macOS 无此概念、iPhone 版式已按矮卡定稿——两处恒 false。
+    private var spotlightPadLayout: Bool {
+        #if os(iOS)
+        iPadLayout.isPad
+        #else
+        false
+        #endif
     }
 
     /// 随机游戏入口：从库里随机挑一款（每次进入首页换一轮，尽量不重复上一款）。

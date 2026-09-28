@@ -12,6 +12,8 @@ struct iOSRootView: View {
     /// AirDrop / 打开方式 收到的备份文件 URL（确认后导入）。
     @State private var incomingBackupURL: URL?
     @State private var showingIncomingImport = false
+    /// 导入失败的分型提示（旧版静默吞错，用户只能看到「无效或已损坏」误报）。
+    @State private var incomingImportMessage: String?
 
     private enum Tab: Hashable { case library, stats, links, settings }
 
@@ -47,6 +49,12 @@ struct iOSRootView: View {
             incomingBackupURL = url
             showingIncomingImport = true
         }
+        .alert(L10n.tr("backup.import", lang: language), isPresented: .init(
+            get: { incomingImportMessage != nil }, set: { if !$0 { incomingImportMessage = nil } })) {
+            Button(L10n.tr("common.ok", lang: language), role: .cancel) {}
+        } message: {
+            Text(verbatim: incomingImportMessage ?? "")
+        }
         .platformConfirmDialog(
             L10n.tr("common.confirm", lang: language),
             isPresented: $showingIncomingImport,
@@ -60,23 +68,24 @@ struct iOSRootView: View {
         )
     }
 
-    /// 导入 AirDrop 收到的备份：走统一入口 importBackup（快照→后台重建→定制回写→广播→补备份）。
-    /// 安全作用域内只同步读完 Data 就释放——`defer{stop}` 不可跨 await（2026-09-08），
-    /// 后续异步链只传 Data 不传 URL。
+    /// 导入 AirDrop/打开方式收到的备份：走 AutoBackup.importBackup(fromFile:)（后台读盘 +
+    /// 快照→后台重建→定制回写→广播→补备份），与设置页导入同一实现。
+    /// 旧实现在主线程同步 `Data(contentsOf:)` 读 GB 级备份且 `try?` 吞错（2026-09-23 修复）。
     private func importIncomingBackup() {
         guard let url = incomingBackupURL else { return }
         incomingBackupURL = nil
-        // 「文件」App 打开方式发来的 URL 是 security-scoped，直接读会无权限；AirDrop 路径系统已拷入沙盒可读。
-        // 无条件 start：对 AirDrop URL 是 no-op（返回 false），对「文件」App 路径真正生效。
-        let didStart = url.startAccessingSecurityScopedResource()
-        guard let data = try? Data(contentsOf: url) else {
-            if didStart { url.stopAccessingSecurityScopedResource() }
-            return
-        }
-        if didStart { url.stopAccessingSecurityScopedResource() }
         let context = context
+        let language = language
         Task { @MainActor in
-            try? await AutoBackup.shared.importBackup(data, into: context) { _ in }
+            do {
+                // 「文件」App 打开方式发来的 URL 是 security-scoped；AirDrop 路径系统已拷入沙盒，
+                // 无条件 start 对后者是 no-op。
+                try await AutoBackup.shared.importBackup(fromFile: url, into: context,
+                                                         requestAccess: true) { _ in }
+            } catch {
+                NSLog("GameLog onOpenURL import failed: %@", String(describing: error))
+                incomingImportMessage = importFailMessageForUser(error, lang: language)
+            }
         }
     }
 }

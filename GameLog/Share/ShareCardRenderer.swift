@@ -91,7 +91,7 @@ enum ShareCardRenderer {
     /// 保证朋友圈九宫格每张同尺寸；标题自动带 i/9 序号）。
     static func renderGrid9Data(
         games: [Game], title: String, language: String, theme: ShareTheme,
-        format: OutputFormat = .jpeg(quality: 0.9)
+        scale: CGFloat = 1, format: OutputFormat = .jpeg(quality: 0.9)
     ) -> [Data] {
         let chunks = grid9Chunks(games: games)
         return chunks.indices.compactMap { i in
@@ -105,7 +105,7 @@ enum ShareCardRenderer {
             }
             .frame(width: side, height: side)
             .environment(\.appLanguageCode, language)
-            return renderView(view, canvas: CGSize(width: side, height: side), scale: 1, format: format)
+            return renderView(view, canvas: CGSize(width: side, height: side), scale: scale, format: format)
         }
     }
 

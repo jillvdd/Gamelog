@@ -162,11 +162,27 @@ enum BackupManager {
 
     /// 按 DTO 重建全库：清空现有 + 逐游戏重建（不含定制回写/清缓存/广播——
     /// 新定序要求这三者在 DB 落盘成功后由调用方在主线程执行，见 AutoBackup.importBackup）。
+    /// 不 save（批量路径由 BackupImporter.applyDTO 收尾 save，语义与历史一致）。
     /// - Parameters:
     ///   - onProgress: 已处理游戏数/总数回调（约每 50 个游戏一次 + 末尾一次），nil = 不上报。
     static func apply(_ dto: BackupDTO, into context: ModelContext,
                       onProgress: ((Int, Int) -> Void)? = nil) throws {
+        let session = try beginReplace(groups: dto.groups, into: context, batching: false)
+        let total = dto.games.count
+        for (index, gameDTO) in dto.games.enumerated() {
+            // 进度上报（后台导入链用；每 50 个游戏一次 + 末尾一次，主线程节流见调用方）。
+            if let onProgress = onProgress, (index % 50 == 0 || index + 1 == total) {
+                onProgress(index + 1, total)
+            }
+            try session.applyGame(gameDTO)
+        }
+    }
 
+    /// 增量替换入口：清空现有 + 分组重建。整库替换（bulk / 流式）两条路径共用，防口径漂移。
+    /// `batching` = 流式路径专用：每 25 款 save + reset，压住驻留内存
+    /// （externalStorage 的图字节被上下文持有，不清会随库体积线性膨胀）。
+    static func beginReplace(groups: [GroupDTO], into context: ModelContext,
+                             batching: Bool) throws -> BackupApplySession {
         // 再清空现有（删除游戏会级联删除通关记录与持有记录；以下重建均不抛错，不会中途失败）
         if let existingGames = try? context.fetch(FetchDescriptor<Game>()) {
             existingGames.forEach { context.delete($0) }
@@ -174,9 +190,21 @@ enum BackupManager {
         if let existingGroups = try? context.fetch(FetchDescriptor<GameGroup>()) {
             existingGroups.forEach { context.delete($0) }
         }
+        return try BackupApplySession(context: context, groups: groups, batching: batching)
+    }
+}
 
-        var groupMap: [String: GameGroup] = [:]
-        for groupDTO in dto.groups {
+/// 整库替换增量会话：分组一次建好，游戏逐个 `applyGame` 落库。
+final class BackupApplySession {
+    private let context: ModelContext
+    private let batching: Bool
+    private var groupMap: [String: GameGroup] = [:]
+    private var processed = 0
+
+    fileprivate init(context: ModelContext, groups: [GroupDTO], batching: Bool) throws {
+        self.context = context
+        self.batching = batching
+        for groupDTO in groups {
             // 分组名 trim：与新建/改名弹窗的存储口径一致，避免备份里带空格的分组名造成视觉重名
             // 或与游戏 groupNames 引用错位（如导出 "ABC "、游戏引用 "ABC"）。
             let groupName = groupDTO.name.trimmingCharacters(in: .whitespaces)
@@ -191,97 +219,106 @@ enum BackupManager {
             context.insert(group)
             groupMap[groupName] = group
         }
+    }
 
-        for (index, gameDTO) in dto.games.enumerated() {
-            // 进度上报（后台导入链用；每 50 个游戏一次 + 末尾一次，主线程节流见调用方）。
-            if let onProgress = onProgress, (index % 50 == 0 || index + 1 == dto.games.count) {
-                onProgress(index + 1, dto.games.count)
-            }
-            // base64 解码/枚举解析拆出局部变量：Game init 参数 20+，全内联会超出编译器
-            // 类型检查预算（2026-09-05 实测 unable to type-check in reasonable time）。
-            let coverData = gameDTO.coverBase64.flatMap { Data(base64Encoded: $0) }
-            let squareData = gameDTO.squareBase64.flatMap { Data(base64Encoded: $0) }
-            let landscapeData = gameDTO.landscapeBase64.flatMap { Data(base64Encoded: $0) }
-            let heroData = gameDTO.heroBase64.flatMap { Data(base64Encoded: $0) }
-            let logoData = gameDTO.logoBase64.flatMap { Data(base64Encoded: $0) }
-            let logoSize = gameDTO.logoSizeRaw.flatMap(LogoBannerSize.init(rawValue:)) ?? LogoBannerSize.medium
-            let logoVertical = gameDTO.logoVerticalRaw.flatMap(LogoBannerVertical.init(rawValue:)) ?? LogoBannerVertical.bottom
-            let logoHorizontal = gameDTO.logoHorizontalRaw.flatMap(LogoBannerHorizontal.init(rawValue:)) ?? LogoBannerHorizontal.leading
-            let importedStatus = gameDTO.status.flatMap(GameStatus.init(rawValue:)) ?? GameStatus.completed
-            let importedCreatedAt = gameDTO.createdAt ?? Date.now
-            let game = Game(
-                name: gameDTO.name,
-                nameZh: gameDTO.nameZh,
-                nameJa: gameDTO.nameJa,
-                aliases: gameDTO.aliases,
-                platform: gameDTO.platform ?? "",
-                releaseDate: gameDTO.releaseDate,
-                developer: gameDTO.developer,
-                publisher: gameDTO.publisher,
-                genre: gameDTO.genre,
-                coverData: coverData,
-                squareData: squareData,
-                landscapeData: landscapeData,
-                heroData: heroData,
-                logoData: logoData,
-                logoSize: logoSize,
-                logoVertical: logoVertical,
-                logoHorizontal: logoHorizontal,
-                reviewTitle: gameDTO.reviewTitle,
-                reviewBody: gameDTO.reviewBody,
-                // 旧版备份缺 createdAt → .now（模型默认）；缺 status → 默认已通关。
-                createdAt: importedCreatedAt,
-                status: importedStatus,
-                isFavorite: gameDTO.isFavorite ?? false
+    /// 单款游戏重建（与整库替换共用：通关记录 / 持有记录 / 分组关系）。
+    func applyGame(_ gameDTO: GameDTO) throws {
+        // base64 解码/枚举解析拆出局部变量：Game init 参数 20+，全内联会超出编译器
+        // 类型检查预算（2026-09-05 实测 unable to type-check in reasonable time）。
+        let coverData = gameDTO.coverBase64.flatMap { Data(base64Encoded: $0) }
+        let squareData = gameDTO.squareBase64.flatMap { Data(base64Encoded: $0) }
+        let landscapeData = gameDTO.landscapeBase64.flatMap { Data(base64Encoded: $0) }
+        let heroData = gameDTO.heroBase64.flatMap { Data(base64Encoded: $0) }
+        let logoData = gameDTO.logoBase64.flatMap { Data(base64Encoded: $0) }
+        let logoSize = gameDTO.logoSizeRaw.flatMap(LogoBannerSize.init(rawValue:)) ?? LogoBannerSize.medium
+        let logoVertical = gameDTO.logoVerticalRaw.flatMap(LogoBannerVertical.init(rawValue:)) ?? LogoBannerVertical.bottom
+        let logoHorizontal = gameDTO.logoHorizontalRaw.flatMap(LogoBannerHorizontal.init(rawValue:)) ?? LogoBannerHorizontal.leading
+        let importedStatus = gameDTO.status.flatMap(GameStatus.init(rawValue:)) ?? GameStatus.completed
+        let importedCreatedAt = gameDTO.createdAt ?? Date.now
+        let game = Game(
+            name: gameDTO.name,
+            nameZh: gameDTO.nameZh,
+            nameJa: gameDTO.nameJa,
+            aliases: gameDTO.aliases,
+            platform: gameDTO.platform ?? "",
+            releaseDate: gameDTO.releaseDate,
+            developer: gameDTO.developer,
+            publisher: gameDTO.publisher,
+            genre: gameDTO.genre,
+            coverData: coverData,
+            squareData: squareData,
+            landscapeData: landscapeData,
+            heroData: heroData,
+            logoData: logoData,
+            logoSize: logoSize,
+            logoVertical: logoVertical,
+            logoHorizontal: logoHorizontal,
+            reviewTitle: gameDTO.reviewTitle,
+            reviewBody: gameDTO.reviewBody,
+            // 旧版备份缺 createdAt → .now（模型默认）；缺 status → 默认已通关。
+            createdAt: importedCreatedAt,
+            status: importedStatus,
+            isFavorite: gameDTO.isFavorite ?? false
+        )
+        // updatedAt 单独恢复：init 把 updatedAt 钉成 createdAt，而导入的 updatedAt 可能更早/更晚。
+        game.updatedAt = gameDTO.updatedAt ?? game.createdAt
+        game.groups = gameDTO.groupNames.compactMap { groupMap[$0.trimmingCharacters(in: .whitespaces)] }
+        context.insert(game)
+
+        for completionDTO in gameDTO.completions {
+            let completion = Completion(
+                platform: completionDTO.platform,
+                date: completionDTO.date,
+                degree: completionDTO.degree,
+                playtime: completionDTO.playtime,
+                notes: completionDTO.notes,
+                scoreGameplay: completionDTO.scoreGameplay,
+                scoreDesign: completionDTO.scoreDesign,
+                scoreStory: completionDTO.scoreStory,
+                scoreArt: completionDTO.scoreArt,
+                scoreMusic: completionDTO.scoreMusic,
+                scorePerformance: completionDTO.scorePerformance
             )
-            // updatedAt 单独恢复：init 把 updatedAt 钉成 createdAt，而导入的 updatedAt 可能更早/更晚。
-            game.updatedAt = gameDTO.updatedAt ?? game.createdAt
-            game.groups = gameDTO.groupNames.compactMap { groupMap[$0.trimmingCharacters(in: .whitespaces)] }
-            context.insert(game)
+            completion.game = game
+            context.insert(completion)
+        }
 
-            for completionDTO in gameDTO.completions {
-                let completion = Completion(
-                    platform: completionDTO.platform,
-                    date: completionDTO.date,
-                    degree: completionDTO.degree,
-                    playtime: completionDTO.playtime,
-                    notes: completionDTO.notes,
-                    scoreGameplay: completionDTO.scoreGameplay,
-                    scoreDesign: completionDTO.scoreDesign,
-                    scoreStory: completionDTO.scoreStory,
-                    scoreArt: completionDTO.scoreArt,
-                    scoreMusic: completionDTO.scoreMusic,
-                    scorePerformance: completionDTO.scorePerformance
+        // 持有记录（旧版备份缺字段 → 默认值兜底；枚举走 migrate 而非 flatMap(rawValue)）
+        if let copies = gameDTO.copies {
+            for copyDTO in copies {
+                let copy = PhysicalCopy(
+                    version: copyDTO.version,
+                    count: max(1, copyDTO.count),
+                    images: copyDTO.images.prefix(6).compactMap { Data(base64Encoded: $0) }
                 )
-                completion.game = game
-                context.insert(completion)
-            }
-
-            // 持有记录（旧版备份缺字段 → 默认值兜底；枚举走 migrate 而非 flatMap(rawValue)）
-            if let copies = gameDTO.copies {
-                for copyDTO in copies {
-                    let copy = PhysicalCopy(
-                        version: copyDTO.version,
-                        count: max(1, copyDTO.count),
-                        images: copyDTO.images.prefix(6).compactMap { Data(base64Encoded: $0) }
-                    )
-                    copy.media = CopyMedia.migrate(copyDTO.mediaRaw ?? "")
-                    copy.regional = CopyRegional.migrate(copyDTO.regionalRaw ?? "")
-                    copy.condition = CopyCondition.migrate(copyDTO.conditionRaw ?? "")
-                    copy.acquisition = CopyAcquisition.migrate(copyDTO.acquisitionRaw ?? "")
-                    copy.platform = copyDTO.platform ?? ""
-                    copy.priceZh = copyDTO.priceZh
-                    copy.priceJa = copyDTO.priceJa
-                    copy.priceEn = copyDTO.priceEn
-                    copy.estValueZh = copyDTO.estValueZh
-                    copy.estValueJa = copyDTO.estValueJa
-                    copy.estValueEn = copyDTO.estValueEn
-                    copy.purchaseDate = copyDTO.purchaseDate
-                    copy.notes = copyDTO.notes ?? ""
-                    copy.game = game
-                    context.insert(copy)
-                }
+                copy.media = CopyMedia.migrate(copyDTO.mediaRaw ?? "")
+                copy.regional = CopyRegional.migrate(copyDTO.regionalRaw ?? "")
+                copy.condition = CopyCondition.migrate(copyDTO.conditionRaw ?? "")
+                copy.acquisition = CopyAcquisition.migrate(copyDTO.acquisitionRaw ?? "")
+                copy.platform = copyDTO.platform ?? ""
+                copy.priceZh = copyDTO.priceZh
+                copy.priceJa = copyDTO.priceJa
+                copy.priceEn = copyDTO.priceEn
+                copy.estValueZh = copyDTO.estValueZh
+                copy.estValueJa = copyDTO.estValueJa
+                copy.estValueEn = copyDTO.estValueEn
+                copy.purchaseDate = copyDTO.purchaseDate
+                copy.notes = copyDTO.notes ?? ""
+                copy.game = game
+                context.insert(copy)
             }
         }
+        processed += 1
+        // 分批落盘：每 25 款 flush 一次，让本函数已建的对象随 save 进入持久存储、
+        // decoded 局部（含 base64→Data）及时被 ARC 回收。SwiftData 无 `reset()`，
+        // 依赖 save 后的外部存储卸载 —— 常驻对象图仅剩轻量行记录（图片走 externalStorage 文件）。
+        if batching, processed % 25 == 0 {
+            try context.save()
+        }
+    }
+
+    /// 收尾。流式路径 `save: true` 原子落盘最后一批；bulk 路径由调用方 save（历史语义）。
+    func finish(save: Bool) throws {
+        if save { try context.save() }
     }
 }

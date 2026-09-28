@@ -387,67 +387,80 @@ struct LinkSettingsView: View {
         return "GameLog-backup-\(formatter.string(from: Date())).json"
     }
 
+    /// 导出统一路径：ModelActor 后台逐游戏流式编码写盘（内存峰值 = 单游戏片段）。
+    /// 旧 BackupManager.encode 在主线程序列化整库，GB 级库必卡死（2026-09-23 替换）。
+    /// `atomic`=false 供 NSSavePanel 目标直写：powerbox 只授权选定文件本身，同目录临时件会被拒。
+    private func streamExportBackup(to url: URL, atomic: Bool = true) async throws {
+        let writer = BackupWriter(modelContainer: context.container)
+        try await writer.writeStreamingBackup(
+            to: url,
+            username: UserDefaults.standard.string(forKey: UserCustomization.usernameKey),
+            avatarPNG: UserCustomization.avatarImageData(),
+            iconPNG: UserCustomization.iconImageData(),
+            bannerTitle: UserDefaults.standard.string(forKey: UserCustomization.bannerTitleKey),
+            bannerSubtitle: UserDefaults.standard.string(forKey: UserCustomization.bannerSubtitleKey),
+            bannerBackgroundPNG: UserCustomization.bannerBackgroundImageData(),
+            atomic: atomic
+        )
+    }
+
+    /// 起后台导出任务：期间按钮禁用 + 「正在导出」状态，完成/失败回填文案。
+    private func startStreamingExport(to url: URL, atomic: Bool = true,
+                                      onDone: @escaping @MainActor () -> Void = {}) {
+        isExporting = true
+        statusMessage = L10n.tr("backup.exporting", lang: language)
+        let language = language
+        Task { @MainActor in
+            defer { isExporting = false }
+            do {
+                try await streamExportBackup(to: url, atomic: atomic)
+                onDone()
+            } catch {
+                NSLog("GameLog export failed: %@", String(describing: error))
+                statusMessage = L10n.tr("backup.exportFailed", lang: language)
+            }
+        }
+    }
+
     #if os(macOS)
     private func export() {
-        // 禁重入：同步编码期间按钮已禁用，此处是双保险（2026-09-08）。
+        // 禁重入：导出进行中按钮已禁用，此处双保险（2026-09-08）。
         guard !isExporting else { return }
-        isExporting = true
-        defer { isExporting = false }
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.json]
         panel.nameFieldStringValue = backupFileName()
         panel.canCreateDirectories = true
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        do {
-            let data = try BackupManager.encode(games: games, groups: groups)
-            try data.write(to: url)
+        startStreamingExport(to: url, atomic: false) {
             statusMessage = L10n.tr("backup.exportDone", lang: language)
-        } catch {
-            statusMessage = L10n.tr("backup.exportFailed", lang: language)
         }
     }
-    #endif
 
-    #if os(macOS)
-    /// macOS 分享备份：编码整库 → 写临时文件 → 从「分享备份」按钮位置弹出系统分享面板（含 AirDrop）。
-    /// 同步编码与 export() / iOS prepareBackupShare 口径一致。
+    /// macOS 分享备份：后台流式导出临时文件 → 完成后从按钮位置弹系统分享面板（含 AirDrop）。
     private func shareBackup() {
         guard !isExporting else { return }
-        isExporting = true
-        defer { isExporting = false }
-        guard let data = try? BackupManager.encode(games: games, groups: groups) else {
-            statusMessage = L10n.tr("backup.exportFailed", lang: language)
-            return
-        }
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(backupFileName())
-        guard (try? data.write(to: url)) != nil else {
-            statusMessage = L10n.tr("backup.exportFailed", lang: language)
-            return
+        startStreamingExport(to: url) {
+            self.statusMessage = nil
+            self.backupShareURL = url
+            self.showingBackupShare = true
         }
-        backupShareURL = url
-        showingBackupShare = true
     }
     #endif
 
     #if !os(macOS)
-    /// iOS 备份导出：编码成 JSON → 写临时文件 → 直接用 UIKit 呈现系统分享单（含 AirDrop / 存储到文件）。
+    /// iOS 备份导出：后台流式写临时文件 → 完成后直接用 UIKit 呈现系统分享单（含 AirDrop / 存储到文件）。
     /// 不走 SwiftUI sheet：挂 Form 行按钮上的 sheet 首次弹窗会呈现为空白、静默失败（先弹别的窗可「预热」）。
     private func prepareBackupShare() {
         guard !isExporting else { return }
-        isExporting = true
-        defer { isExporting = false }
-        guard let data = try? BackupManager.encode(games: games, groups: groups) else {
-            statusMessage = L10n.tr("backup.exportFailed", lang: language)
-            return
-        }
-        // 文件名带时间，与 macOS 导出（NSSavePanel 预填名）同一格式。
         let url = FileManager.default.temporaryDirectory.appendingPathComponent(backupFileName())
-        guard (try? data.write(to: url)) != nil else {
-            statusMessage = L10n.tr("backup.exportFailed", lang: language)
-            return
-        }
-        if !presentShareSheet(url: url) {
-            statusMessage = L10n.tr("backup.exportFailed", lang: language)
+        let language = language
+        startStreamingExport(to: url) {
+            if !presentShareSheet(url: url) {
+                statusMessage = L10n.tr("backup.exportFailed", lang: language)
+            } else {
+                statusMessage = nil
+            }
         }
     }
     #endif
@@ -468,37 +481,20 @@ struct LinkSettingsView: View {
         #endif
     }
 
-    /// 解码并整库替换（走统一入口 importBackup：快照→后台重建→定制回写→广播→补备份）。
-    /// iOS 的「文件」App URL 在安全沙盒作用域外，需先取得安全作用域授权才能读取。
-    /// 安全作用域在后台 Task 内同步读完立即释放——`defer{stop}` 不可跨 await，
-    /// 后续异步链只传 Data 不传 URL。
-    /// ⚠️ 超大备份（1GB+）必须在后台读文件，主线程同步 Data(contentsOf:) 会 OOM（2026-09-18）。
+    /// 解码并整库替换：读盘/解码/落库失败分型报错（统一走 AutoBackup.importBackup(fromFile:)，
+    /// 与 AirDrop/打开方式入口同一实现，防口径漂移）。
     private func importBackupData(from url: URL, requestAccess: Bool) {
         let context = context
         let language = language
         Task { @MainActor in
-            // 文件读取放后台：1GB 备份在主线程同步读会直接撑爆 iOS 内存限制（jetsam 杀进程）。
-            let dataResult = await Task.detached(priority: .utility) { () -> Result<Data, Error> in
-                let didStart = requestAccess ? url.startAccessingSecurityScopedResource() : false
-                defer { if didStart { url.stopAccessingSecurityScopedResource() } }
-                do {
-                    let data = try Data(contentsOf: url)
-                    return .success(data)
-                } catch {
-                    return .failure(error)
-                }
-            }.value
-
-            switch dataResult {
-            case .failure:
-                statusMessage = L10n.tr("backup.importFailed", lang: language)
-            case .success(let data):
-                do {
-                    try await AutoBackup.shared.importBackup(data, into: context) { _ in }
-                    statusMessage = L10n.tr("backup.importDone", lang: language)
-                } catch {
-                    statusMessage = L10n.tr("backup.importFailed", lang: language)
-                }
+            statusMessage = L10n.tr("backup.importing", lang: language)
+            do {
+                try await AutoBackup.shared.importBackup(fromFile: url, into: context,
+                                                         requestAccess: requestAccess) { _ in }
+                statusMessage = L10n.tr("backup.importDone", lang: language)
+            } catch {
+                NSLog("GameLog import failed: %@", String(describing: error))
+                statusMessage = importFailMessageForUser(error, lang: language)
             }
         }
     }

@@ -18,7 +18,7 @@
   <img src="https://img.shields.io/badge/Platform-macOS%2014.0%2B%20%7C%20iOS%2018.0%2B-blue?style=flat-square" alt="Platform" />
   <img src="https://img.shields.io/badge/Swift-5.10%20%2F%206.0-orange?style=flat-square" alt="Swift" />
   <img src="https://img.shields.io/badge/SwiftUI-SwiftData-purple?style=flat-square" alt="SwiftUI + SwiftData" />
-  <img src="https://img.shields.io/badge/Version-beta%203.4-amber?style=flat-square" alt="Version" />
+  <img src="https://img.shields.io/badge/Version-beta%203.5-amber?style=flat-square" alt="Version" />
   <img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="License" />
 </p>
 
@@ -106,10 +106,10 @@
 ### 1. 安装应用
 
 #### macOS
-- 从 Release 页面下载 `GameLog-beta-3.4.dmg`，打开并将 `GameLog.app` 拖入 `Applications` 文件夹即可。
+- 从 Release 页面下载 `GameLog-beta-3.5.dmg`，打开并将 `GameLog.app` 拖入 `Applications` 文件夹即可。
 
 #### iOS / iPadOS（无签名 IPA）
-- 从 `dist/` 目录获取 `GameLog-beta-3.4.ipa`（arm64 真机包）。
+- 从 `dist/` 目录获取 `GameLog-beta-3.5.ipa`（arm64 真机包）。
 - 使用自身证书及工具（如 TrollStore、eSign、AltStore、SideStore 等）重签后安装至真机。
 
 ### 2. 导入演示数据（体验 Demo）
@@ -130,7 +130,8 @@
 
 | 版本 | 核心内容 |
 |---|---|
-| **beta 3.4**（当前）| 分组分享标题串位 Bug 修复；版本构建基线稳定。 |
+| **beta 3.5**（当前）| 分享卡导出分辨率提升至 FHD/UHD 双档（每种画幅可选，排版零变化）；iOS 启动屏改用小尺寸图标。 |
+| **beta 3.4** | 分组分享标题串位 Bug 修复；版本构建基线稳定。 |
 | **beta 3.3** | 统计页现代看板（Fitness 风格 Bento + Swift Charts + 排行榜）；分享系统三端全面重塑（双主题 / 四画幅 / iPhone 纯净流 / iPad-macOS 双栏工作台）。 |
 | **beta 3.2** | 「关联设置」独立页；iOS 真机启动与 1GB+ 导入 OOM 根治；全应用三语文案重写。 |
 | **beta 3.1** | 外部账号游玩记录导入（Nintendo / PlayStation / Xbox）；三张来源卡；详情页「游戏记录」折叠区。 |
