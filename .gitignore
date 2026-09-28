@@ -7,9 +7,12 @@ xcuserdata/
 *.xcuserstate
 build/
 
-# 交接文档
+# 本地开发资料（AI 交接与底稿，一律不入库、不推送）
 HANDOVER.md
 HANDOVER_PROMPT.md
+ROADMAP.md
+LOCALIZATION.md
+GameLog_Localization_Revised.md
 
 # 发布产物
 dist/
