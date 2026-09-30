@@ -546,6 +546,107 @@ do {
     try? FileManager.default.removeItem(at: tmpURL)
 }
 
+// MARK: - 备份写出：目标目录不存在（iOS 全新安装的 `Documents/Backups` 从未被任何代码创建过 ——
+// 2026-09-30 真机「导入失败」根因；旧实现忽略 createFile 返回值，退化成 Code=4「文件不存在」）
+
+do {
+    let dir = URL(fileURLWithPath: NSTemporaryDirectory())
+        .appendingPathComponent("datasmoke-missing-dir-\(UUID().uuidString)", isDirectory: true)
+    let writer = BackupWriter(modelContainer: context.container)
+    let atomicURL = dir.appendingPathComponent("GameLog-autobackup.json")
+    do {
+        let bytes = try await writer.writeStreamingBackup(
+            to: atomicURL, username: nil, avatarPNG: nil, iconPNG: nil)
+        check("备份写出: 目录缺失时自动建目录（原子换名）",
+              bytes > 0 && FileManager.default.fileExists(atPath: atomicURL.path))
+    } catch {
+        check("备份写出: 目录缺失时自动建目录（原子换名）抛出 \(error)", false)
+    }
+    // 直写分支（NSSavePanel 选定路径不能建同目录临时件）走同一条创目录代码。
+    let directURL = dir.appendingPathComponent("direct-export.json")
+    do {
+        let bytes = try await writer.writeStreamingBackup(
+            to: directURL, username: nil, avatarPNG: nil, iconPNG: nil, atomic: false)
+        check("备份写出: 目录缺失时自动建目录（直写）",
+              bytes > 0 && FileManager.default.fileExists(atPath: directURL.path))
+    } catch {
+        check("备份写出: 目录缺失时自动建目录（直写）抛出 \(error)", false)
+    }
+    try? FileManager.default.removeItem(at: dir)
+}
+
+// MARK: - 流式写出的游标分页（>1 批：无重复、无遗漏、createdAt 全同时靠 name 翻页）
+
+do {
+    guard let pageContainer = try? ModelContainer(for: schema,
+          configurations: [ModelConfiguration(isStoredInMemoryOnly: true)]) else {
+        check("流式写出分页: 建探针容器", false)
+        exit(1)
+    }
+    let pctx = ModelContext(pageContainer)
+    // 探针库专用：绝不动共享 `context`。70 款 > 批大小 32 → 至少 3 批。
+    // 同一秒内建出来的 createdAt 精度不足以彼此区分 —— 正好压测游标的次级排序键 name。
+    for i in 0..<70 { pctx.insert(Game(name: "Paging-\(i)", reviewTitle: "p")) }
+    try pctx.save()
+
+    let pageURL = URL(fileURLWithPath: NSTemporaryDirectory())
+        .appendingPathComponent("datasmoke-paging-\(UUID().uuidString).json")
+    let writer = BackupWriter(modelContainer: pageContainer)
+    let bytes = try await writer.writeStreamingBackup(to: pageURL, username: nil, avatarPNG: nil, iconPNG: nil)
+    check("流式写出分页: 写出非空", bytes > 0)
+
+    let pageDecoder = JSONDecoder()
+    pageDecoder.dateDecodingStrategy = .iso8601
+    let pageDTO = try pageDecoder.decode(BackupDTO.self, from: Data(contentsOf: pageURL))
+    check("流式写出分页: 70 款全部写出", pageDTO.games.count == 70)
+    check("流式写出分页: 无重复（游标不回头）", Set(pageDTO.games.map(\.name)).count == 70)
+    check("流式写出分页: 首尾都在（同 createdAt 仍按 name 前进）",
+          pageDTO.games.contains { $0.name == "Paging-0" } && pageDTO.games.contains { $0.name == "Paging-69" })
+    try? FileManager.default.removeItem(at: pageURL)
+}
+
+// MARK: - 启动迁移的平台改名：谓词必须**真的可执行**（内部 try? 会把不支持的谓词吞成「无改动」）
+
+do {
+    guard let migContainer = try? ModelContainer(for: schema,
+          configurations: [ModelConfiguration(isStoredInMemoryOnly: true)]) else {
+        check("平台迁移: 建探针容器", false)
+        exit(1)
+    }
+    let mctx = ModelContext(migContainer)
+    let migGame = Game(name: "MigProbe", reviewTitle: "r")
+    migGame.platform = "Switch"
+    let migCompletion = Completion(platform: "Switch 2", date: Date(timeIntervalSince1970: 1_700_000_000),
+                                   degree: "主线通关", playtime: 10, notes: "n",
+                                   scoreGameplay: 8, scoreDesign: 8, scoreStory: 7,
+                                   scoreArt: 8, scoreMusic: 7, scorePerformance: 9)
+    migCompletion.game = migGame
+    let migCopy = PhysicalCopy(version: "v", count: 1, platform: "Switch")
+    mctx.insert(migGame)
+    mctx.insert(migCompletion)
+    mctx.insert(migCopy)
+    try mctx.save()
+
+    try PlatformMigration.migrate(in: mctx)
+    check("平台迁移: Game 主平台旧名改写", migGame.platform == "Nintendo Switch")
+    check("平台迁移: Completion 旧名改写", migCompletion.platform == "Nintendo Switch 2")
+    check("平台迁移: PhysicalCopy 旧名改写", migCopy.platform == "Nintendo Switch")
+    // 幂等：第二次跑不得再产生改动（谓词已取不到旧名行）。
+    try PlatformMigration.migrate(in: mctx)
+    check("平台迁移: 二次运行幂等", migGame.platform == "Nintendo Switch"
+          && migCompletion.platform == "Nintendo Switch 2")
+}
+
+// MARK: - 持有照片唯一性不变式（`ForEach(copy.images, id: \.self)` 见重复 ID 直接崩）
+
+do {
+    let dup = Data([9, 9, 9])
+    let dupCopy = PhysicalCopy(version: "Dup", count: 1, images: [Data([1]), dup, Data([2]), dup])
+    check("持有照片: 构造入口剔除逐字节重复", dupCopy.images == [Data([1]), dup, Data([2])])
+    check("持有照片: 不重复的照片一张不丢",
+          PhysicalCopy.deduplicated([Data([1]), Data([2]), Data([3])]).count == 3)
+}
+
 // MARK: - 流式备份读取器（扫描/区间解码 = bulk 解码；增量落库；非法分类）
 
 do {

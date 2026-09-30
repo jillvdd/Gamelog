@@ -203,12 +203,16 @@
 "backup.exportDone" = "Backup Exported";
 "backup.exportFailed" = "Export Failed";
 "backup.importDone" = "Backup Imported";
-"backup.importFailed" = "Import failed: Invalid or corrupted backup file.";
 "backup.importConfirm" = "Importing will replace all current data. Continue?";
 "backup.share" = "Share Backup…";
 "backup.exporting" = "Exporting backup…";
 "backup.importReadFailed" = "Import failed: The file can\u2019t be read. Check that it hasn\u2019t moved and that access is allowed.";
 "backup.importDecodeFailed" = "Import failed: Couldn\u2019t parse the backup (file too large for available memory, or corrupted).";
+"backup.importSnapshotFailed" = "Import failed: The pre-restore snapshot couldn\u2019t be written (out of storage, or the backup folder isn\u2019t writable).";
+"backup.importStoreFailed" = "Import failed: The backup passed validation, but writing to the library failed.";
+"backup.importLocked" = "Import failed: A previous import is still running. Wait for it to finish.";
+"backup.importUnknown" = "Import failed: Unclassified error.";
+"backup.importDiagnosis" = "%1$@ (Diagnosis: %2$@)";
 "validation.nameRequired" = "Enter a title in at least one language";
 "validation.reviewTitleRequired" = "Review title is required";
 "validation.scoreRequired" = "Score at least one dimension";

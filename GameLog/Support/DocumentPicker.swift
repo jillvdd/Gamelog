@@ -16,7 +16,13 @@ enum DocumentPicker {
         onPicked: @escaping (URL) -> Void,
         onCancel: (() -> Void)? = nil
     ) {
-        guard let root = Self.topMostViewController() else { return }
+        // 拿不到锚点必须留痕：`guard … else { return }` 静默返回时，用户点了「导入备份」
+        // 却什么都没发生，也没有任何东西可查（2026-09-29 审计 P3）。
+        guard let root = Self.topMostViewController() else {
+            NSLog("GameLog DocumentPicker: no foreground window to present from")
+            onCancel?()
+            return
+        }
         let picker = UIDocumentPickerViewController(forOpeningContentTypes: types, asCopy: true)
         picker.allowsMultipleSelection = false
         let coordinator = Coordinator(onPicked: onPicked, onCancel: onCancel)
@@ -26,9 +32,18 @@ enum DocumentPicker {
     }
 
     private static func topMostViewController(base: UIViewController? = nil) -> UIViewController? {
-        let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first
-        let resolved = base ?? scene?.windows.first(where: { $0.isKeyWindow })?.rootViewController
+        // 只认**前台激活**的场景：不过滤时 `.first` 可能取到后台/未连接窗口的 scene，
+        // 拿到的 VC 没有 window → `present` 直接崩（iPad 上还会撞上 popover 无锚点的硬崩）。
+        let scene = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .first(where: { $0.activationState == .foregroundActive })
+            ?? UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first
+        guard let resolved = base
+            ?? scene?.windows.first(where: { $0.isKeyWindow })?.rootViewController
             ?? scene?.windows.first?.rootViewController
+        else { return nil }
+        // 没有 window 的 VC 不能用来 present（与上面同源，2026-09-29 审计 P3）。
+        guard resolved.view.window != nil || resolved.presentedViewController != nil else { return nil }
         if let nav = resolved as? UINavigationController,
            let visible = nav.visibleViewController {
             return topMostViewController(base: visible)
@@ -37,7 +52,7 @@ enum DocumentPicker {
            let selected = tab.selectedViewController {
             return topMostViewController(base: selected)
         }
-        if let presented = resolved?.presentedViewController {
+        if let presented = resolved.presentedViewController {
             return topMostViewController(base: presented)
         }
         return resolved

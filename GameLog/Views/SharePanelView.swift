@@ -863,7 +863,11 @@ struct SharePanelView: View {
             selection: Binding(
                 get: { ShareMode.allCases.firstIndex(of: mode) ?? 0 },
                 set: {
-                    mode = ShareMode.allCases[$0]
+                    // 索引夹住再取：`Picker` 的 tag 由外部枚举驱动，越界取值是 Swift 层崩溃
+                    // （`Index out of range`），而这里崩一次就是分享面板白屏闪退。
+                    let all = ShareMode.allCases
+                    guard !all.isEmpty, (0..<all.count).contains($0) else { return }
+                    mode = all[$0]
                     triggerSelectionHaptic()
                 }
             )

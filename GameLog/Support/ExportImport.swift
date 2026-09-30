@@ -312,6 +312,9 @@ final class BackupApplySession {
         // 分批落盘：每 25 款 flush 一次，让本函数已建的对象随 save 进入持久存储、
         // decoded 局部（含 base64→Data）及时被 ARC 回收。SwiftData 无 `reset()`，
         // 依赖 save 后的外部存储卸载 —— 常驻对象图仅剩轻量行记录（图片走 externalStorage 文件）。
+        // 2026-09-30 实测复核：在 save 之后再加 rollback() 想把对象打回 fault，
+        // 1.1GB 备份导入的峰值 physical footprint 前后都是 1638MB（模拟器 A/B 各跑一轮），
+        // 即 save 已经卸载了图字节，多出来的 rollback 只是每批让 groupMap 重新 fault 一次 —— 不加。
         if batching, processed % 25 == 0 {
             try context.save()
         }

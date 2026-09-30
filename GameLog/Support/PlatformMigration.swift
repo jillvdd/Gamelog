@@ -122,7 +122,15 @@ enum PlatformMigration {
         // PhysicalCopy.platform（持有记录）。此前只迁移 Completion，游戏与持有的旧名
         // 永远不同步——platformCounts 按原始字符串计数，同名两行（2026-09-05 审计）。
         // （Game.platformList 是计算属性，源头就是 completions+platform，改完源头即同步。）
-        if let completions = try? context.fetch(FetchDescriptor<Completion>()) {
+        //
+        // 2026-09-29 审计 P2：**不用一次性闸门**跳过本段 —— 导入的备份可能带着旧名进来，
+        // 闸门会让那些名字永远改不过来。改法是「只取需要的行」：谓词把筛选交给 SQLite，
+        // 三处存储各一次 `IN` 查询（命中通常 0 行），不再每启动把三张表整个物化进对象图。
+        // 此前那是启动期最重的一笔开销：全库冷启动时它与首帧的全库 fetch 抢同一个连接。
+        let oldNames = Array(renames.keys)
+        if let completions = try? context.fetch(
+            FetchDescriptor<Completion>(predicate: #Predicate { oldNames.contains($0.platform) })
+        ) {
             for completion in completions {
                 if let newName = renames[completion.platform], completion.platform != newName {
                     completion.platform = newName
@@ -130,7 +138,9 @@ enum PlatformMigration {
                 }
             }
         }
-        if let games = try? context.fetch(FetchDescriptor<Game>()) {
+        if let games = try? context.fetch(
+            FetchDescriptor<Game>(predicate: #Predicate { oldNames.contains($0.platform) })
+        ) {
             for game in games {
                 if let newName = renames[game.platform], game.platform != newName {
                     game.platform = newName
@@ -138,7 +148,9 @@ enum PlatformMigration {
                 }
             }
         }
-        if let copies = try? context.fetch(FetchDescriptor<PhysicalCopy>()) {
+        if let copies = try? context.fetch(
+            FetchDescriptor<PhysicalCopy>(predicate: #Predicate { oldNames.contains($0.platform) })
+        ) {
             for copy in copies {
                 if let newName = renames[copy.platform], copy.platform != newName {
                     copy.platform = newName
@@ -160,14 +172,9 @@ enum PlatformMigration {
             UserDefaults.standard.set(true, forKey: logoRewriteKey)
         }
 
-        if let records = try? context.fetch(FetchDescriptor<ExternalGameRecord>()) {
-            for record in records {
-                if record.providerRaw == "nintendo", record.platformRaw == "BEE", record.platform != "Nintendo Switch 2" {
-                    record.platform = "Nintendo Switch 2"
-                    changed = true
-                }
-            }
-        }
+        // ExternalGameRecord 的 nintendo/BEE 改名**不在这里做**：`sanitizeDatabase` 已经用一条
+        // SQL UPDATE 覆盖了同一件事（且必须在那之前不可能有 SwiftData 行）。这里再全表 fetch
+        // 一遍只是每启动多搬一次整表（2026-09-29 审计 P2）。
 
         // 迁移幂等（改动前后值相等时不重复标记），但 save 失败必须暴露：闸门/重跑语义
         // 依赖 save 真正落盘。静默 `try?` 会让用户以为已迁移（2026-09-05 审计）。

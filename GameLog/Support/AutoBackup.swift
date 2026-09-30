@@ -518,13 +518,15 @@ final class AutoBackup: ObservableObject {
 
     /// 从用户文件导入（设置页「导入备份」与 AirDrop/打开方式两入口共用）：**流式**整库替换。
     ///
-    /// 定序：上锁 → 恢复前快照（兼作回滚锚点）→ 后台字节扫描 + 逐游戏增量落库 →
-    /// 主线程定制回写 → 清缓存 → 广播整库替换 → 补一次自动备份 → 解锁。
+    /// 定序：上锁 → 后台字节扫描 + header 校验（只读文件，不碰 DB、不写快照）→
+    /// 恢复前快照（此后才是回滚锚点）→ 逐游戏增量落库 → 主线程定制回写 → 清缓存 →
+    /// 广播整库替换 → 补一次自动备份 → 解锁。
     /// 全程峰值内存与备份体积无关，GB 级备份也能在 iOS 上导完（bulk `decode(Data(整文件))`
     /// 是 jetsam/OOM 根因，文件入口已全部改走此路径）。
     ///
-    /// 失败分类：读盘/扫描/header 阶段 DB 尚未动，直接抛（`importFailMessageForUser` 出文案）；
-    /// `applyStreaming` 清库后抛 `replacementFailed` → 从快照尽力回滚后再抛原错。
+    /// 失败分类：读盘/扫描/header/快照阶段 DB 尚未动，直接抛（`importFailMessageForUser`
+    /// 按阶段出文案 + 附原始错误串）；`applyStreaming` 清库后抛 `replacementFailed`
+    /// → 从快照尽力回滚后再抛原错。
     ///
     /// - Parameter requestAccess: 用户选择/AirDrop 打开的文件传 true（安全作用域）；
     ///   App 沙盒内的自动备份文件传 false。
@@ -545,17 +547,33 @@ final class AutoBackup: ObservableObject {
             onProgress(frac)
         }
 
-        // 1. 恢复前快照（throw 即中断；同时是流式替换失败的回滚锚点）。
-        report(0.02)
-        let snapshotURL = try await writeSnapshot(context: context)
+        // 1. 先扫盘校验（读盘 + header），**不碰 DB、也不写快照**。
+        //    顺序理由（2026-09-30 iOS 真机排查）：快照要把当前整库重编码写盘（大库 = 1.1GB/次），
+        //    旧顺序把它放在最前面，于是「文件读不到 / 不是备份 / 磁盘写不下」这类根本没动过 DB
+        //    的失败也会各留一份 1.1GB 废快照 —— 在手机上重试几次就把空间吃光，而失败又被报成
+        //    「备份文件无效或已损坏」，用户永远看不到真因。现在只有确认要清库了才写回滚锚点。
+        let (scan, header): (BackupScanResult, BackupHeaderData) =
+            try await scanAndHeader(url: url, requestAccess: requestAccess, report: report)
 
-        // 2. 流式扫描 + 逐游戏增量落库（DB 已落盘成功后才回写定制）。
+        // 2. 恢复前快照 = 流式替换失败的回滚锚点（空库返回 nil）。
+        //    快照失败与「文件损坏」是两件事，分型出去才不会被兜底文案盖成无效或已损坏。
+        report(0.5)
+        let snapshotURL: URL?
+        do {
+            snapshotURL = try await writeSnapshot(context: context)
+        } catch {
+            throw ImportError.snapshotFailed(underlying: String(describing: error))
+        }
+
+        // 3. 逐游戏增量落库（DB 已落盘成功后才回写定制）。
         let customization: BackupCustomization
         do {
-            customization = try await streamingReplace(url: url, requestAccess: requestAccess,
-                                                        into: context, report: report)
+            customization = try await applyScan(scan, header: header, url: url,
+                                                 requestAccess: requestAccess,
+                                                 into: context, report: report)
         } catch {
-            // 仅在确认「已开始清库后失败」（半替换）时回滚；扫描/header 失败 DB 未动，不回滚。
+            // 仅在确认「已开始清库后失败」（半替换）时回滚；DB 未动过的失败不回滚。
+            // 空库时 snapshotURL = nil，无可回滚（本来也没有数据要保）。
             if case ImportError.replacementFailed = error, let snapshotURL {
                 await rollbackToSnapshot(snapshotURL, into: context, report: report)
             }
@@ -588,16 +606,13 @@ final class AutoBackup: ObservableObject {
         scheduleWrite()
     }
 
-    /// 流式替换核心：后台扫描（1MB 窗口恒定内存）→ 读 header（groups + 定制）→
-    /// `BackupImporter.applyStreaming` 逐游戏读盘落库。安全作用域在各同步读闭包内 start/stop
-    /// （不跨 await）。进度分两段：扫描 0.05→0.45（按字节）、增量落库 0.45→0.92（按游戏数）。
-    /// 成功返回定制六字段（调用方主线程回写）；失败按 `ImportError` / `DecodingError` 抛。
-    private func streamingReplace(url: URL, requestAccess: Bool, into context: ModelContext,
-                                  report: @escaping @MainActor (Double) -> Void) async throws -> BackupCustomization {
-        let container = context.container
-
-        // 阶段 1：后台扫描 + header（同一安全作用域块内，均为同步 FileHandle 读）。
-        let (scan, header): (BackupScanResult, BackupHeaderData) = try await Task.detached(priority: .utility) {
+    /// 流式替换·阶段 1：后台扫描（1MB 窗口恒定内存）+ 读 header（groups + 定制）。
+    /// 全程只读文件、不碰 DB —— 结构非法/读不到的备份在这里就抛，调用方因此**不必**先写快照。
+    /// 安全作用域在同步读闭包内 start/stop（不跨 await）。进度 0.05→0.45（按字节）。
+    private func scanAndHeader(url: URL, requestAccess: Bool,
+                               report: @escaping @MainActor (Double) -> Void) async throws
+        -> (BackupScanResult, BackupHeaderData) {
+        try await Task.detached(priority: .utility) {
             let didStart = requestAccess ? url.startAccessingSecurityScopedResource() : false
             defer { if didStart { url.stopAccessingSecurityScopedResource() } }
             let fileSize = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0
@@ -614,16 +629,32 @@ final class AutoBackup: ObservableObject {
             let header = try StreamingBackupReader.header(of: scan, url: url)
             return (scan, header)
         }.value
+    }
 
-        // 阶段 2：后台逐游戏增量落库（applyStreaming 自带安全作用域 + replacementFailed 包装）。
-        report(0.45)
-        let importer = BackupImporter(modelContainer: container)
+    /// 流式替换·阶段 2：按扫描区间逐游戏增量落库（`BackupImporter.applyStreaming`
+    /// 自带安全作用域 + `replacementFailed` 包装）。进度 0.5→0.92（按游戏数）。
+    /// 这一步会先清库，失败即半替换 → 调用方拿阶段 1 之后写的快照回滚。
+    private func applyScan(_ scan: BackupScanResult, header: BackupHeaderData, url: URL,
+                           requestAccess: Bool, into context: ModelContext,
+                           report: @escaping @MainActor (Double) -> Void) async throws
+        -> BackupCustomization {
+        report(0.5)
+        let importer = BackupImporter(modelContainer: context.container)
         try await importer.applyStreaming(url: url, requestAccess: requestAccess,
                                           scan: scan, groups: header.groups) { done, total in
-            let frac = min(0.92, 0.45 + 0.47 * Double(done) / Double(max(1, total)))
+            let frac = min(0.92, 0.5 + 0.42 * Double(done) / Double(max(1, total)))
             Task { @MainActor in report(frac) }
         }
         return header.customization
+    }
+
+    /// 扫描 + 落库连着跑（不回滚锚点场景用：`rollbackToSnapshot` 的输入是自家快照，
+    /// 体积与当前库相当，再为它写一份快照纯属套娃）。
+    private func streamingReplace(url: URL, requestAccess: Bool, into context: ModelContext,
+                                  report: @escaping @MainActor (Double) -> Void) async throws -> BackupCustomization {
+        let (scan, header) = try await scanAndHeader(url: url, requestAccess: requestAccess, report: report)
+        return try await applyScan(scan, header: header, url: url,
+                                   requestAccess: requestAccess, into: context, report: report)
     }
 
     /// 半替换后的尽力回滚：从快照再跑一次流式替换，把库整体恢复回替换前状态。
@@ -681,9 +712,22 @@ final class AutoBackup: ObservableObject {
             bannerTitle: bannerTitle, bannerSubtitle: bannerSubtitle, bannerBackgroundPNG: bannerBG
         )
         guard bytes >= 0 else { throw SnapshotError.writeFailed }
-        Self.trimSnapshotFilesStatic(keep: 10)
+        Self.trimSnapshotFilesStatic(keep: Self.snapshotKeepCount)
         return url
     }
+
+    /// 恢复前快照保留份数。
+    ///
+    /// 2026-09-29 用户决策「iOS 恢复前快照保留一份就行」：iOS 的快照与滚动备份同在
+    /// `Documents/Backups`，每份都是**整库含图**（本机 1.1 GB 量级），保留 10 份等于
+    /// 把 App 沙盒当成 11 倍的备份盘 —— 在 iOS 上这会直接触发「存储空间不足」类失败，
+    /// 也正是导入崩溃的诱因之一。macOS 的备份目录在 Application Support、磁盘预算宽裕，
+    /// 维持 10 份不变。
+    #if os(macOS)
+    nonisolated private static let snapshotKeepCount = 10
+    #else
+    nonisolated private static let snapshotKeepCount = 1
+    #endif
 
     /// trimSnapshotFiles 的静态包装（后台 Task 闭包内用）。
     /// 目录推导与 MainActor 版 backupDir 一致（纯文件系统路径，无隔离需求）。
@@ -697,26 +741,6 @@ final class AutoBackup: ObservableObject {
         let fm = FileManager.default
         guard let files = try? fm.contentsOfDirectory(
             at: dir,
-            includingPropertiesForKeys: [.contentModificationDateKey]
-        ) else { return }
-        let matches = files
-            .filter { $0.lastPathComponent.hasPrefix("GameLog-autobackup-snapshot-") && $0.pathExtension == "json" }
-            .sorted { lhs, rhs in
-                let l = (try? lhs.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantPast
-                let r = (try? rhs.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantPast
-                return l < r
-            }
-        if matches.count > keep {
-            matches.prefix(matches.count - keep).forEach { try? fm.removeItem(at: $0) }
-        }
-    }
-
-    /// 只保留最近 keep 份恢复前快照（按修改时间，删除更旧的）。
-    /// 此前快照无任何清理、无限累积（每份含封面可达数十 MB，HANDOVER §30.1 记录的磁盘隐患）。
-    private func trimSnapshotFiles(keep: Int) {
-        let fm = FileManager.default
-        guard let files = try? fm.contentsOfDirectory(
-            at: Self.backupDir,
             includingPropertiesForKeys: [.contentModificationDateKey]
         ) else { return }
         let matches = files
@@ -771,20 +795,62 @@ enum ImportError: Error {
     case backupUnreadable
     /// 读盘阶段失败（权限/磁盘/内存分配）。与解码/落库失败分开报，定位「无效或已损坏」误报。
     case readFailed(underlying: String)
+    /// 导入前的「恢复前快照」写盘失败（多为存储空间不足 / 目录不可写）。
+    /// 这一步在**读备份文件之前**，此时备份文件尚未被看过一眼，绝不能报成「文件损坏」。
+    case snapshotFailed(underlying: String)
     /// 流式替换**已开始清库**后的失败（DB 可能半替换，须从快照回滚）。
     /// 扫描/头字段阶段的失败不裹这层 —— 那时 DB 尚未动过，回滚是纯浪费。
     case replacementFailed(underlying: String)
 }
 
 /// 导入错误 → 用户可读文案（设置页导入与 AirDrop/打开方式导入两入口共用，防口径漂移）。
+///
+/// 口径：**每个阶段说自己那句**。旧版把 `backupUnreadable` / 快照失败 / 落库失败 / 重入
+/// 全部落进兜底的「备份文件无效或已损坏」，用户和我们都无从区分「文件坏了」和
+/// 「这台机器读不到 / 写不下」（2026-09-30 iOS 真机 1.1GB 备份导入排查）。
+/// 带 `underlying` 的阶段一律附原始错误串（beta 期自证用，`backup.importDiagnosis`）。
 func importFailMessageForUser(_ error: Error, lang: String) -> String {
+    func diagnose(_ stage: String, _ reason: String) -> String {
+        // 原始 underlying 可能是整棵 CoreData 错误树（数 KB），弹窗放不下：截前 300 字符，
+        // 完整串仍由调用方 NSLog 落到系统日志里。
+        let tail = reason.count > 300 ? String(reason.prefix(300)) + "…" : reason
+        return L10n.tr("backup.importDiagnosis", [stage, tail], lang: lang)
+    }
     switch error {
-    case ImportError.readFailed:
+    case ImportError.readFailed(let reason):
+        return diagnose(L10n.tr("backup.importReadFailed", lang: lang), reason)
+    case ImportError.backupUnreadable:
         return L10n.tr("backup.importReadFailed", lang: lang)
-    case is DecodingError:
-        return L10n.tr("backup.importDecodeFailed", lang: lang)
+    case ImportError.snapshotFailed(let reason):
+        return diagnose(L10n.tr("backup.importSnapshotFailed", lang: lang), reason)
+    case ImportError.replacementFailed(let reason):
+        return diagnose(L10n.tr("backup.importStoreFailed", lang: lang), reason)
+    case ImportError.alreadyImporting:
+        return L10n.tr("backup.importLocked", lang: lang)
+    case let decodingError as DecodingError:
+        return diagnose(L10n.tr("backup.importDecodeFailed", lang: lang), decodingFailReason(decodingError))
     default:
-        return L10n.tr("backup.importFailed", lang: lang)
+        return diagnose(L10n.tr("backup.importUnknown", lang: lang), String(describing: error))
+    }
+}
+
+/// `DecodingError` 里真正有信息量的那一段（`localizedDescription` 会把整棵 codingPath 的
+/// Swift 反射类型名糊上来，一行塞不进弹窗）。
+private func decodingFailReason(_ error: DecodingError) -> String {
+    func path(_ context: DecodingError.Context) -> String {
+        context.codingPath.isEmpty ? "root" : context.codingPath.map(\.stringValue).joined(separator: ".")
+    }
+    switch error {
+    case .keyNotFound(let key, let context):
+        return "keyNotFound \(key.stringValue) @ \(path(context))"
+    case .typeMismatch(let type, let context):
+        return "typeMismatch \(type) @ \(path(context)): \(context.debugDescription)"
+    case .valueNotFound(let type, let context):
+        return "valueNotFound \(type) @ \(path(context))"
+    case .dataCorrupted(let context):
+        return "dataCorrupted @ \(path(context)): \(context.debugDescription)"
+    @unknown default:
+        return String(describing: error)
     }
 }
 

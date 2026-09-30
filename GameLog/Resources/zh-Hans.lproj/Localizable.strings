@@ -203,12 +203,16 @@
 "backup.exportDone" = "备份已导出";
 "backup.exportFailed" = "导出失败";
 "backup.importDone" = "备份已导入";
-"backup.importFailed" = "导入失败：备份文件无效或已损坏";
 "backup.importConfirm" = "导入将替换当前全部数据，确定继续吗？";
 "backup.share" = "分享备份…";
 "backup.exporting" = "正在导出备份…";
 "backup.importReadFailed" = "导入失败：无法读取文件（请确认文件未被移动且有访问权限）";
 "backup.importDecodeFailed" = "导入失败：解析备份失败（文件过大导致内存不足，或格式损坏）";
+"backup.importSnapshotFailed" = "导入失败：写入恢复前快照失败（多为存储空间不足或备份目录不可写）";
+"backup.importStoreFailed" = "导入失败：备份文件已通过校验，但写入数据库时出错";
+"backup.importLocked" = "导入失败：上一次导入尚未结束，请等它完成后再试";
+"backup.importUnknown" = "导入失败：未分类的错误";
+"backup.importDiagnosis" = "%1$@（诊断：%2$@）";
 "validation.nameRequired" = "请至少填写一种语言的名称";
 "validation.reviewTitleRequired" = "评价标题必填";
 "validation.scoreRequired" = "至少需要评分一个维度";

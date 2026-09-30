@@ -15,6 +15,9 @@ import SwiftData
 @ModelActor
 actor BackupWriter {
 
+    /// 一次取多少款游戏（见 `writeStreamingBackup` 的 games 段：内存峰值 = 一批的外置图 Data）。
+    static let backupBatchSize = 32
+
     /// 流式写整个备份到 url。返回写入字节数。
     /// - 顶层结构按 BackupDTO 字段顺序手拼：version / exportedAt / groups / games /
     ///   username / avatarBase64 / iconBase64 / bannerTitle / bannerSubtitle / bannerBackgroundBase64
@@ -40,7 +43,18 @@ actor BackupWriter {
         let tmpURL = atomic
             ? url.deletingLastPathComponent().appendingPathComponent(".autobackup-tmp-\(UUID().uuidString).json")
             : url
-        FileManager.default.createFile(atPath: tmpURL.path, contents: nil)
+        // 目录必须先存在。iOS 的 `Documents/Backups` 此前**没有任何代码创建过它**
+        //（macOS 侧靠 `UserCustomization.supportDir` 的懒建目录侥幸覆盖），全新安装的 iPhone
+        // 上第一次导入/第一次自动备份必失败：`createFile` 在缺目录时只返回 false 且被忽略，
+        // 紧接着 `FileHandle(forWritingTo:)` 抛 NSCocoaErrorDomain Code=4「文件不存在」，
+        // 真因被盖成「备份文件无效或已损坏」（2026-09-30 真机排查）。
+        try FileManager.default.createDirectory(
+            at: tmpURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        // 返回值必须看：实测 `createFile` 会把已存在的目标**清空**（直写分支靠这一点截断旧备份），
+        // 而在缺目录/不可写时返回 false —— 忽略它就是把真实原因换成一句误导性的「文件不存在」。
+        guard FileManager.default.createFile(atPath: tmpURL.path, contents: nil) else {
+            throw BackupWriterError.cannotCreate(path: tmpURL.path)
+        }
         let fh = try FileHandle(forWritingTo: tmpURL)
         var closed = false
         func closeFH() {
@@ -70,21 +84,62 @@ actor BackupWriter {
         try write(try encoder.encode(groupDTOs))
         try write(Data(",\"games\":[".utf8))
 
-        // games：逐个编码、逗号分隔
-        let games = try modelContext.fetch(FetchDescriptor<Game>(sortBy: [SortDescriptor(\.createdAt)]))
-        for (index, game) in games.enumerated() {
-            if index > 0 { try write(Data(",".utf8)) }
-            // 字段映射唯一入口 = GameDTO(from:)（与 BackupManager.encode 同一构造器，永不漂移）。
-            try write(try encoder.encode(GameDTO(from: game)))
-            // 每 24 款让路一次：编码要逐款 fault 外置封面（每款数百 KB 磁盘读），
-            // 一口气跑几千款会把共享连接池/页缓存吃满 —— 主线程任何一次查询都被饿死
-            // （2026-09-24 iOS 实机：启动备份与首帧全库 fetch 对撞 → 0x8BADF00D 看门狗）。
-            // 4ms/24 款的节流对总时长影响 <2%，但让 SQLite 事务与磁盘 I/O 有插空窗口。
-            if index % 24 == 23 { try? await Task.sleep(nanoseconds: 4_000_000) }
+        // games：按游标分批取、逐款编码写盘（2026-09-29 审计 P1）。
+        //
+        // 一次 `fetch` 整库在内存上是隐藏的双峰：
+        // 1) **外置图 Data 挂账**。`coverData` 等字段是 externalStorage，逐款 fault 之后原始
+        //    字节就钉在对象槽里，直到下一次 `rollback()` —— 而回滚原本在**整库编完之后**。
+        //    峰值于是等于整库备份体积（本机 1.1 GB 级），iOS 上这就是导入/启动闪退的内存底座。
+        //    现在每批只取 32 款，批末回滚 → 峰值 = 一批（约 130 MB 量级）。
+        // 2) **自动释放池不排**。编码产物（每款数 MB 的 Data 片段）经 Foundation 走 autorelease，
+        //    而 Swift 并发协作线程不像 RunLoop 那样逐轮排池，一个 actor job 跑到完都不排 →
+        //    全程累积。逐款 `autoreleasepool` 把它们就地释放。
+        //
+        // 为什么用**游标分页**而不是 `fetchOffset`：offset 翻页在写入期间被并发编辑（用户在
+        // 备份跑的这几秒里改了库）会整体错位 —— 少一款就是备份里**静默丢一款数据**。
+        // 游标（createdAt, name 严格大于）只受「排序键本身变化」影响，插入/删除都不会让
+        // 未写的游戏被跳过，因此也不需要「写一半发现对不上就中止」（中止会毁掉用户手选的直写目标）。
+        var cursor: (date: Date, name: String)?
+        var written = 0
+        while true {
+            var descriptor: FetchDescriptor<Game>
+            if let cursor {
+                let afterDate = cursor.date
+                let afterName = cursor.name
+                descriptor = FetchDescriptor<Game>(
+                    predicate: #Predicate {
+                        $0.createdAt > afterDate
+                            || ($0.createdAt == afterDate && $0.name > afterName)
+                    },
+                    sortBy: [SortDescriptor(\.createdAt), SortDescriptor(\.name)]
+                )
+            } else {
+                descriptor = FetchDescriptor<Game>(
+                    sortBy: [SortDescriptor(\.createdAt), SortDescriptor(\.name)]
+                )
+            }
+            descriptor.fetchLimit = Self.backupBatchSize
+            let batch = try modelContext.fetch(descriptor)
+            if batch.isEmpty { break }
+            for game in batch {
+                if written > 0 { try write(Data(",".utf8)) }
+                written += 1
+                cursor = (game.createdAt, game.name)
+                // 字段映射唯一入口 = GameDTO(from:)（与 BackupManager.encode 同一构造器，永不漂移）。
+                try autoreleasepool {
+                    try write(try encoder.encode(GameDTO(from: game)))
+                }
+                // 每 24 款让路一次：编码要逐款 fault 外置封面（每款数百 KB 磁盘读），
+                // 一口气跑几千款会把共享连接池/页缓存吃满 —— 主线程任何一次查询都被饿死
+                // （2026-09-24 iOS 实机：启动备份与首帧全库 fetch 对撞 → 0x8BADF00D 看门狗）。
+                // 4ms/24 款的节流对总时长影响 <2%，但让 SQLite 事务与磁盘 I/O 有插空窗口。
+                if written % 24 == 0 { try? await Task.sleep(nanoseconds: 4_000_000) }
+            }
+            // 批末回滚：这一批 fault 出来的外置图 Data 就地交还内存（下一批各自重新 fault）。
+            modelContext.rollback()
         }
         try write(Data("]".utf8))
-        // 游戏对象全部编完即回滚：故障物化的封面（整库可达数百 MB）不再长期挂在
-        // 写器上下文里（否则 4150 款的图常驻到下一次写盘）。
+        // 收尾再回滚一次：最后一批的对象同样不该留到下一次写盘。
         modelContext.rollback()
 
         // 自定义项（与 BackupManager.encode 同字段名；缺省 = null）
@@ -135,5 +190,17 @@ actor BackupWriter {
             }
         }
         return count
+    }
+}
+
+/// 写备份文件本身建不出来（目录缺失/不可写）。与「磁盘写满」（在 `fh.write` 处抛真实 POSIX 错）
+/// 分开，避免两种完全不同的故障共用一句「文件不存在」。
+enum BackupWriterError: Error, CustomStringConvertible {
+    case cannotCreate(path: String)
+
+    var description: String {
+        switch self {
+        case .cannotCreate(let path): return "BackupWriter.cannotCreate(\(path))"
+        }
     }
 }

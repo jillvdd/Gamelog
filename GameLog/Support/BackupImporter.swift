@@ -41,8 +41,14 @@ actor BackupImporter {
             defer { try? fh.close() }
             let decoder = StreamingBackupReader.decoder()
             for (index, range) in scan.gameRanges.enumerated() {
-                let dto = try StreamingBackupReader.game(from: fh, decoder: decoder, range: range)
-                try session.applyGame(dto)
+                // 逐款套池：`readData(ofLength:)` 与 JSONDecoder 的中间对象都走 autoreleased，
+                // 而整个循环是 actor 上的**一个** job —— 不逐轮排空就要等函数返回才释放。
+                // （2026-09-30 模拟器实测：1.1GB 备份导入峰值 1638MB，加不加这一层数字不动，
+                // 大头在别处；留着是因为它压的是瞬时分配，成本为零。）
+                try autoreleasepool {
+                    let dto = try StreamingBackupReader.game(from: fh, decoder: decoder, range: range)
+                    try session.applyGame(dto)
+                }
                 onProgress(index + 1, total)
             }
             try session.finish(save: true)

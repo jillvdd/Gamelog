@@ -203,12 +203,16 @@
 "backup.exportDone" = "バックアップを書き出しました";
 "backup.exportFailed" = "書き出しに失敗しました";
 "backup.importDone" = "バックアップを読み込みました";
-"backup.importFailed" = "読み込みに失敗しました：無効または破損したバックアップです";
 "backup.importConfirm" = "読み込むと現在のデータがすべて置き換えられます。続けますか？";
 "backup.share" = "バックアップを共有…";
 "backup.exporting" = "バックアップを書き出し中…";
 "backup.importReadFailed" = "読み込みに失敗しました：ファイルを読み取れません（移動されていないか、アクセス権を確認してください）";
 "backup.importDecodeFailed" = "読み込みに失敗しました：バックアップを解析できません（ファイルが大きすぎてメモリ不足か、形式が破損しています）";
+"backup.importSnapshotFailed" = "読み込みに失敗しました：復元前スナップショットを書き込めません（保存容量不足、またはバックアップフォルダに書き込めません）";
+"backup.importStoreFailed" = "読み込みに失敗しました：バックアップ自体は検証を通過しましたが、データベースへの書き込みでエラーが発生しました";
+"backup.importLocked" = "読み込みに失敗しました：前の読み込みがまだ終了していません。完了してから再試行してください";
+"backup.importUnknown" = "読み込みに失敗しました：分類できないエラー";
+"backup.importDiagnosis" = "%1$@（診断：%2$@）";
 "validation.nameRequired" = "少なくとも 1 つの言語のタイトルを入力してください";
 "validation.reviewTitleRequired" = "レビュータイトルは必須です";
 "validation.scoreRequired" = "少なくとも1つの項目を評価してください";

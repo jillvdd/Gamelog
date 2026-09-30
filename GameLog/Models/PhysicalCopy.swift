@@ -160,6 +160,19 @@ final class PhysicalCopy {
     /// 备注。
     var notes: String = ""
 
+    /// 持有照片的**唯一性不变式**：同一份照片（逐字节相同）在一个 copy 里只出现一次。
+    ///
+    /// 为什么是数据层不变式而不是视图层补丁：持有页的照片网格是
+    /// `ForEach(copy.images, id: \.self)`（用 Data 自身当身份，为了删除时不迁移 hover 态，
+    /// 见 `HoldingsView` 那条注释）。SwiftUI 的 ForEach **见到重复 ID 直接崩溃**
+    /// （`Fatal error: Duplicate IDs found in ForEach`），而「两张一模一样的截图」恰恰是
+    /// 用户最容易同时选中的组合。2026-09-29 审计 P5：把去重放在写入的唯一入口，
+    /// 视图层就不需要（也不应该）再兜一次。
+    static func deduplicated(_ images: [Data]) -> [Data] {
+        var seen = Set<Data>()
+        return images.filter { seen.insert($0).inserted }
+    }
+
     init(version: String, count: Int = 1, images: [Data] = [], createdAt: Date = .now,
          media: CopyMedia = .physicalStandard, regional: CopyRegional = .jp,
          condition: CopyCondition = .used, acquisition: CopyAcquisition = .officialChannelOverseas,
@@ -169,7 +182,7 @@ final class PhysicalCopy {
          purchaseDate: Date? = nil, notes: String = "") {
         self.version = version
         self.count = count
-        self.images = images
+        self.images = Self.deduplicated(images)
         self.createdAt = createdAt
         self.game = nil
         self.mediaRaw = media.rawValue

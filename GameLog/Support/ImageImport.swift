@@ -86,6 +86,9 @@ enum ImageImport {
         var images = copy.images
         for data in datas {
             guard images.count < 6 else { break }
+            // 逐字节相同的照片不重复入库：持有页 `ForEach(copy.images, id: \.self)` 见到重复
+            // ID 会直接崩（不变式在 `PhysicalCopy.deduplicated`，两条写入路径都要守）。
+            if images.contains(data) { continue }
             images.append(data)
         }
         guard images.count != copy.images.count else { return false }

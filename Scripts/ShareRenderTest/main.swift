@@ -330,8 +330,21 @@ func run() -> Int {
     // MARK: - 梯1.4 effectiveScale：超限自动缩倍率
 
     check("effectiveScale 4000px 画布不缩", ShareCardRenderer.effectiveScale(canvas: CGSize(width: 4000, height: 4000), scale: 1) == 1)
-    check("effectiveScale 20000px 画布缩到 0.6",
-          abs(ShareCardRenderer.effectiveScale(canvas: CGSize(width: 20000, height: 20000), scale: 1) - 0.6) < 0.001)
+    check("effectiveScale 20000px 画布缩到 ≤0.6（旧口径）",
+          ShareCardRenderer.effectiveScale(canvas: CGSize(width: 20000, height: 20000), scale: 1) <= 0.6)
+    // 2026-09-29 审计 P4：只有最长边一道闸时 12000×12000（=1.44 亿像素 / 576 MB 常驻位图）恰好合规，
+    // 而它在 iOS 上必被系统杀掉。现在**总像素**也封顶 —— 断言的是不变式而非具体数字，
+    // 这样 macOS(64M px) / iOS(24M px) 两套上限都能跑同一条测试。
+    check("effectiveScale 输出像素不超总面积上限",
+          {
+              let side: CGFloat = 20000
+              let e = ShareCardRenderer.effectiveScale(canvas: CGSize(width: side, height: side), scale: 4)
+              return (side * e) * (side * e) <= ShareCardRenderer.maxBitmapPixels * 1.001
+          }())
+    check("effectiveScale 面积封顶不误伤 UHD 导出（3840×2160 仍按原倍率出图）",
+          ShareCardRenderer.effectiveScale(canvas: CGSize(width: 1280, height: 720), scale: 3) == 3)
+    check("effectiveScale 面积封顶不误伤 FHD 导出（1920×1080 仍按原倍率出图）",
+          ShareCardRenderer.effectiveScale(canvas: CGSize(width: 1280, height: 720), scale: 1.5) == 1.5)
     check("effectiveScale 预览倍率不被抬高",
           ShareCardRenderer.effectiveScale(canvas: CGSize(width: 1080, height: 1920), scale: 0.5) == 0.5)
 
